@@ -4,35 +4,32 @@ import Prelude hiding (between)
 
 import Control.Alternative ((<|>))
 import Control.Lazy (defer)
-import Control.Monad.Trans.Class (lift)
 import Data.Array (cons)
 import Data.Array.NonEmpty as NonEmptyArray
 import Data.Cell (CellIndex(..), Expr(..), Ident(..), Literal(..), Operator(..))
 import Data.Int as Int
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.String.CodeUnits (fromCharArray)
-import Data.Time.Duration (Milliseconds(..))
 import Data.Tuple (snd)
-import Effect.Aff (Aff, delay)
-import Parsing (ParserT, fail)
+import Parsing (Parser, fail)
 import Parsing.Combinators (between, optionMaybe, try)
 import Parsing.Combinators.Array (many, many1, manyIndex)
 import Parsing.String (char)
 import Parsing.String.Basic (alphaNum, digit, number, upper)
 
-type Parser a b = ParserT a Aff b
-
 equalSign :: Parser String Char
 equalSign = char '='
 
+formulaParser :: Parser String Expr
+formulaParser =
+  equalSign *> expressionParser
+
 expressionParser :: Parser String Expr
 expressionParser = do
-  lift $ delay (Milliseconds 1000.0)
   (try $ defer \_ -> functionParser)
     <|> try (defer \_ -> binOpParser)
     <|> try cellRefParser
     <|> try literalParser
-    
 
 operatorParser :: Parser String Operator
 operatorParser = do
@@ -48,12 +45,10 @@ binOpParser = do
   right <- expressionParser
   pure $ BinOp op left right
   where
-    expressionParser' = do
-      cellRefParser
-        <|> literalParser
-        <|> (defer \_ -> functionParser)
-
-
+  expressionParser' = do
+    cellRefParser
+      <|> literalParser
+      <|> (defer \_ -> functionParser)
 
 cellIndex :: Parser String CellIndex
 cellIndex = do
@@ -73,7 +68,7 @@ ident =
   many1 upper <#> NonEmptyArray.toArray >>> fromCharArray <#> Ident
 
 -- functionParser :: forall m. ParserT String Expr
-functionParser :: Parser String  Expr
+functionParser :: Parser String Expr
 functionParser = do
   name <- ident
   args <- between (char '(') (char ')') argListParser
@@ -97,4 +92,4 @@ literalParser = numLit <|> stringLit
       <#> StrLit >>> Literal
 
 cellRefParser :: Parser String Expr
-cellRefParser =  cellIndex <#> CellRef
+cellRefParser = cellIndex <#> CellRef

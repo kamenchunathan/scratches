@@ -13,6 +13,7 @@ module Data.Cell
 
 import Prelude
 
+import Data.Eq.Generic (genericEq)
 import Data.Generic.Rep (class Generic)
 import Data.Map (Map)
 import Data.Map as Map
@@ -25,7 +26,10 @@ import Data.Unfoldable (unfoldr)
 import Partial.Unsafe (unsafePartial)
 
 data Cell
+  -- Treated as text Data types such as number, date, can be inferred and formatting done
+  -- Inference of type is useful for evaluation and use of cells in other cells
   = Text String
+  -- Preceded by an equal sign and is recomputed when inputs change
   | Formula Expr
 
 derive instance Generic Cell _
@@ -33,8 +37,6 @@ derive instance Generic Cell _
 instance Show Cell where
   show = genericShow
 
--- I currently can't think of any situations where formulas aren't equivalent to
--- expressions
 data Operator
   = Add
   | Sub
@@ -43,21 +45,28 @@ data Operator
 
 derive instance Generic Operator _
 
-data Literal
-  = NumLit Number
-  | StrLit String
+instance Eq Operator where
+  eq = genericEq
 
 instance Show Operator where
   show = genericShow
 
-newtype Ident = Ident String
-
-derive newtype instance Show Ident
+data Literal
+  = NumLit Number
+  | StrLit String
 
 derive instance Generic Literal _
 
 instance Show Literal where
   show = genericShow
+
+instance Eq Literal where
+  eq = genericEq
+
+newtype Ident = Ident String
+
+derive newtype instance Show Ident
+derive newtype instance Eq Ident
 
 data Expr
   = Literal Literal
@@ -70,6 +79,13 @@ instance Show Expr where
   show (Function funcName args) = show funcName <> "(" <> show args <> ")"
   show (CellRef cIx) = show cIx
   show (BinOp op expr1 expr2) = show expr1 <> show op <> show expr2
+
+instance Eq Expr where
+  eq (Literal l) (Literal r) = l == r
+  eq (Function l1 l2) (Function r1 r2) = l1 == r1 && l2 == r2
+  eq (CellRef l1) (CellRef l2) = l1 == l2
+  eq (BinOp l1 l2 l3) (BinOp r1 r2 r3) = l1 == r1 && l2 == r2 && l3 == r3
+  eq _ _ = false
 
 data CellIndex = CellIndex Int String
 

@@ -9,6 +9,8 @@ package:
     - ordered-collections
     - parsing
     - prelude
+    - spec
+    - spec-node
     - tuples
   test:
     main: Test.Main
