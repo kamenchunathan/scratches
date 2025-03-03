@@ -1,7 +1,6 @@
 module Main
   ( main
-  )
-  where
+  ) where
 
 import Prelude
 
@@ -17,5 +16,4 @@ main = Halogen.Aff.runHalogenAff do
   log "Starting app..."
   body <- awaitBody
   runUI App.component unit body
-
 

@@ -2,9 +2,14 @@ package:
   name: nazdak
   dependencies:
     - console
+    - debug
     - effect
     - halogen
+    - lazy
+    - ordered-collections
+    - parsing
     - prelude
+    - tuples
   test:
     main: Test.Main
     dependencies: []

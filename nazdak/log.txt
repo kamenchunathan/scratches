@@ -1,0 +1,13 @@
+expr
+function parser
+"SUM"
+argListparser
+expr
+function parser
+"A"
+binOpParser
+expressionParser
+cellRefParser
+operatorParser
+cellRefParser
+(Right "SUM"([(CellIndex 4 "A")]))
