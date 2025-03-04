@@ -3,16 +3,11 @@ module Sheet.Evaluator where
 import Prelude
 
 import Data.Array (foldl, length)
-import Data.Cell
-  ( Cell(..)
-  , CellIndex
-  , Expr(..)
-  , Ident(..)
-  , Literal(..)
-  , Operator(..)
-  , Sheet(..)
-  )
-import Data.Cell as Cell
+import Sheet.Cell (Cell(..))
+import Sheet (Sheet(..))
+import Sheet as Sheet
+import Sheet.Index (CellIndex)
+import Sheet.AST (Expr(..), Ident(..), Literal(..), Operator(..))
 import Data.Either (Either(..), note)
 import Data.Map as Map
 import Data.Maybe (Maybe(..))
@@ -31,11 +26,12 @@ derive instance eqValue :: Eq Value
 
 instance showValue :: Show Value where
   show (NumberVal n) = show n
-  show (StringVal s) = s
+  show (StringVal s) = "\"" <> s <> "\"" 
   show (ErrorVal e) = "#" <> e
 
 -- | Evaluate a Cell to get its value
 evaluateCell :: Sheet -> Cell -> Value
+-- TODO: This value should be parsed
 evaluateCell _ (Text s) = StringVal s
 evaluateCell sheet (Formula expr) = evaluateExpr sheet expr
 
@@ -50,7 +46,7 @@ evaluateExpr sheet expr = case expr of
 -- | Evaluate a cell reference
 evaluateCellRef :: Sheet -> CellIndex -> Value
 evaluateCellRef sheet idx =
-  case Cell.index sheet idx of
+  case Sheet.index sheet idx of
     Just cell -> evaluateCell sheet cell
     Nothing -> ErrorVal "REF"
 
@@ -70,7 +66,6 @@ evalBinOp op (NumberVal left) (NumberVal right) = case op of
     else NumberVal (left / right)
 evalBinOp _ (ErrorVal e) _ = ErrorVal e
 evalBinOp _ _ (ErrorVal e) = ErrorVal e
-evalBinOp Add (StringVal s1) (StringVal s2) = StringVal (s1 <> s2)
 evalBinOp _ _ _ = ErrorVal "TYPE"
 
 -- | Convert a value to number for calculation
@@ -148,10 +143,6 @@ reevaluateSheet (Sheet cells) =
   where
   -- TODO: refactor cell type to have a raw value and computed value
   evaluateCell' _ cell = Just cell
-
--- | Helper function to update a cell in the sheet
-updateCell :: CellIndex -> Cell -> Sheet -> Sheet
-updateCell idx cell (Sheet cells) = Sheet (Map.insert idx cell cells)
 
 -- | Helper function to parse a formula string and create a Formula cell
 parseFormula :: String -> Either String Cell

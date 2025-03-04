@@ -6,7 +6,6 @@ import Control.Alternative ((<|>))
 import Control.Lazy (defer)
 import Data.Array (cons)
 import Data.Array.NonEmpty as NonEmptyArray
-import Data.Cell (CellIndex(..), Expr(..), Ident(..), Literal(..), Operator(..))
 import Data.Int as Int
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.String.CodeUnits (fromCharArray)
@@ -16,6 +15,8 @@ import Parsing.Combinators (between, optionMaybe, try)
 import Parsing.Combinators.Array (many, many1, manyIndex)
 import Parsing.String (char)
 import Parsing.String.Basic (alphaNum, digit, number, upper)
+import Sheet.AST (Expr(..), Ident(..), Literal(..), Operator(..))
+import Sheet.Index (CellIndex(..))
 
 equalSign :: Parser String Char
 equalSign = char '='

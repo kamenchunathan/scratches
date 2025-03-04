@@ -8,7 +8,6 @@ import Data.Show.Generic (genericShow)
 import Data.String as String
 import Data.Tuple.Nested ((/\))
 
-
 data CellIndex = CellIndex Int String
 
 derive instance Generic CellIndex _
@@ -33,5 +32,4 @@ alphaIxFromNum n =
     (i /\ j) -> (<>) <$> (f (i - 1)) <*> (f j)
       where
       f l = String.singleton <$> String.codePointAt l alphabet
-
 

@@ -2,7 +2,8 @@ module Test.Sheet.Parser where
 
 import Prelude
 
-import Data.Cell (CellIndex(..), Expr(..), Ident(..), Literal(..), Operator(..))
+import Sheet.Index (CellIndex(..))
+import Sheet.AST (Expr(..), Ident(..), Literal(..), Operator(..))
 import Data.Either (Either(..))
 import Parsing (runParser)
 import Sheet.Parser

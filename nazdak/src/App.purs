@@ -2,10 +2,8 @@ module App where
 
 import Prelude
 
-import Data.Array as Array
 import Data.Array ((:))
-import Data.Cell (Cell(..), CellIndex(..), Sheet(..), alphaIxFromNum)
-import Data.Cell (CellIndex(..), Sheet(..), emptySheet, index) as Cell
+import Data.Array as Array
 import Data.Map as Map
 import Data.Maybe (fromJust, fromMaybe)
 import Data.Newtype (unwrap)
@@ -17,18 +15,22 @@ import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Partial.Unsafe (unsafePartial)
+import Sheet (Sheet)
+import Sheet as Sheet
+import Sheet.Cell (Cell(..))
+import Sheet.Index (CellIndex(..), alphaIxFromNum)
 import Unsafe.Coerce (unsafeCoerce)
 import Web.DOM.Node as Node
 import Web.Event.Event (Event)
 import Web.Event.Event as Event
 
-type State = { spreadSheet :: Cell.Sheet }
+type State = { spreadSheet :: Sheet }
 
 data Action =
   CellInput CellIndex Event
 
 initialState :: forall input. input -> State
-initialState _ = { spreadSheet: Cell.emptySheet }
+initialState _ = { spreadSheet: Sheet.sample }
 
 handleAction
   :: forall output m
@@ -78,7 +80,7 @@ renderCol spreadSheet colIndex =
           -- Spreadsheet cells
           ( spreadSheet
               # unwrap
-              # Map.filterKeys (\(Cell.CellIndex _ col) -> col == colIndex)
+              # Map.filterKeys (\(CellIndex _ col) -> col == colIndex)
               # Map.keys
               # Array.fromFoldable
               <#> renderCell spreadSheet
@@ -87,7 +89,7 @@ renderCol spreadSheet colIndex =
 
 renderCell :: forall m. Sheet -> CellIndex -> H.ComponentHTML Action () m
 renderCell sheet ix =
-  Cell.index sheet ix
+  Sheet.index sheet ix
     <#> renderCellContent
     # fromMaybe (HH.text "Error")
     # renderCellWrapper

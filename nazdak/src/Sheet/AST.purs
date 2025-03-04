@@ -7,7 +7,6 @@ import Data.Generic.Rep (class Generic)
 import Sheet.Index (CellIndex)
 import Data.Show.Generic (genericShow)
 
-
 data Expr
   = Literal Literal
   | CellRef CellIndex
@@ -27,7 +26,6 @@ instance Eq Expr where
   eq (BinOp l1 l2 l3) (BinOp r1 r2 r3) = l1 == r1 && l2 == r2 && l3 == r3
   eq _ _ = false
 
-
 data Literal
   = NumLit Number
   | StrLit String
@@ -39,7 +37,6 @@ instance Show Literal where
 
 instance Eq Literal where
   eq = genericEq
-
 
 newtype Ident = Ident String
 
