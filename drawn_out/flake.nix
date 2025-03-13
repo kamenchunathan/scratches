@@ -16,7 +16,6 @@
           venvDir = ".venv";
           packages = with pkgs; [ 
             python311
-            libclang.lib
           ] ++
             (with pkgs.python311Packages; [
               pip
@@ -26,6 +25,8 @@
               numpy
               pandas
             ]);
+            
+          LD_LIBRARY_PATH = nixpkgs.lib.makeLibraryPath [pkgs.stdenv.cc.cc.lib];
         };
       });
     };
