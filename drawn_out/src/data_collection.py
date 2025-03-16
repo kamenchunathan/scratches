@@ -135,8 +135,7 @@ def populate_tournament_rounds(tournament_id: str):
         return
     rounds_fetched = res[0]
     
-    current_round = rounds_fetched + 1
-    for i in range(current_round, TT_ROUNDS + 1):
+    for current_round in range(rounds_fetched + 1, TT_ROUNDS + 1):
         logger.info(f"Fetching game IDs for tournament {tournament_id}, round {current_round}")
         round_ids = get_game_ids(tournament_id, current_round)
         logger.info(f"Found {len(round_ids)} games for round {current_round}")
@@ -159,70 +158,75 @@ def populate_tournament_rounds(tournament_id: str):
 def populate_game_pgns(tournament_id: str):
     logger.info(f"Populating game PGNs for tournament {tournament_id}")
     logger.info(f"Connecting to selenium")
-    options = Options()
-    driver = webdriver.Remote(f"{SELENIUM_HOST}:{SELENIUM_PORT}", options=options)
-    
-    while True:
-        db = libsql_connect()
-        res = db.execute("""
-            SELECT COUNT(*) AS matching_count
-            FROM game
-            WHERE
-                tournament_id = ?
-                AND (status = 'not_asked' OR status = 'error')
-                AND retries < 3;""",
-            ( tournament_id, )
-        ).fetchone()
-        if res is None:
-            logger.error("Error querying game count")
-            return
-        count = res[0]
-        logger.info(f"Found {count} games to process for tournament {tournament_id}")
-        if count == 0:
-            break
-            
-        res = db.execute("""
-            SELECT "id" 
-            FROM game
-            WHERE
-	            tournament_id = ? 
-	            AND (status = 'not_asked' OR status = 'error')
-	            AND retries < 3
-            LIMIT 50;""",
-            ( tournament_id, )
-        ).fetchall()
-        # db.close()
-
-        for (game_id,) in res:
-            start_time = time.time()
-            logger.info(f"Fetching PGN for game {game_id}")
-            pgn = get_pgn(driver, game_id)
-            
-            # Record selenium request time
-            request_time = time.time() - start_time
-            metrics["selenium_request_times"].append(request_time)
-            logger.debug(f"Selenium request completed in {request_time:.2f}s for game {game_id}")
-            
-            db = libsql_connect()
-            if pgn is not None:
-                logger.info(f"Successfully fetched PGN for game {game_id}")
-                db.execute(
-                    """UPDATE game SET status = 'success', pgn = ?2 WHERE id = ?1;""", 
-                    ( game_id, pgn )
-                )
-            else:
-                logger.warning(f"Failed to fetch PGN for game {game_id}")
-                db.execute( 
-                    """UPDATE game SET status = 'error', retries = retries + 1 WHERE id = ?;""",
-                    ( game_id, )
-                )
-                            
-            db.commit()
-            # db.close()
+    try:
+        options = Options()
+        driver = webdriver.Remote(f"{SELENIUM_HOST}:{SELENIUM_PORT}", options=options)
+        logger.info(f"Connected to selenium on: {SELENIUM_HOST}:{SELENIUM_PORT}")
         
-        driver.close()
-        logger.info(f"Batch of games processed, logging interim metrics")
-        log_metrics()
+        
+        while True:
+            db = libsql_connect()
+            res = db.execute("""
+                SELECT COUNT(*) AS matching_count
+                FROM game
+                WHERE
+                    tournament_id = ?
+                    AND (status = 'not_asked' OR status = 'error')
+                    AND retries < 3;""",
+                ( tournament_id, )
+            ).fetchone()
+            if res is None:
+                logger.error("Error querying game count")
+                return
+            count = res[0]
+            logger.info(f"Found {count} games to process for tournament {tournament_id}")
+            if count == 0:
+                break
+                
+            res = db.execute("""
+                SELECT "id" 
+                FROM game
+                WHERE
+	                tournament_id = ? 
+	                AND (status = 'not_asked' OR status = 'error')
+	                AND retries < 3
+                LIMIT 50;""",
+                ( tournament_id, )
+            ).fetchall()
+
+            for (game_id,) in res:
+                start_time = time.time()
+                logger.info(f"Fetching PGN for game {game_id}")
+                pgn = get_pgn(driver, game_id)
+                
+                # Record selenium request time
+                request_time = time.time() - start_time
+                metrics["selenium_request_times"].append(request_time)
+                logger.debug(f"Selenium request completed in {request_time:.2f}s for game {game_id}")
+                
+                db = libsql_connect()
+                if pgn is not None:
+                    logger.info(f"Successfully fetched PGN for game {game_id}")
+                    db.execute(
+                        """UPDATE game SET status = 'success', pgn = ?2 WHERE id = ?1;""", 
+                        ( game_id, pgn )
+                    )
+                else:
+                    logger.warning(f"Failed to fetch PGN for game {game_id}")
+                    db.execute( 
+                        """UPDATE game SET status = 'error', retries = retries + 1 WHERE id = ?;""",
+                        ( game_id, )
+                    )
+                                
+                db.commit()
+    except Exception as e:
+        logger.exception(f"Error connecting to selenium: \n{e}")
+        
+    finally:
+        driver.quit()    
+        
+    logger.info(f"Batch of games processed, logging interim metrics")
+    log_metrics()
 
 
 def get_game_ids(tournament_id: str, tournament_round: int) -> [str]:
@@ -271,18 +275,15 @@ def get_game_ids(tournament_id: str, tournament_round: int) -> [str]:
 def get_pgn(driver: webdriver.chrome.webdriver.WebDriver, game_id: str, page_delay=10) -> Optional[str] :
     try:
         driver.get(f'https://www.chess.com/game/live/{game_id}')
-        # Necessary to allow chess.com to load the modal
-        time.sleep(page_delay)
-                                
+        driver.implicitly_wait(100)
         close_modal_btn = driver.find_element(
             By.CSS_SELECTOR, 
-            '.board-modal-header-close[aria-label="Close"'
+            '.board-modal-header-close[aria-label="Close"]'
         )
         close_modal_btn.click()
         
         share_btn = driver.find_element(By.CSS_SELECTOR, '.share')
         share_btn.click()
-        time.sleep(2)
         
         pgn_tab = driver.find_element(
             By.CSS_SELECTOR, 
@@ -295,6 +296,7 @@ def get_pgn(driver: webdriver.chrome.webdriver.WebDriver, game_id: str, page_del
             "textarea.share-menu-tab-pgn-textarea"
         )
         return pgn_contents.get_property('value')
+
     except Exception as e:
         logger.exception(f"Error getting PGN for game {game_id}: {str(e)}")
         return None
