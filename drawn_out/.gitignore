@@ -3,3 +3,4 @@
 data
 .direnv
 db.sqlite3
+*/__pycache__/
