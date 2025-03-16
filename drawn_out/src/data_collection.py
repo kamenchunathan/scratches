@@ -25,7 +25,6 @@ SELENIUM_PORT = os.getenv("SELENIUM_PORT")
 API_HOST = 'www.chess.com'
 TT_ROUNDS = 11
 
-# Configure logging 
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -33,11 +32,11 @@ logging.basicConfig(
 )
 logger = logging.getLogger("tt_scraper")
 
-
 # Add metrics dict to track timings
 metrics = {
     "selenium_request_times": [],
     "db_call_intervals": [],
+    "selenium_connect_times": [],
     "last_db_call_time": None
 }
 
@@ -53,6 +52,26 @@ def log_metrics():
         avg_db_interval = sum(metrics["db_call_intervals"]) / len(metrics["db_call_intervals"])
         max_db_interval = max(metrics["db_call_intervals"])
         logger.info(f"DB metrics - Avg interval between calls: {avg_db_interval:.2f}s, Max: {max_db_interval:.2f}s, Count: {len(metrics['db_call_intervals'])}")
+    
+    if metrics["selenium_connect_times"]:
+        avg_connect_time = sum(metrics["selenium_connect_times"]) / len(metrics["selenium_connect_times"])
+        max_connect_time = max(metrics["selenium_connect_times"])
+        logger.info(f"Selenium connection metrics - Avg connect time: {avg_connect_time:.2f}s, Max: {max_connect_time:.2f}s, Count: {len(metrics['selenium_connect_times'])}")
+
+
+def connect_to_selenium() -> webdriver.remote.webdriver.WebDriver:
+    """Connect to Selenium remote server with timing metrics"""
+    logger.info(f"Connecting to Selenium at {SELENIUM_HOST}:{SELENIUM_PORT}")
+    start_time = time.time()
+    options = Options()
+    driver = webdriver.Remote(
+        command_executor=f"{SELENIUM_HOST}:{SELENIUM_PORT}",
+        options=options
+    )
+    connect_time = time.time() - start_time
+    metrics["selenium_connect_times"].append(connect_time)
+    logger.info(f"Connected to Selenium in {connect_time:.2f}s")
+    return driver
 
 
 def main():
@@ -63,7 +82,6 @@ def main():
 
     db = libsql_connect()
     run_migrations(db)
-    # db.close()
     
     
     tournament_id = fetch_current_job(db)
@@ -151,16 +169,16 @@ def populate_tournament_rounds(tournament_id: str):
             ( tournament_id, )
         ).fetchone()
         db.commit()
-        # db.close()
 
 
 
 def populate_game_pgns(tournament_id: str):
     logger.info(f"Populating game PGNs for tournament {tournament_id}")
-    logger.info(f"Connecting to selenium")
+    driver = None
     try:
+        logger.info(f"Connecting to selenium")
         options = Options()
-        driver = webdriver.Remote(f"{SELENIUM_HOST}:{SELENIUM_PORT}", options=options)
+        driver = connect_to_selenium()
         logger.info(f"Connected to selenium on: {SELENIUM_HOST}:{SELENIUM_PORT}")
         
         
@@ -223,7 +241,8 @@ def populate_game_pgns(tournament_id: str):
         logger.exception(f"Error connecting to selenium: \n{e}")
         
     finally:
-        driver.quit()    
+        if driver is not None:
+            driver.quit()
         
     logger.info(f"Batch of games processed, logging interim metrics")
     log_metrics()
