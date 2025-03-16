@@ -8,6 +8,9 @@ name = "pypi"
 chess = "*"
 pandas = "*"
 numpy = "*"
+beautifulsoup4 = "*"
+libsql-experimental = "*"
+selenium = "*"
 
 [dev-packages]
 

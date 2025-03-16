@@ -16,14 +16,12 @@
           venvDir = ".venv";
           packages = with pkgs; [ 
             python311
+            chromedriver
           ] ++
             (with pkgs.python311Packages; [
               pip
               pipenv
               venvShellHook
-              
-              numpy
-              pandas
             ]);
             
           LD_LIBRARY_PATH = nixpkgs.lib.makeLibraryPath [pkgs.stdenv.cc.cc.lib];

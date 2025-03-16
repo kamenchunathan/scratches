@@ -15,10 +15,14 @@ from selenium.webdriver.chrome.options import Options
 
 DB_URI = os.getenv("DB_URI")
 DB_TOKEN = os.getenv("DB_TOKEN")
-HOST = 'www.chess.com'
+SELENIUM_HOST = os.getenv("SELENIUM_HOST")
+SELENIUM_PORT = os.getenv("SELENIUM_PORT")
+
+API_HOST = 'www.chess.com'
 TT_ROUNDS = 11
 
 def main():
+    print('starting')
     if DB_URI is None or DB_TOKEN is None:
         print('Ensure DB_URI and DB_TOKEN are set in the environemnt')
         return
@@ -131,8 +135,7 @@ def populate_game_pgns(tournament_id: str):
         ).fetchall()
         
         options = Options()
-        options.add_argument("--user-data-dir=./data/chromedriver")
-        driver = webdriver.Chrome(options=options)
+        driver = webdriver.Remote(f"{SELENIUM_HOST}:{SELENIUM_PORT}", options=options)
 
         for (game_id,) in res:
             pgn = get_pgn(driver, game_id)
@@ -156,7 +159,7 @@ def get_game_ids(tournament_id: str, tournament_round: int) -> [str]:
     game_ids = []
     
     current_page = 1
-    conn = http.client.HTTPSConnection(HOST)
+    conn = http.client.HTTPSConnection(API_HOST)
     conn.request(
         'GET', 
         get_tourndament_round_uri(
