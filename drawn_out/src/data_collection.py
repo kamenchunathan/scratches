@@ -4,6 +4,7 @@ import time
 import urllib3
 import logging
 import json
+from time import sleep
 from typing import Optional, Tuple
 from datetime import datetime
 
@@ -15,6 +16,8 @@ from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.support.wait import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 
 DB_URI = os.getenv("DB_URI")
 DB_TOKEN = os.getenv("DB_TOKEN")
@@ -63,8 +66,9 @@ def connect_to_selenium() -> webdriver.remote.webdriver.WebDriver:
     logger.info(f"Connecting to Selenium at {SELENIUM_HOST}:{SELENIUM_PORT}")
     start_time = time.time()
     options = Options()
-    driver = webdriver.Remote(
-        command_executor=f"{SELENIUM_HOST}:{SELENIUM_PORT}",
+    options.add_argument("--user-data-dir=./data/chromedriver")
+    driver = webdriver.Chrome(
+        # command_executor=f"{SELENIUM_HOST}:{SELENIUM_PORT}",
         options=options
     )
     connect_time = time.time() - start_time
@@ -291,25 +295,37 @@ def get_game_ids(tournament_id: str, tournament_round: int) -> [str]:
 def get_pgn(driver: webdriver.chrome.webdriver.WebDriver, game_id: str, page_delay=10) -> Optional[str] :
     try:
         driver.get(f'https://www.chess.com/game/live/{game_id}')
-        driver.implicitly_wait(100)
-        close_modal_btn = driver.find_element(
-            By.CSS_SELECTOR, 
-            '.board-modal-header-close[aria-label="Close"]'
+        WebDriverWait(driver, 120).until(
+            EC.presence_of_element_located((
+                By.CSS_SELECTOR, 
+                '.board-modal-header-close[aria-label="Close"]'
+            ))
         )
-        close_modal_btn.click()
         
-        share_btn = driver.find_element(By.CSS_SELECTOR, '.share')
-        share_btn.click()
+        wait = WebDriverWait(driver, 10)
+        # Sleep to account for layout shifts
+        sleep(2)
+        wait.until(
+            EC.element_to_be_clickable((
+                By.CSS_SELECTOR, 
+                '.board-modal-header-close[aria-label="Close"]'
+            ))
+        ).click()
         
-        pgn_tab = driver.find_element(
-            By.CSS_SELECTOR, 
-            '.share-menu-tab-selector-component > div:first-child'
-        )
-        pgn_tab.click()
+        wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, '.share'))).click()
         
-        pgn_contents = driver.find_element(
-            By.CSS_SELECTOR, 
-            "textarea.share-menu-tab-pgn-textarea"
+        wait.until(
+            EC.element_to_be_clickable((
+                By.CSS_SELECTOR, 
+                '.share-menu-tab-selector-component > div:first-child'
+            ))
+        ).click()
+                
+        pgn_contents = wait.until(
+            EC.presence_of_element_located((
+                By.CSS_SELECTOR, 
+                "textarea.share-menu-tab-pgn-textarea"
+            ))
         )
         return pgn_contents.get_property('value')
 
