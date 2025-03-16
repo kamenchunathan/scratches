@@ -66,7 +66,6 @@ def connect_to_selenium() -> webdriver.remote.webdriver.WebDriver:
     logger.info(f"Connecting to Selenium at {SELENIUM_HOST}:{SELENIUM_PORT}")
     start_time = time.time()
     options = Options()
-    options.add_argument("--user-data-dir=./data/chromedriver")
     driver = webdriver.Remote(
         command_executor=f"{SELENIUM_HOST}:{SELENIUM_PORT}",
         options=options
