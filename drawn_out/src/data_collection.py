@@ -141,18 +141,21 @@ def fetch_current_job(db: libsql.Connection) -> Optional[str]:
 
 def populate_tournament_rounds(tournament_id: str):
     logger.info(f"Populating tournament rounds for tournament {tournament_id}")
-    db = libsql_connect()
-    res = db.execute(
-        "SELECT rounds_fetched FROM tournament WHERE id = ?1;", 
-        ( tournament_id, )
-    ).fetchone()
-    
-    if res is None:
-        logger.error(f"Tournament {tournament_id} not found in database")
-        return
-    rounds_fetched = res[0]
-    
-    for current_round in range(rounds_fetched + 1, TT_ROUNDS + 1):
+    while True:
+        db = libsql_connect()
+        res = db.execute(
+            "SELECT rounds_fetched FROM tournament WHERE id = ?1;", 
+            ( tournament_id, )
+        ).fetchone()
+        
+        if res is None:
+            logger.error(f"Tournament {tournament_id} not found in database")
+            return
+        rounds_fetched = res[0]
+        
+        if rounds_fetched > TT_ROUNDS + 1:
+            return
+
         logger.info(f"Fetching game IDs for tournament {tournament_id}, round {current_round}")
         round_ids = get_game_ids(tournament_id, current_round)
         logger.info(f"Found {len(round_ids)} games for round {current_round}")
@@ -167,7 +170,6 @@ def populate_tournament_rounds(tournament_id: str):
             ( tournament_id, )
         ).fetchone()
         db.commit()
-
 
 
 def populate_game_pgns(tournament_id: str):
