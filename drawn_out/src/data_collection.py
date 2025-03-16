@@ -67,8 +67,8 @@ def connect_to_selenium() -> webdriver.remote.webdriver.WebDriver:
     start_time = time.time()
     options = Options()
     options.add_argument("--user-data-dir=./data/chromedriver")
-    driver = webdriver.Chrome(
-        # command_executor=f"{SELENIUM_HOST}:{SELENIUM_PORT}",
+    driver = webdriver.Remote(
+        command_executor=f"{SELENIUM_HOST}:{SELENIUM_PORT}",
         options=options
     )
     connect_time = time.time() - start_time
