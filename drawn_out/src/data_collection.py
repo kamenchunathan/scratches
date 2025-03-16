@@ -2,7 +2,11 @@ import http.client
 import os
 import time
 import urllib3
+import logging
+import json
 from typing import Optional, Tuple
+from datetime import datetime
+import statistics
 
 import bs4
 import libsql_experimental as libsql
@@ -21,36 +25,80 @@ SELENIUM_PORT = os.getenv("SELENIUM_PORT")
 API_HOST = 'www.chess.com'
 TT_ROUNDS = 11
 
+# Configure logging 
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[ logging.StreamHandler() ]
+)
+logger = logging.getLogger("tt_scraper")
+
+
+# Add metrics dict to track timings
+metrics = {
+    "selenium_request_times": [],
+    "db_call_intervals": [],
+    "last_db_call_time": None
+}
+
+
+def log_metrics():
+    """Log the current metrics to the console"""
+    if metrics["selenium_request_times"]:
+        avg_selenium_time = sum(metrics["selenium_request_times"]) / len(metrics["selenium_request_times"])
+        max_selenium_time = max(metrics["selenium_request_times"])
+        logger.info(f"Selenium metrics - Avg request time: {avg_selenium_time:.2f}s, Max: {max_selenium_time:.2f}s, Count: {len(metrics['selenium_request_times'])}")
+    
+    if metrics["db_call_intervals"]:
+        avg_db_interval = sum(metrics["db_call_intervals"]) / len(metrics["db_call_intervals"])
+        max_db_interval = max(metrics["db_call_intervals"])
+        logger.info(f"DB metrics - Avg interval between calls: {avg_db_interval:.2f}s, Max: {max_db_interval:.2f}s, Count: {len(metrics['db_call_intervals'])}")
+
+
 def main():
-    print('starting')
-    if DB_URI is None or DB_TOKEN is None:
-        print('Ensure DB_URI and DB_TOKEN are set in the environemnt')
+    logger.info('Starting data collection process')
+    if DB_URI is None or DB_TOKEN is None or SELENIUM_HOST is None or SELENIUM_PORT is None :
+        logger.error('Required environement variables are set in the environment')
         return
 
-    db = libsql.connect(DB_URI, auth_token=DB_TOKEN)
+    db = libsql_connect()
     run_migrations(db)
+    # db.close()
     
     
     tournament_id = fetch_current_job(db)
     if tournament_id is None:
-        # Assume there are no incomplete jobs
-        # TODO: Log it and close program
-        db.close()
+        logger.info("No pending jobs found")
         return
 
-    print(tournament_id)
+    logger.info(f"Processing tournament ID: {tournament_id}")
     populate_tournament_rounds(tournament_id)
     populate_game_pgns(tournament_id)
-    db.close()
+    
+    log_metrics()  # Log final metrics summary
+
+
+def libsql_connect() -> libsql.Connection:
+    """Wrapper for database connection that tracks metrics"""
+    now = time.time()
+    if metrics["last_db_call_time"] is not None:
+        interval = now - metrics["last_db_call_time"]
+        metrics["db_call_intervals"].append(interval)
+        logger.debug(f"Time since last DB call: {interval:.2f}s")
+    
+    metrics["last_db_call_time"] = now
+    return libsql.connect(DB_URI, auth_token=DB_TOKEN)
 
 
 def run_migrations(db: libsql.Connection):
+    logger.info("Running database migrations")
     with open('migrations/init.sql') as f:
         db.executescript(f.read())
         db.commit()
    
  
 def fetch_current_job(db: libsql.Connection) -> Optional[str]:
+    logger.info("Fetching current job from database")
     pending_jobs = db.execute(
         "SELECT tournament_id FROM jobs WHERE status = 'pending' LIMIT 1;"
     ).fetchone()
@@ -75,27 +123,28 @@ def fetch_current_job(db: libsql.Connection) -> Optional[str]:
 
 
 def populate_tournament_rounds(tournament_id: str):
-    db = libsql.connect(DB_URI, auth_token=DB_TOKEN)
+    logger.info(f"Populating tournament rounds for tournament {tournament_id}")
+    db = libsql_connect()
     res = db.execute(
         "SELECT rounds_fetched FROM tournament WHERE id = ?1;", 
         ( tournament_id, )
     ).fetchone()
     
     if res is None:
-        # TODO: log the error
+        logger.error(f"Tournament {tournament_id} not found in database")
         return
     rounds_fetched = res[0]
     
-    current_round = rounds_fetched
+    current_round = rounds_fetched + 1
     for i in range(current_round, TT_ROUNDS + 1):
-        # In between http / long running processes we create a new connection
-        round_ids =  get_game_ids(tournament_id, current_round)
-        db = libsql.connect(DB_URI, auth_token=DB_TOKEN)
-        db.executemany("""
-            INSERT INTO game ("id", "tournament_id", "round", "pgn")
-            VALUES
-	            (?, ?, ?, "")
-	        ON CONFLICT DO NOTHING;""",
+        logger.info(f"Fetching game IDs for tournament {tournament_id}, round {current_round}")
+        round_ids = get_game_ids(tournament_id, current_round)
+        logger.info(f"Found {len(round_ids)} games for round {current_round}")
+        logger.info(f"Sample { list(map(lambda game_id: (game_id, tournament_id, current_round), round_ids)) [0]}")
+        
+        db = libsql_connect()
+        db.executemany(
+            """INSERT INTO game (id, tournament_id, round, pgn) VALUES (?, ?, ?, "") ON CONFLICT DO NOTHING;""",
 	        list(map(lambda game_id: (game_id, tournament_id, current_round), round_ids))
 	    )
         db.execute(
@@ -103,11 +152,18 @@ def populate_tournament_rounds(tournament_id: str):
             ( tournament_id, )
         ).fetchone()
         db.commit()
+        # db.close()
+
 
 
 def populate_game_pgns(tournament_id: str):
+    logger.info(f"Populating game PGNs for tournament {tournament_id}")
+    logger.info(f"Connecting to selenium")
+    options = Options()
+    driver = webdriver.Remote(f"{SELENIUM_HOST}:{SELENIUM_PORT}", options=options)
+    
     while True:
-        db = libsql.connect(DB_URI, auth_token=DB_TOKEN)
+        db = libsql_connect()
         res = db.execute("""
             SELECT COUNT(*) AS matching_count
             FROM game
@@ -118,8 +174,10 @@ def populate_game_pgns(tournament_id: str):
             ( tournament_id, )
         ).fetchone()
         if res is None:
+            logger.error("Error querying game count")
             return
         count = res[0]
+        logger.info(f"Found {count} games to process for tournament {tournament_id}")
         if count == 0:
             break
             
@@ -133,26 +191,38 @@ def populate_game_pgns(tournament_id: str):
             LIMIT 50;""",
             ( tournament_id, )
         ).fetchall()
-        
-        options = Options()
-        driver = webdriver.Remote(f"{SELENIUM_HOST}:{SELENIUM_PORT}", options=options)
+        # db.close()
 
         for (game_id,) in res:
+            start_time = time.time()
+            logger.info(f"Fetching PGN for game {game_id}")
             pgn = get_pgn(driver, game_id)
+            
+            # Record selenium request time
+            request_time = time.time() - start_time
+            metrics["selenium_request_times"].append(request_time)
+            logger.debug(f"Selenium request completed in {request_time:.2f}s for game {game_id}")
+            
+            db = libsql_connect()
             if pgn is not None:
+                logger.info(f"Successfully fetched PGN for game {game_id}")
                 db.execute(
                     """UPDATE game SET status = 'success', pgn = ?2 WHERE id = ?1;""", 
                     ( game_id, pgn )
                 )
             else:
+                logger.warning(f"Failed to fetch PGN for game {game_id}")
                 db.execute( 
                     """UPDATE game SET status = 'error', retries = retries + 1 WHERE id = ?;""",
                     ( game_id, )
                 )
                             
             db.commit()
+            # db.close()
         
         driver.close()
+        logger.info(f"Batch of games processed, logging interim metrics")
+        log_metrics()
 
 
 def get_game_ids(tournament_id: str, tournament_round: int) -> [str]:
@@ -176,6 +246,7 @@ def get_game_ids(tournament_id: str, tournament_round: int) -> [str]:
     try:
         page_count = int(get_total_pages(soup))
     except:
+        logger.exception("Error determining total pages")
         pass
      
     if page_count <= 1:
@@ -224,10 +295,11 @@ def get_pgn(driver: webdriver.chrome.webdriver.WebDriver, game_id: str, page_del
             "textarea.share-menu-tab-pgn-textarea"
         )
         return pgn_contents.get_property('value')
-    except:
-        return
+    except Exception as e:
+        logger.exception(f"Error getting PGN for game {game_id}: {str(e)}")
+        return None
 
- 
+
 def get_tourndament_round_uri(tt_uri: str, round: int, page_no: int):
     return '/tournament/live/' + tt_uri  + f'?round={round}&pairings={page_no}'
 
@@ -249,4 +321,3 @@ def get_game_ids_from_page(soup: bs4.BeautifulSoup):
 
 if __name__ == '__main__':
     main()
-
