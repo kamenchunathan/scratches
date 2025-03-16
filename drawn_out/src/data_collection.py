@@ -6,7 +6,6 @@ import logging
 import json
 from typing import Optional, Tuple
 from datetime import datetime
-import statistics
 
 import bs4
 import libsql_experimental as libsql
@@ -176,11 +175,8 @@ def populate_game_pgns(tournament_id: str):
     logger.info(f"Populating game PGNs for tournament {tournament_id}")
     driver = None
     try:
-        logger.info(f"Connecting to selenium")
         options = Options()
         driver = connect_to_selenium()
-        logger.info(f"Connected to selenium on: {SELENIUM_HOST}:{SELENIUM_PORT}")
-        
         
         while True:
             db = libsql_connect()
