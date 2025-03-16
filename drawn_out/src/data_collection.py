@@ -156,7 +156,6 @@ def populate_tournament_rounds(tournament_id: str):
         logger.info(f"Fetching game IDs for tournament {tournament_id}, round {current_round}")
         round_ids = get_game_ids(tournament_id, current_round)
         logger.info(f"Found {len(round_ids)} games for round {current_round}")
-        logger.info(f"Sample { list(map(lambda game_id: (game_id, tournament_id, current_round), round_ids)) [0]}")
         
         db = libsql_connect()
         db.executemany(
@@ -251,7 +250,7 @@ def get_game_ids(tournament_id: str, tournament_round: int) -> [str]:
     conn = http.client.HTTPSConnection(API_HOST)
     conn.request(
         'GET', 
-        get_tourndament_round_uri(
+        get_tournament_round_uri(
             tournament_id, 
             tournament_round, 
             current_page
@@ -274,10 +273,10 @@ def get_game_ids(tournament_id: str, tournament_round: int) -> [str]:
     for i in range(2, page_count + 1):
         conn.request(
             'GET', 
-            get_tourndament_round_uri(
+            get_tournament_round_uri(
                 tournament_id, 
                 tournament_round , 
-                current_page
+                i
             )
         )
         resp = conn.getresponse()
@@ -317,7 +316,7 @@ def get_pgn(driver: webdriver.chrome.webdriver.WebDriver, game_id: str, page_del
         return None
 
 
-def get_tourndament_round_uri(tt_uri: str, round: int, page_no: int):
+def get_tournament_round_uri(tt_uri: str, round: int, page_no: int):
     return '/tournament/live/' + tt_uri  + f'?round={round}&pairings={page_no}'
 
 
