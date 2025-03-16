@@ -85,15 +85,19 @@ def main():
     db = libsql_connect()
     run_migrations(db)
     
-    
-    tournament_id = fetch_current_job(db)
-    if tournament_id is None:
-        logger.info("No pending jobs found")
-        return
+    while True:
+        tournament_id = fetch_current_job(db)
+        if tournament_id is None:
+            logger.info("No pending jobs found")
+            return
 
-    logger.info(f"Processing tournament ID: {tournament_id}")
-    populate_tournament_rounds(tournament_id)
-    populate_game_pgns(tournament_id)
+        logger.info(f"Processing tournament ID: {tournament_id}")
+        populate_tournament_rounds(tournament_id)
+        populate_game_pgns(tournament_id)
+
+        # Check for completion of a job and update
+        check_and_set_completed(tournament_id)
+        
     
     log_metrics()  # Log final metrics summary
 
@@ -135,11 +139,54 @@ def fetch_current_job(db: libsql.Connection) -> Optional[str]:
         )
         RETURNING tournament_id;'''
     ).fetchone()
+    db.commit()
     
     if pending_jobs is not None:
         return pending_jobs[0]
     
     return None
+
+
+def check_and_set_completed(tournament_id: str):
+    logger.info(f"Checking job {tournament_id} for completeness")
+    db = libsql_connect()
+    res = db.execute(
+        "SELECT rounds_fetched FROM tournament WHERE id = ?;", 
+        (tournament_id,)
+    ).fetchone()
+    if res is None:
+        logger.error(f"Could not check job {tournament_id} for completeness")
+        return
+    rounds_fetched = res[0] 
+    
+    res = db.execute("""
+        SELECT 
+          COUNT(g.id) 
+        FROM 
+          `game` AS g 
+          LEFT JOIN tournament AS t ON g.tournament_id = t.id 
+        WHERE 
+          t.id = ?
+          AND NOT (
+            g.status = "success" 
+            OR (
+              g.status = "error" 
+              AND g.retries > 3
+            )
+          );""",
+        (tournament_id,)
+    ).fetchone()
+    if res is None:
+        logger.error(f"Could not check job {tournament_id} for completeness")
+        return
+    unprocessed_games = res[0] 
+    
+    if rounds_fetched > 11 and unprocessed_games == 0:
+        logger.info(f"Setting {tournament_id} as complete")
+        db.execute("UPDATE jobs SET status = 'complete' WHERE tournament_id = ?;", (tournament_id,))
+        db.commit()
+    
+    
 
 
 def populate_tournament_rounds(tournament_id: str):
@@ -156,8 +203,10 @@ def populate_tournament_rounds(tournament_id: str):
             return
         rounds_fetched = res[0]
         
-        if rounds_fetched > TT_ROUNDS + 1:
+        if rounds_fetched > TT_ROUNDS:
             return
+
+        current_round = rounds_fetched + 1
 
         logger.info(f"Fetching game IDs for tournament {tournament_id}, round {current_round}")
         round_ids = get_game_ids(tournament_id, current_round)
