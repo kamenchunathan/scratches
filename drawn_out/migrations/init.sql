@@ -23,3 +23,12 @@ CREATE TABLE if NOT EXISTS jobs (
 
   FOREIGN KEY(tournament_id) REFERENCES tournament(id)
 );
+
+
+-- Indices for all foreign keys
+CREATE INDEX IF NOT EXISTS idx_game_tournament ON game(tournament_id);
+                           
+CREATE INDEX IF NOT EXISTS idx_jobs_tournament ON jobs(tournament_id);
+
+-- performance specific
+CREATE INDEX IF NOT EXISTs idx_game_tournament_status_retries ON game(tournament_id, status, retries);
