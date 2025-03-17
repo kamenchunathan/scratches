@@ -1,6 +1,7 @@
 .venv
 .env
-data
 .direnv
+data
+*.db
 db.sqlite3
 */__pycache__/
