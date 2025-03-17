@@ -224,11 +224,21 @@ def populate_tournament_rounds(tournament_id: str):
         db.commit()
 
 
-def populate_game_pgns(tournament_id: str):
+def populate_game_pgns(tournament_id: str, local_max_retries: int = 3):
+    """
+    Populates game PGNs for a tournament with local retries for Selenium connection errors.
+    
+    Args:
+        tournament_id: The ID of the tournament to populate PGNs for
+        local_max_retries: Maximum number of local retries before updating database status
+    """
     logger.info(f"Populating game PGNs for tournament {tournament_id}")
     driver = None
+    
+    # Local retry tracking dictionary
+    local_retry_tracker = {}  # game_id -> retry_count
+    
     try:
-        options = Options()
         driver = connect_to_selenium()
         
         while True:
@@ -240,11 +250,13 @@ def populate_game_pgns(tournament_id: str):
                     tournament_id = ?
                     AND (status = 'not_asked' OR status = 'error')
                     AND retries < 3;""",
-                ( tournament_id, )
+                (tournament_id,)
             ).fetchone()
+            
             if res is None:
                 logger.error("Error querying game count")
                 return
+                
             count = res[0]
             logger.info(f"Found {count} games to process for tournament {tournament_id}")
             if count == 0:
@@ -254,48 +266,114 @@ def populate_game_pgns(tournament_id: str):
                 SELECT "id" 
                 FROM game
                 WHERE
-	                tournament_id = ? 
-	                AND (status = 'not_asked' OR status = 'error')
-	                AND retries < 3
+                    tournament_id = ? 
+                    AND (status = 'not_asked' OR status = 'error')
+                    AND retries < 3
                 LIMIT 50;""",
-                ( tournament_id, )
+                (tournament_id,)
             ).fetchall()
 
+            # Process batch of games with local retry mechanism
             for (game_id,) in res:
-                start_time = time.time()
-                logger.info(f"Fetching PGN for game {game_id}")
-                pgn = get_pgn(driver, game_id)
+                success = False
                 
-                # Record selenium request time
-                request_time = time.time() - start_time
-                metrics["selenium_request_times"].append(request_time)
-                logger.debug(f"Selenium request completed in {request_time:.2f}s for game {game_id}")
+                # Initialize retry count if not present
+                if game_id not in local_retry_tracker:
+                    local_retry_tracker[game_id] = 0
                 
-                db = libsql_connect()
-                if pgn is not None:
-                    logger.info(f"Successfully fetched PGN for game {game_id}")
-                    db.execute(
-                        """UPDATE game SET status = 'success', pgn = ?2 WHERE id = ?1;""", 
-                        ( game_id, pgn )
-                    )
-                else:
-                    logger.warning(f"Failed to fetch PGN for game {game_id}")
+                while local_retry_tracker[game_id] < local_max_retries and not success:
+                    try:
+                        start_time = time.time()
+                        logger.info(f"Fetching PGN for game {game_id} (local retry {local_retry_tracker[game_id]})")
+                        
+                        pgn = get_pgn(driver, game_id)
+                        
+                        # Record selenium request time
+                        request_time = time.time() - start_time
+                        metrics["selenium_request_times"].append(request_time)
+                        logger.debug(f"Selenium request completed in {request_time:.2f}s for game {game_id}")
+                        
+                        if pgn is not None:
+                            logger.info(f"Successfully fetched PGN for game {game_id}")
+                            db = libsql_connect()
+                            db.execute(
+                                """UPDATE game SET status = 'success', pgn = ?2 WHERE id = ?1;""", 
+                                (game_id, pgn)
+                            )
+                            db.commit()
+                            success = True
+                        else:
+                            # Increment local retry count on failure
+                            local_retry_tracker[game_id] += 1
+                            logger.warning(f"Failed to fetch PGN for game {game_id} (local retry {local_retry_tracker[game_id]}/{local_max_retries})")
+                            
+                            # Wait before retry with exponential backoff
+                            backoff_time = 2 ** local_retry_tracker[game_id]
+                            logger.info(f"Waiting {backoff_time} seconds before retrying")
+                            time.sleep(backoff_time)
+                            
+                            # Check if we need to reconnect to Selenium
+                            if driver is None or not is_driver_active(driver):
+                                logger.info("Reconnecting to Selenium")
+                                if driver is not None:
+                                    try:
+                                        driver.quit()
+                                    except:
+                                        pass
+                                driver = connect_to_selenium()
+                    
+                    except Exception as e:
+                        logger.warning(f"Selenium error while fetching PGN for game {game_id}: {str(e)}")
+                        local_retry_tracker[game_id] += 1
+                        
+                        # Wait before retry with exponential backoff
+                        backoff_time = 2 ** local_retry_tracker[game_id]
+                        logger.info(f"Waiting {backoff_time} seconds before retrying")
+                        time.sleep(backoff_time)
+                        
+                        # Reconnect to Selenium on error
+                        if driver is not None:
+                            try:
+                                driver.quit()
+                            except:
+                                pass
+                        driver = connect_to_selenium()
+                
+                # Update DB status only after all local retries are exhausted
+                if not success:
+                    db = libsql_connect()
+                    logger.warning(f"All local retries failed for game {game_id}, updating database status")
                     db.execute( 
                         """UPDATE game SET status = 'error', retries = retries + 1 WHERE id = ?;""",
-                        ( game_id, )
+                        (game_id,)
                     )
-                                
-                db.commit()
+                    db.commit()
+                
+                # Reset local retry count after processing
+                local_retry_tracker.pop(game_id, None)
+    
     except Exception as e:
-        logger.exception(f"Error connecting to selenium: \n{e}")
+        logger.exception(f"Error in populate_game_pgns: \n{e}")
         
     finally:
         if driver is not None:
-            driver.quit()
+            try:
+                driver.quit()
+            except:
+                pass
         
     logger.info(f"Batch of games processed, logging interim metrics")
     log_metrics()
 
+
+def is_driver_active(driver):
+    """Check if the Selenium driver is still active and responsive"""
+    try:
+        # Try to execute a simple command to check if the driver is responsive
+        driver.title
+        return True
+    except:
+        return False
 
 def get_game_ids(tournament_id: str, tournament_round: int) -> [str]:
     game_ids = []
