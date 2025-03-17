@@ -171,7 +171,7 @@ def check_and_set_completed(tournament_id: str):
             g.status = "success" 
             OR (
               g.status = "error" 
-              AND g.retries > 3
+              AND g.retries >= 3
             )
           );""",
         (tournament_id,)
