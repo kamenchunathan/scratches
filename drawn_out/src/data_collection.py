@@ -267,8 +267,11 @@ def populate_game_pgns(tournament_id: str, local_max_retries: int = 3):
                 FROM game
                 WHERE
                     tournament_id = ? 
-                    AND (status = 'not_asked' OR status = 'error')
-                    AND retries < 3
+                    AND status = 'not_asked' 
+                    OR (
+                        status = 'error'
+                        AND retries < 3
+                        )
                 LIMIT 50;""",
                 (tournament_id,)
             ).fetchall()
