@@ -7,6 +7,7 @@ import Data.Array as Array
 import Data.Map as Map
 import Data.Maybe (fromJust, fromMaybe)
 import Data.Newtype (unwrap)
+import Data.Number.Format as Number
 import Effect.Class (class MonadEffect, liftEffect)
 import Effect.Class.Console (log)
 import Halogen (AttrName(..), ClassName(..))
@@ -17,6 +18,7 @@ import Halogen.HTML.Properties as HP
 import Partial.Unsafe (unsafePartial)
 import Sheet (Sheet)
 import Sheet as Sheet
+import Sheet.AST (Expr(..), Literal(..))
 import Sheet.Cell (Cell(..))
 import Sheet.Index (CellIndex(..), alphaIxFromNum)
 import Unsafe.Coerce (unsafeCoerce)
@@ -106,7 +108,8 @@ renderCell sheet ix =
       ]
       [ innerHtml ]
 
-  renderCellContent (Text t) = HH.text t
+  renderCellContent (Simple (NumLit num)) = HH.text $ Number.toString num
+  renderCellContent (Simple (StrLit str)) = HH.text str
   renderCellContent (Formula _) = HH.text "Formula"
 
 component :: forall q i o m. MonadEffect m => H.Component q i o m

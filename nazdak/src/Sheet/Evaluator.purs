@@ -3,17 +3,17 @@ module Sheet.Evaluator where
 import Prelude
 
 import Data.Array (foldl, length)
-import Sheet.Cell (Cell(..))
-import Sheet (Sheet(..))
-import Sheet as Sheet
-import Sheet.Index (CellIndex)
-import Sheet.AST (Expr(..), Ident(..), Literal(..), Operator(..))
 import Data.Either (Either(..), note)
+import Data.Int (toNumber) as Int
 import Data.Map as Map
 import Data.Maybe (Maybe(..))
-import Data.Int (toNumber) as Int
 import Data.Traversable (traverse)
 import Parsing (runParser)
+import Sheet (Sheet(..))
+import Sheet as Sheet
+import Sheet.AST (Expr(..), Ident(..), Literal(..), Operator(..))
+import Sheet.Cell (Cell(..))
+import Sheet.Index (CellIndex)
 import Sheet.Parser (formulaParser)
 
 -- | Result of evaluation
@@ -32,7 +32,8 @@ instance showValue :: Show Value where
 -- | Evaluate a Cell to get its value
 evaluateCell :: Sheet -> Cell -> Value
 -- TODO: This value should be parsed
-evaluateCell _ (Text s) = StringVal s
+evaluateCell _ (Simple (StrLit s)) = StringVal s
+evaluateCell _ (Simple (NumLit num)) = NumberVal num
 evaluateCell sheet (Formula expr) = evaluateExpr sheet expr
 
 -- | Evaluate an expression given the current sheet state
@@ -106,16 +107,6 @@ evalFunction _ (Ident "MAX") args =
 
 evalFunction _ (Ident "COUNT") args =
   NumberVal $ Int.toNumber $ length args
-
-evalFunction _ (Ident "IF") args =
-  case args of
-    [ condition, trueVal, falseVal ] ->
-      case condition of
-        NumberVal n -> if n /= 0.0 then trueVal else falseVal
-        StringVal "" -> falseVal
-        StringVal _ -> trueVal
-        ErrorVal _ -> condition
-    _ -> ErrorVal "ARGS"
 
 evalFunction _ (Ident "CONCAT") args =
   StringVal $ foldl (\acc val -> acc <> valueToString val) "" args

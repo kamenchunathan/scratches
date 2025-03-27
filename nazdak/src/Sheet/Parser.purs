@@ -73,7 +73,7 @@ functionParser :: Parser String Expr
 functionParser = do
   name <- ident
   args <- between (char '(') (char ')') argListParser
-  pure $ Function name args
+  pure $ Function  name args
 
 argListParser :: Parser String (Array Expr)
 argListParser = do
