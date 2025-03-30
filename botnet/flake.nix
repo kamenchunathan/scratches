@@ -44,8 +44,8 @@
             cargo-deny
             cargo-watch
             rust-analyzer
-
             maelstrom-clj
+            just
           ];
 
           env = {
