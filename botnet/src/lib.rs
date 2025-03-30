@@ -54,6 +54,30 @@ pub enum MessageBody {
         in_reply_to: u32,
     },
 
+    Generate {
+        msg_id: u32,
+    },
+
+    GenerateOk {
+        id: String,
+        in_reply_to: u32,
+    },
+
     #[serde(other)]
     Other,
+}
+
+#[derive(Debug, Clone)]
+pub struct Node {
+    pub id: String,
+    pub previous_msg_id: u32,
+}
+
+impl Node {
+    pub fn new(id: String) -> Self {
+        Self {
+            id,
+            previous_msg_id: 0,
+        }
+    }
 }
