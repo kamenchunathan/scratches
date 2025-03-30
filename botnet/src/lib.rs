@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::io::BufRead;
 use std::io::BufReader;
 
@@ -67,6 +68,37 @@ pub enum MessageBody {
         in_reply_to: u32,
     },
 
+    Topology {
+        msg_id: u32,
+        topology: HashMap<String, Vec<String>>,
+    },
+
+    TopologyOk {
+        msg_id: u32,
+        in_reply_to: u32,
+    },
+
+    Broadcast {
+        // Ideally is Any type
+        message: serde_json::Value,
+        msg_id: u32,
+    },
+
+    BroadcastOk {
+        msg_id: u32,
+        in_reply_to: u32,
+    },
+
+    Read {
+        msg_id: u32,
+    },
+
+    ReadOk {
+        msg_id: u32,
+        messages: Vec<serde_json::Value>,
+        in_reply_to: u32,
+    },
+
     #[serde(other)]
     Other,
 }
@@ -74,6 +106,8 @@ pub enum MessageBody {
 #[derive(Debug)]
 pub struct Node<R, W> {
     pub id: String,
+    pub neighbours: Vec<String>,
+    pub messages: Vec<serde_json::Value>,
     next_msg_id: u32,
     stream: BufReader<R>,
     sink: W,
@@ -114,6 +148,8 @@ where
 
         Ok(Self {
             id: node_id,
+            neighbours: vec![],
+            messages: vec![],
             next_msg_id: 1,
             sink,
             stream,
@@ -121,9 +157,11 @@ where
     }
 
     pub fn send(&mut self, msg: Message) -> anyhow::Result<()> {
+        info!(type_="sending", msg = ?msg);
         writeln!(self.sink, "{}", serde_json::ser::to_string(&msg)?)?;
         self.sink.flush()?;
 
+        self.next_msg_id += 1;
         Ok(())
     }
 
@@ -132,10 +170,7 @@ where
         self.stream
             .read_line(&mut buf)
             .context("could not read from stream")?;
-        info!(
-            "Received message: {}",
-            buf.strip_suffix("\n").unwrap_or(&buf)
-        );
+        info!(type_ = "recv", msg = buf.strip_suffix("\n").unwrap_or(&buf));
 
         serde_json::de::from_str(&buf).context(format!(
             "Unable to deserialize {:?} as message",
