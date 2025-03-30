@@ -1,5 +1,9 @@
-use json::JsonValue;
+use std::io::BufRead;
+use std::io::BufReader;
+
+use anyhow::{bail, Context};
 use serde::{Deserialize, Serialize};
+use tracing::info;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Message {
@@ -67,17 +71,79 @@ pub enum MessageBody {
     Other,
 }
 
-#[derive(Debug, Clone)]
-pub struct Node {
+#[derive(Debug)]
+pub struct Node<R, W> {
     pub id: String,
-    pub previous_msg_id: u32,
+    next_msg_id: u32,
+    stream: BufReader<R>,
+    sink: W,
 }
 
-impl Node {
-    pub fn new(id: String) -> Self {
-        Self {
-            id,
-            previous_msg_id: 0,
-        }
+impl<R, W> Node<R, W>
+where
+    R: std::io::Read,
+    W: std::io::Write,
+{
+    pub fn try_init(stream: R, mut sink: W) -> anyhow::Result<Self> {
+        let mut stream = BufReader::new(stream);
+        let mut buf = String::new();
+        stream
+            .read_line(&mut buf)
+            .context("could not read from stream")?;
+
+        let req: Message = serde_json::de::from_str(&buf).context(format!(
+            "Unable to deserialize {:?} as message",
+            json::parse(&buf),
+        ))?;
+
+        let MessageBody::Init {
+            msg_id, node_id, ..
+        } = req.body
+        else {
+            bail!("An initialization message has to be sent before all other message");
+        };
+
+        let resp = Message {
+            src: node_id.clone(),
+            dest: req.src,
+            body: MessageBody::InitOk {
+                in_reply_to: msg_id,
+            },
+        };
+        writeln!(sink, "{}", serde_json::ser::to_string(&resp)?)?;
+
+        Ok(Self {
+            id: node_id,
+            next_msg_id: 1,
+            sink,
+            stream,
+        })
+    }
+
+    pub fn send(&mut self, msg: Message) -> anyhow::Result<()> {
+        writeln!(self.sink, "{}", serde_json::ser::to_string(&msg)?)?;
+        self.sink.flush()?;
+
+        Ok(())
+    }
+
+    pub fn recv(&mut self) -> anyhow::Result<Message> {
+        let mut buf = String::new();
+        self.stream
+            .read_line(&mut buf)
+            .context("could not read from stream")?;
+        info!(
+            "Received message: {}",
+            buf.strip_suffix("\n").unwrap_or(&buf)
+        );
+
+        serde_json::de::from_str(&buf).context(format!(
+            "Unable to deserialize {:?} as message",
+            json::parse(&buf),
+        ))
+    }
+
+    pub fn next_msg_id(&self) -> u32 {
+        self.next_msg_id
     }
 }

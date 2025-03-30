@@ -10,80 +10,53 @@ fn main() -> Result<(), anyhow::Error> {
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::fmt::layer()
-                .with_ansi(false) // Output is redirected to a file
+                .json()
                 .with_writer(std::io::stderr),
         )
         .init();
 
-    let mut node = None;
-    let mut buf = String::new();
-    while std::io::stdin().read_line(&mut buf).is_ok() {
-        info!(
-            "Received message: {}",
-            buf.strip_suffix("\n").unwrap_or(&buf)
-        );
-        let Ok(req) = serde_json::de::from_str::<Message>(&buf) else {
-            error!("Unable to deserialize {:?} as message", json::parse(&buf));
-            bail!("");
-        };
-        debug!("Parsed {req:?}");
+    let mut node = match Node::try_init(std::io::stdin(), std::io::stdout()) {
+        Ok(node) => node,
+        Err(msg) => {
+            error!("Unable to initialize node. error: {:?}", msg);
+            bail!(msg);
+        }
+    };
 
-        let mut stdout = std::io::stdout();
-        match req.body {
-            MessageBody::Init {
-                msg_id, node_id, ..
-            } => {
-                node = Some(Node::new(node_id.clone()));
-                let resp = Message {
-                    src: node_id,
-                    dest: req.src,
-                    body: botnet::MessageBody::InitOk {
-                        in_reply_to: msg_id,
-                    },
-                };
-                writeln!(stdout, "{}", serde_json::ser::to_string(&resp)?)?;
+    loop {
+        let req = match node.recv() {
+            Ok(node) => node,
+            Err(msg) => {
+                error!("Error while receiving message: {:?}", msg);
+                bail!(msg);
             }
+        };
 
+        match req.body {
             MessageBody::Echo { echo, msg_id } => {
-                let Some(node) = node.as_mut() else {
-                    bail!("An initialization message has to be sent before all other message");
-                };
-
-                node.previous_msg_id += 1;
-
-                let resp = Message {
+                node.send(Message {
                     src: node.id.clone(),
                     dest: req.src,
                     body: botnet::MessageBody::EchoOk {
                         echo,
                         in_reply_to: msg_id,
                     },
-                };
-                writeln!(stdout, "{}", serde_json::ser::to_string(&resp)?)?;
+                })?;
             }
 
             MessageBody::Generate { msg_id } => {
-                let Some(node) = node.as_mut() else {
-                    bail!("An initialization message has to be sent before all other message");
-                };
-
-                node.previous_msg_id += 1;
-
-                let resp = Message {
+                node.send(Message {
                     src: node.id.clone(),
                     dest: req.src,
                     body: botnet::MessageBody::GenerateOk {
-                        id: format!("{}{}", node.id, node.previous_msg_id.to_string()),
+                        // A unique id from the node id and current messge id
+                        id: format!("{}{}", node.id, node.next_msg_id().to_string()),
                         in_reply_to: msg_id,
                     },
-                };
-                writeln!(stdout, "{}", serde_json::ser::to_string(&resp)?)?;
+                })?;
             }
 
             _ => todo!(),
         }
-
-        buf.clear();
     }
-    Ok(())
 }
