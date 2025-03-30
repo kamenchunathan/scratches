@@ -43,6 +43,7 @@ pub trait Layer {
     type Response: Serialize;
 
     fn handle(
+        &mut self,
         node: impl NodeData,
         req: Message<Self::Request>,
     ) -> Message<Result<Self::Response, ErrorBody>>;
@@ -54,6 +55,7 @@ impl Layer for () {
     type Response = ();
 
     fn handle(
+        &mut self,
         node: impl NodeData,
         req: Message<Self::Request>,
     ) -> Message<Result<Self::Response, ErrorBody>> {

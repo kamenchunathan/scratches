@@ -1,5 +1,5 @@
-use anyhow::{bail, Context};
-use botnet::{Message, MessageBody, Node};
+use anyhow::bail;
+use botnet::{generate::GenerateLayer, Node};
 use tracing::error;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -15,14 +15,14 @@ fn main() -> Result<(), anyhow::Error> {
         )
         .init();
 
-    let mut node = match Node::try_init(std::io::stdin(), std::io::stdout()) {
+    let node = match Node::try_init(std::io::stdin(), std::io::stdout()) {
         Ok(node) => node,
         Err(msg) => {
             error!("Unable to initialize node. error: {:?}", msg);
             bail!(msg);
         }
     };
-    let mut node = node.with_layer(EchoLayer);
+    let mut node = node.with_layer(EchoLayer).with_layer(GenerateLayer::new());
 
     loop {
         node.handle_incoming_message()?;

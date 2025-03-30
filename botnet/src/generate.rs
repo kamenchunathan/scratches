@@ -3,11 +3,13 @@ use serde::{Deserialize, Serialize};
 use crate::node::{Layer, NodeData};
 
 #[derive(Debug)]
-pub struct EchoLayer;
+pub struct GenerateLayer {
+    counter: u32,
+}
 
-impl EchoLayer {
+impl GenerateLayer {
     pub fn new() -> Self {
-        Self
+        Self { counter: 0 }
     }
 }
 
@@ -15,17 +17,15 @@ impl EchoLayer {
 #[derive(Debug, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum Req {
-    Echo { echo: String, msg_id: u32 },
+    Generate { msg_id: u32 },
 }
-
-// NOTE: Having messages be enums with only one value is a hack to have serde handle the type field
 #[derive(Debug, Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum Resp {
-    EchoOk { echo: String, in_reply_to: u32 },
+    GenerateOk { id: String, in_reply_to: u32 },
 }
 
-impl Layer for EchoLayer {
+impl Layer for GenerateLayer {
     type Request = Req;
 
     type Response = Resp;
@@ -35,12 +35,13 @@ impl Layer for EchoLayer {
         node: impl NodeData,
         req: crate::node::Message<Self::Request>,
     ) -> crate::node::Message<Result<Self::Response, crate::node::ErrorBody>> {
-        let Req::Echo { echo, msg_id } = req.body;
+        self.counter += 1;
+        let Req::Generate { msg_id } = req.body;
         crate::node::Message {
             src: node.node_id(),
             dest: req.src,
-            body: Ok(Resp::EchoOk {
-                echo,
+            body: Ok(Resp::GenerateOk {
+                id: format!("{}{}", node.node_id(), self.counter),
                 in_reply_to: msg_id,
             }),
         }

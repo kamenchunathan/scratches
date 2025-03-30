@@ -1,5 +1,6 @@
 #![allow(unused)]
 pub mod echo;
+pub mod generate;
 mod node;
 
 use std::collections::HashMap;
@@ -291,15 +292,20 @@ pub struct NodeLayer<L, N> {
 }
 
 pub trait TryHandleLayerMsg {
-    type T;
     /// Returns None if we could not handle the message
-    fn parse_and_handle_layer_msg(&self, data: impl NodeData, buf: String) -> Option<Self::T>;
+    fn parse_and_handle_layer_msg(
+        &mut self,
+        data: impl NodeData,
+        buf: String,
+    ) -> Option<node::Message<Result<serde_json::Value, node::ErrorBody>>>;
 }
 
 impl TryHandleLayerMsg for () {
-    type T = crate::node::Message<Result<serde_json::Value, crate::node::ErrorBody>>;
-
-    fn parse_and_handle_layer_msg(&self, data: impl NodeData, buf: String) -> Option<Self::T> {
+    fn parse_and_handle_layer_msg(
+        &mut self,
+        data: impl NodeData,
+        buf: String,
+    ) -> Option<node::Message<Result<serde_json::Value, node::ErrorBody>>> {
         None
     }
 }
@@ -309,15 +315,17 @@ where
     L: Layer,
     N: TryHandleLayerMsg,
 {
-    type T = node::Message<Result<serde_json::Value, node::ErrorBody>>;
-
-    fn parse_and_handle_layer_msg(&self, data: impl NodeData, buf: String) -> Option<Self::T> {
+    fn parse_and_handle_layer_msg(
+        &mut self,
+        data: impl NodeData,
+        buf: String,
+    ) -> Option<node::Message<Result<serde_json::Value, node::ErrorBody>>> {
         let req = serde_json::de::from_str::<node::Message<L::Request>>(buf.as_str()).context(
             format!("Unable to deserialize {:?} as message", json::parse(&buf),),
         );
         match req {
             Ok(req) => {
-                let resp = L::handle(data, req);
+                let resp = self.layer.handle(data, req);
 
                 Some(node::Message {
                     src: resp.src,
@@ -327,7 +335,16 @@ where
                     }),
                 })
             }
-            _ => todo!(), // _ => self.next.parse_and_handle_layer_msg(data, buf),
+            _ => self
+                .next
+                .parse_and_handle_layer_msg(data, buf)
+                .map(|resp| node::Message {
+                    src: resp.src,
+                    dest: resp.dest,
+                    body: resp.body.map(|body| {
+                        serde_json::to_value(body).expect("Could not serialize as value")
+                    }),
+                }),
         }
     }
 }
