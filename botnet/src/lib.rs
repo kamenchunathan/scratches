@@ -1,6 +1,7 @@
 #![allow(unused)]
 pub mod broadcast;
 pub mod echo;
+pub mod gcounter;
 pub mod generate;
 
 use std::collections::HashMap;

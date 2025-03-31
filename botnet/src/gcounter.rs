@@ -1,69 +1,65 @@
 use std::collections::HashMap;
 
-use anyhow::Context;
 use serde::{Deserialize, Serialize};
 
 use crate::{ErrorBody, Layer, Message, NodeData};
 
 #[derive(Debug)]
-pub struct BroadcastLayer {
-    neighbours: Vec<String>,
-    received: Vec<serde_json::Value>,
-}
+/// A Grow only counter
+pub struct GCounterLayer(HashMap<String, u32>);
 
-impl BroadcastLayer {
+impl GCounterLayer {
     pub fn new() -> Self {
-        Self {
-            neighbours: Vec::new(),
-            received: Vec::new(),
-        }
+        Self(HashMap::new())
     }
 }
 
-// NOTE: Having messages be enums with only one value is a hack to have serde handle the type field
 #[derive(Debug, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum Req {
-    Topology {
-        msg_id: u32,
-        topology: HashMap<String, Vec<String>>,
-    },
-
-    Broadcast {
-        message: serde_json::Value,
+    Add {
+        delta: u32,
         msg_id: u32,
     },
 
     Read {
         msg_id: u32,
     },
+
+    PeerAdd {
+        key: String,
+        delta: u32,
+        msg_id: u32,
+    },
 }
+
 #[derive(Debug, Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum Resp {
-    TopologyOk {
+    AddOk {
         msg_id: u32,
         in_reply_to: u32,
-    },
-
-    BroadcastOk {
-        msg_id: u32,
-        in_reply_to: u32,
-    },
-
-    Broadcast {
-        message: serde_json::Value,
-        msg_id: u32,
     },
 
     ReadOk {
         msg_id: u32,
-        messages: Vec<serde_json::Value>,
+        in_reply_to: u32,
+        value: u32,
+    },
+
+    PeerAdd {
+        key: String,
+        delta: u32,
+        msg_id: u32,
+    },
+
+    PeerAddOk {
+        msg_id: u32,
         in_reply_to: u32,
     },
 }
 
-impl Layer for BroadcastLayer {
+impl Layer for GCounterLayer {
     type Request = Req;
 
     type Response = Resp;
@@ -74,33 +70,19 @@ impl Layer for BroadcastLayer {
         req: Message<Self::Request>,
     ) -> Vec<Message<Result<Self::Response, ErrorBody>>> {
         match req.body {
-            Req::Topology { msg_id, topology } => {
-                self.neighbours = topology
-                    .get(&node.node_id())
-                    .expect("Neighbours not provided")
-                    .clone();
+            Req::Add { delta, msg_id } => {
+                let key = format!("{}{}", req.src, msg_id);
+                self.0.insert(key.clone(), delta);
 
-                vec![Message {
-                    src: node.node_id(),
-                    dest: req.src,
-                    body: Ok(Resp::TopologyOk {
-                        msg_id: node.next_message_id(),
-                        in_reply_to: msg_id,
-                    }),
-                }]
-            }
-
-            Req::Broadcast { message, msg_id } => {
-                self.received.push(message.clone());
-
-                self.neighbours
+                node.all_nodes()
                     .clone()
                     .into_iter()
                     .map(|neighbour| Message {
                         src: node.node_id(),
                         dest: neighbour,
-                        body: Ok(Resp::Broadcast {
-                            message: message.clone(),
+                        body: Ok(Resp::PeerAdd {
+                            key: key.clone(),
+                            delta,
                             // BUG: Multiple messages use the same node id
                             msg_id: node.next_message_id(),
                         }),
@@ -108,7 +90,7 @@ impl Layer for BroadcastLayer {
                     .chain(std::iter::once(Message {
                         src: node.node_id(),
                         dest: req.src,
-                        body: Ok(Resp::BroadcastOk {
+                        body: Ok(Resp::AddOk {
                             msg_id: node.next_message_id(),
                             in_reply_to: msg_id,
                         }),
@@ -116,13 +98,25 @@ impl Layer for BroadcastLayer {
                     .collect()
             }
 
-            Req::Read { msg_id } => {
+            Req::Read { msg_id } => vec![Message {
+                src: node.node_id(),
+                dest: req.src,
+                body: Ok(Resp::ReadOk {
+                    msg_id: node.next_message_id(),
+                    in_reply_to: msg_id,
+                    value: self.0.values().sum(),
+                }),
+            }],
+
+            // Join operation
+            Req::PeerAdd { key, delta, msg_id } => {
+                self.0.entry(key).or_insert(delta);
+
                 vec![Message {
                     src: node.node_id(),
                     dest: req.src,
-                    body: Ok(Resp::ReadOk {
+                    body: Ok(Resp::PeerAddOk {
                         msg_id: node.next_message_id(),
-                        messages: self.received.clone(),
                         in_reply_to: msg_id,
                     }),
                 }]

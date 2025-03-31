@@ -1,5 +1,5 @@
 use anyhow::bail;
-use botnet::{broadcast::BroadcastLayer, generate::GenerateLayer, Node};
+use botnet::{broadcast::BroadcastLayer, gcounter::GCounterLayer, generate::GenerateLayer, Node};
 use tracing::error;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -25,7 +25,8 @@ fn main() -> Result<(), anyhow::Error> {
     let mut node = node
         .with_layer(EchoLayer)
         .with_layer(GenerateLayer::new())
-        .with_layer(BroadcastLayer::new());
+        .with_layer(BroadcastLayer::new())
+        .with_layer(GCounterLayer::new());
 
     loop {
         node.handle_incoming_message()?;

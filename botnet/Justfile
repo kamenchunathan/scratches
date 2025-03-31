@@ -16,3 +16,7 @@ echo:
 unique-ids:
   just build
   maelstrom test -w unique-ids --bin {{bin}} --time-limit 30 --rate 1000 --node-count 3 --availability total --nemesis partition
+
+g-counter: 
+  just build
+  maelstrom test -w g-counter --bin {{bin}} --node-count 3 --rate 100 --time-limit 20 --nemesis partition
