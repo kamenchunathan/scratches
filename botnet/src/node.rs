@@ -46,7 +46,7 @@ pub trait Layer {
         &mut self,
         node: impl NodeData,
         req: Message<Self::Request>,
-    ) -> Message<Result<Self::Response, ErrorBody>>;
+    ) -> Vec<Message<Result<Self::Response, ErrorBody>>>;
 }
 
 impl Layer for () {
@@ -58,12 +58,13 @@ impl Layer for () {
         &mut self,
         node: impl NodeData,
         req: Message<Self::Request>,
-    ) -> Message<Result<Self::Response, ErrorBody>> {
-        todo!()
+    ) -> Vec<Message<Result<Self::Response, ErrorBody>>> {
+        Vec::new()
     }
 }
 
 pub trait NodeData {
     fn node_id(&self) -> String;
     fn all_nodes(&self) -> Vec<String>;
+    fn next_message_id(&self) -> u32;
 }

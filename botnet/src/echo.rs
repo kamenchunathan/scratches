@@ -34,15 +34,15 @@ impl Layer for EchoLayer {
         &mut self,
         node: impl NodeData,
         req: crate::node::Message<Self::Request>,
-    ) -> crate::node::Message<Result<Self::Response, crate::node::ErrorBody>> {
+    ) -> Vec<crate::node::Message<Result<Self::Response, crate::node::ErrorBody>>> {
         let Req::Echo { echo, msg_id } = req.body;
-        crate::node::Message {
+        vec![crate::node::Message {
             src: node.node_id(),
             dest: req.src,
             body: Ok(Resp::EchoOk {
                 echo,
                 in_reply_to: msg_id,
             }),
-        }
+        }]
     }
 }

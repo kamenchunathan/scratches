@@ -1,4 +1,5 @@
 #![allow(unused)]
+pub mod broadcast;
 pub mod echo;
 pub mod generate;
 mod node;
@@ -242,31 +243,29 @@ where
 {
     pub fn handle_incoming_message(&mut self) -> anyhow::Result<()> {
         let buf = self.recv()?;
-        match self
-            .inner
-            .parse_and_handle_layer_msg((self.id.clone(), self.all_nodes.clone()), buf)
-        {
-            Some(resp) => {
-                self.send(resp)?;
-            }
-
-            None => {
-                error!("Unable to handle message");
-                bail!("unable to handle");
-            }
+        let responses = self.inner.parse_and_handle_layer_msg(
+            (self.id.clone(), self.all_nodes.clone(), self.next_msg_id),
+            buf,
+        );
+        for resp in responses {
+            self.send(resp)?;
         }
 
         Ok(())
     }
 }
 
-impl NodeData for (String, Vec<String>) {
+impl NodeData for (String, Vec<String>, u32) {
     fn node_id(&self) -> String {
         self.0.clone()
     }
 
     fn all_nodes(&self) -> Vec<String> {
         self.1.clone()
+    }
+
+    fn next_message_id(&self) -> u32 {
+        self.2
     }
 }
 
@@ -280,6 +279,10 @@ where
 
     fn all_nodes(&self) -> Vec<String> {
         (*self).all_nodes()
+    }
+
+    fn next_message_id(&self) -> u32 {
+        (*self).next_message_id()
     }
 }
 
@@ -297,7 +300,7 @@ pub trait TryHandleLayerMsg {
         &mut self,
         data: impl NodeData,
         buf: String,
-    ) -> Option<node::Message<Result<serde_json::Value, node::ErrorBody>>>;
+    ) -> Vec<node::Message<Result<serde_json::Value, node::ErrorBody>>>;
 }
 
 impl TryHandleLayerMsg for () {
@@ -305,8 +308,8 @@ impl TryHandleLayerMsg for () {
         &mut self,
         data: impl NodeData,
         buf: String,
-    ) -> Option<node::Message<Result<serde_json::Value, node::ErrorBody>>> {
-        None
+    ) -> Vec<node::Message<Result<serde_json::Value, node::ErrorBody>>> {
+        vec![]
     }
 }
 
@@ -319,32 +322,37 @@ where
         &mut self,
         data: impl NodeData,
         buf: String,
-    ) -> Option<node::Message<Result<serde_json::Value, node::ErrorBody>>> {
+    ) -> Vec<node::Message<Result<serde_json::Value, node::ErrorBody>>> {
         let req = serde_json::de::from_str::<node::Message<L::Request>>(buf.as_str()).context(
             format!("Unable to deserialize {:?} as message", json::parse(&buf),),
         );
         match req {
             Ok(req) => {
-                let resp = self.layer.handle(data, req);
+                let responses = self.layer.handle(data, req);
 
-                Some(node::Message {
-                    src: resp.src,
-                    dest: resp.dest,
-                    body: resp.body.map(|body| {
-                        serde_json::to_value(body).expect("Could not serialize as value")
-                    }),
-                })
+                responses
+                    .into_iter()
+                    .map(|resp| node::Message {
+                        src: resp.src,
+                        dest: resp.dest,
+                        body: resp.body.map(|body| {
+                            serde_json::to_value(body).expect("Could not serialize as value")
+                        }),
+                    })
+                    .collect()
             }
             _ => self
                 .next
                 .parse_and_handle_layer_msg(data, buf)
+                .into_iter()
                 .map(|resp| node::Message {
                     src: resp.src,
                     dest: resp.dest,
                     body: resp.body.map(|body| {
                         serde_json::to_value(body).expect("Could not serialize as value")
                     }),
-                }),
+                })
+                .collect(),
         }
     }
 }

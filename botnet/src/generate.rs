@@ -34,16 +34,16 @@ impl Layer for GenerateLayer {
         &mut self,
         node: impl NodeData,
         req: crate::node::Message<Self::Request>,
-    ) -> crate::node::Message<Result<Self::Response, crate::node::ErrorBody>> {
+    ) -> Vec<crate::node::Message<Result<Self::Response, crate::node::ErrorBody>>> {
         self.counter += 1;
         let Req::Generate { msg_id } = req.body;
-        crate::node::Message {
+        vec![crate::node::Message {
             src: node.node_id(),
             dest: req.src,
             body: Ok(Resp::GenerateOk {
                 id: format!("{}{}", node.node_id(), self.counter),
                 in_reply_to: msg_id,
             }),
-        }
+        }]
     }
 }
