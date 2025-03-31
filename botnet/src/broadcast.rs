@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use anyhow::Context;
 use serde::{Deserialize, Serialize};
 
-use crate::node::{Layer, NodeData};
+use crate::{ErrorBody, Layer, Message, NodeData};
 
 #[derive(Debug)]
 pub struct BroadcastLayer {
@@ -71,8 +71,8 @@ impl Layer for BroadcastLayer {
     fn handle(
         &mut self,
         node: impl NodeData,
-        req: crate::node::Message<Self::Request>,
-    ) -> Vec<crate::node::Message<Result<Self::Response, crate::node::ErrorBody>>> {
+        req: Message<Self::Request>,
+    ) -> Vec<Message<Result<Self::Response, ErrorBody>>> {
         match req.body {
             Req::Topology { msg_id, topology } => {
                 self.neighbours = topology
@@ -80,7 +80,7 @@ impl Layer for BroadcastLayer {
                     .expect("Neighbours not provided")
                     .clone();
 
-                vec![crate::node::Message {
+                vec![Message {
                     src: node.node_id(),
                     dest: req.src,
                     body: Ok(Resp::TopologyOk {
@@ -96,7 +96,7 @@ impl Layer for BroadcastLayer {
                 self.neighbours
                     .clone()
                     .into_iter()
-                    .map(|neighbour| crate::node::Message {
+                    .map(|neighbour| Message {
                         src: node.node_id(),
                         dest: neighbour,
                         body: Ok(Resp::Broadcast {
@@ -104,7 +104,7 @@ impl Layer for BroadcastLayer {
                             msg_id: node.next_message_id(),
                         }),
                     })
-                    .chain(std::iter::once(crate::node::Message {
+                    .chain(std::iter::once(Message {
                         src: node.node_id(),
                         dest: req.src,
                         body: Ok(Resp::BroadcastOk {
@@ -116,7 +116,7 @@ impl Layer for BroadcastLayer {
             }
 
             Req::Read { msg_id } => {
-                vec![crate::node::Message {
+                vec![Message {
                     src: node.node_id(),
                     dest: req.src,
                     body: Ok(Resp::ReadOk {

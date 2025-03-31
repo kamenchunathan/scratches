@@ -2,7 +2,6 @@
 pub mod broadcast;
 pub mod echo;
 pub mod generate;
-mod node;
 
 use std::collections::HashMap;
 use std::fmt::Debug;
@@ -10,14 +9,13 @@ use std::io::BufRead;
 use std::io::BufReader;
 
 use anyhow::{bail, Context};
-use node::Layer;
-use node::NodeData;
+use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use tracing::error;
 use tracing::info;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Message {
+pub struct Message<Body> {
     /// Identifies the node this message came from
     pub src: String,
 
@@ -25,7 +23,64 @@ pub struct Message {
     pub dest: String,
 
     /// Payload of the message
-    pub body: MessageBody,
+    pub body: Body,
+}
+
+impl<T> Message<T> {
+    pub fn map<U>(self, f: fn(T) -> U) -> Message<U> {
+        let body = f(self.body);
+        Message {
+            src: self.src,
+            dest: self.dest,
+            body,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ErrorBody {
+    /// `msg_id` of the request which caused this error.
+    in_reply_to: u32,
+
+    /// code is an integer which indicates the type of error which occurred.
+    /// Maelstrom defines several error types, and you can also invent your own.
+    /// Codes 0-999 are reserved for Maelstrom's use;
+    /// codes 1000 and above are free for your own purposes.
+    code: u32,
+
+    /// optional, and may contain any explanatory message
+    text: String,
+}
+
+pub trait Layer {
+    type Request: DeserializeOwned;
+    type Response: Serialize;
+
+    fn handle(
+        &mut self,
+        node: impl NodeData,
+        req: Message<Self::Request>,
+    ) -> Vec<Message<Result<Self::Response, ErrorBody>>>;
+}
+
+impl Layer for () {
+    type Request = ();
+
+    type Response = ();
+
+    fn handle(
+        &mut self,
+        node: impl NodeData,
+        req: Message<Self::Request>,
+    ) -> Vec<Message<Result<Self::Response, ErrorBody>>> {
+        Vec::new()
+    }
+}
+
+pub trait NodeData {
+    fn node_id(&self) -> String;
+    fn all_nodes(&self) -> Vec<String>;
+    fn next_message_id(&self) -> u32;
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -39,93 +94,9 @@ struct Init {
     node_ids: Vec<String>,
 }
 
+#[derive(Debug, Clone, Serialize)]
 struct InitOk {
     in_reply_to: u32,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "type", rename_all = "snake_case")]
-pub enum MessageBody {
-    Init {
-        msg_id: u32,
-
-        ///  ID of the node which is receiving this message
-        node_id: String,
-
-        /// All nodes in the cluster, including the recipient.
-        node_ids: Vec<String>,
-    },
-
-    InitOk {
-        in_reply_to: u32,
-    },
-
-    Error {
-        /// `msg_id` of the request which caused this error.
-        in_reply_to: u32,
-
-        /// code is an integer which indicates the type of error which occurred.
-        /// Maelstrom defines several error types, and you can also invent your own.
-        /// Codes 0-999 are reserved for Maelstrom's use;
-        /// codes 1000 and above are free for your own purposes.
-        code: u32,
-
-        /// optional, and may contain any explanatory message
-        text: String,
-    },
-
-    Echo {
-        echo: String,
-        msg_id: u32,
-    },
-
-    EchoOk {
-        echo: String,
-        in_reply_to: u32,
-    },
-
-    Generate {
-        msg_id: u32,
-    },
-
-    GenerateOk {
-        id: String,
-        in_reply_to: u32,
-    },
-
-    Topology {
-        msg_id: u32,
-        topology: HashMap<String, Vec<String>>,
-    },
-
-    TopologyOk {
-        msg_id: u32,
-        in_reply_to: u32,
-    },
-
-    Broadcast {
-        // Ideally is Any type
-        message: serde_json::Value,
-        msg_id: u32,
-    },
-
-    BroadcastOk {
-        msg_id: u32,
-        in_reply_to: u32,
-    },
-
-    Read {
-        msg_id: u32,
-    },
-
-    ReadOk {
-        msg_id: u32,
-        messages: Vec<serde_json::Value>,
-        in_reply_to: u32,
-    },
-
-    #[serde(other)]
-    Other,
 }
 
 #[derive(Debug)]
@@ -150,7 +121,7 @@ where
             .read_line(&mut buf)
             .context("could not read from stream")?;
 
-        let req: node::Message<Init> = serde_json::de::from_str(&buf).context(format!(
+        let req: Message<Init> = serde_json::de::from_str(&buf).context(format!(
             "Unable to deserialize {:?} as message",
             json::parse(&buf),
         ))?;
@@ -158,7 +129,7 @@ where
         let resp = Message {
             src: req.body.node_id.clone(),
             dest: req.src,
-            body: MessageBody::InitOk {
+            body: InitOk {
                 in_reply_to: req.body.msg_id,
             },
         };
@@ -183,10 +154,7 @@ where
     R: std::io::Read,
     W: std::io::Write,
 {
-    pub fn send<M>(
-        &mut self,
-        msg: crate::node::Message<Result<M, crate::node::ErrorBody>>,
-    ) -> anyhow::Result<()>
+    pub fn send<M>(&mut self, msg: Message<Result<M, ErrorBody>>) -> anyhow::Result<()>
     where
         M: Serialize + Debug,
     {
@@ -300,7 +268,7 @@ pub trait TryHandleLayerMsg {
         &mut self,
         data: impl NodeData,
         buf: String,
-    ) -> Vec<node::Message<Result<serde_json::Value, node::ErrorBody>>>;
+    ) -> Vec<Message<Result<serde_json::Value, ErrorBody>>>;
 }
 
 impl TryHandleLayerMsg for () {
@@ -308,7 +276,7 @@ impl TryHandleLayerMsg for () {
         &mut self,
         data: impl NodeData,
         buf: String,
-    ) -> Vec<node::Message<Result<serde_json::Value, node::ErrorBody>>> {
+    ) -> Vec<Message<Result<serde_json::Value, ErrorBody>>> {
         vec![]
     }
 }
@@ -322,17 +290,18 @@ where
         &mut self,
         data: impl NodeData,
         buf: String,
-    ) -> Vec<node::Message<Result<serde_json::Value, node::ErrorBody>>> {
-        let req = serde_json::de::from_str::<node::Message<L::Request>>(buf.as_str()).context(
-            format!("Unable to deserialize {:?} as message", json::parse(&buf),),
-        );
+    ) -> Vec<Message<Result<serde_json::Value, ErrorBody>>> {
+        let req = serde_json::de::from_str::<Message<L::Request>>(buf.as_str()).context(format!(
+            "Unable to deserialize {:?} as message",
+            json::parse(&buf),
+        ));
         match req {
             Ok(req) => {
                 let responses = self.layer.handle(data, req);
 
                 responses
                     .into_iter()
-                    .map(|resp| node::Message {
+                    .map(|resp| Message {
                         src: resp.src,
                         dest: resp.dest,
                         body: resp.body.map(|body| {
@@ -345,7 +314,7 @@ where
                 .next
                 .parse_and_handle_layer_msg(data, buf)
                 .into_iter()
-                .map(|resp| node::Message {
+                .map(|resp| Message {
                     src: resp.src,
                     dest: resp.dest,
                     body: resp.body.map(|body| {

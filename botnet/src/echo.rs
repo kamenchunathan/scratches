@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::node::{Layer, NodeData};
+use crate::{ErrorBody, Layer, Message, NodeData};
 
 #[derive(Debug)]
 pub struct EchoLayer;
@@ -33,10 +33,10 @@ impl Layer for EchoLayer {
     fn handle(
         &mut self,
         node: impl NodeData,
-        req: crate::node::Message<Self::Request>,
-    ) -> Vec<crate::node::Message<Result<Self::Response, crate::node::ErrorBody>>> {
+        req: Message<Self::Request>,
+    ) -> Vec<Message<Result<Self::Response, ErrorBody>>> {
         let Req::Echo { echo, msg_id } = req.body;
-        vec![crate::node::Message {
+        vec![Message {
             src: node.node_id(),
             dest: req.src,
             body: Ok(Resp::EchoOk {

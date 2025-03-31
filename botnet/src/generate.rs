@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::node::{Layer, NodeData};
+use crate::{ErrorBody, Layer, Message, NodeData};
 
 #[derive(Debug)]
 pub struct GenerateLayer {
@@ -33,11 +33,11 @@ impl Layer for GenerateLayer {
     fn handle(
         &mut self,
         node: impl NodeData,
-        req: crate::node::Message<Self::Request>,
-    ) -> Vec<crate::node::Message<Result<Self::Response, crate::node::ErrorBody>>> {
+        req: Message<Self::Request>,
+    ) -> Vec<Message<Result<Self::Response, ErrorBody>>> {
         self.counter += 1;
         let Req::Generate { msg_id } = req.body;
-        vec![crate::node::Message {
+        vec![Message {
             src: node.node_id(),
             dest: req.src,
             body: Ok(Resp::GenerateOk {
