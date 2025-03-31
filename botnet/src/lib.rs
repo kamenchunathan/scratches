@@ -5,8 +5,7 @@ pub mod generate;
 
 use std::collections::HashMap;
 use std::fmt::Debug;
-use std::io::BufRead;
-use std::io::BufReader;
+use std::io::{BufRead, BufReader};
 
 use anyhow::{bail, Context};
 use serde::de::DeserializeOwned;
@@ -95,8 +94,9 @@ struct Init {
 }
 
 #[derive(Debug, Clone, Serialize)]
-struct InitOk {
-    in_reply_to: u32,
+#[serde(tag = "type", rename_all = "snake_case")]
+enum InitResponse {
+    InitOk { in_reply_to: u32 },
 }
 
 #[derive(Debug)]
@@ -129,7 +129,7 @@ where
         let resp = Message {
             src: req.body.node_id.clone(),
             dest: req.src,
-            body: InitOk {
+            body: InitResponse::InitOk {
                 in_reply_to: req.body.msg_id,
             },
         };
