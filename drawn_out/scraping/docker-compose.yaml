@@ -1,0 +1,41 @@
+services:
+  playwright:
+    image: mcr.microsoft.com/playwright:v1.51.1-noble
+    container_name: playwright
+    command: "npx -y playwright@1.51.1 run-server --port 3000 --host 0.0.0.0"
+    ports:
+      - "3000:3000"
+    shm_size: "2g"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:3000"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 120s
+
+  turso:
+    container_name: turso
+    build:
+      context: .
+      dockerfile: Turso.Dockerfile
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  app:
+    build:
+      context: .
+    container_name: scraper
+    depends_on:
+      playwright:
+        condition: service_healthy
+      turso:
+        condition: service_healthy
+    environment:
+      PLAYWRIGHT_URI: "ws://playwright:3000"
+      DB_URI: "http://turso:8080"

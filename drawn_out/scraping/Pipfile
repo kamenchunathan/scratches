@@ -4,14 +4,13 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-chess = "*"
-pandas = "*"
-numpy = "*"
+asyncio = "*"
 beautifulsoup4 = "*"
 libsql-experimental = "*"
-selenium = "*"
+urllib3 = "*"
+playwright = "==1.15.1"
 
 [dev-packages]
 
 [requires]
-python_version = "3.11"
+python_version = "3.12"

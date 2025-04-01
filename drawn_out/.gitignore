@@ -3,5 +3,8 @@
 .direnv
 data
 *.db
+*.db-shm
+*.db-wal
 db.sqlite3
 */__pycache__/
+
