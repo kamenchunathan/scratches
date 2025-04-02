@@ -53,9 +53,8 @@ async def initialize_browser_pool(browser: Browser, max_tabs: int):
     
     # Create and add browser contexts to the queue
     for _ in range(max_tabs):
-        context = await browser.new_context()
-        page = await context.new_page()
-        await context_queue.put({"context": context, "page": page, 'first_launch': True})
+        page = await browser.new_page()
+        await context_queue.put({'page': page, 'first_launch': True})
 
 
 
@@ -67,7 +66,7 @@ async def get_context():
         return context
 
 
-async def release_context(ctx: {"context": BrowserContext, "page": Page }):
+async def release_context(ctx):
     """Release a browser context back to the pool"""
     global context_queue
     await context_queue.put(ctx)
@@ -251,10 +250,7 @@ async def get_pgn(page: Page, game_id: str, first_launch=False) -> Optional[str]
         return pgn
 
     except Exception as e:
-        logging.error(f"Error fetching PGN for game {game_id}: {e}")
-        await page.screenshot(
-            path = os.path.join(SCREENSHOT_PATH, f'share-button-debug-{datetime.now()}.png')
-        )
+        logging.error(f"Error fetching PGN for game {game_id}: {type(e)} {e}")
         return None
 
 
@@ -304,7 +300,6 @@ async def process_game(game_id: str, tournament_id: str, local_retry_tracker: di
     while local_retry_tracker[game_id] < max_retries and not success:
         # Get a browser context from the pool
         ctx = await get_context()
-        context = ctx.get('context')
         page = ctx.get('page')
         first_launch = ctx.get('first_launch')
         try:
@@ -330,7 +325,7 @@ async def process_game(game_id: str, tournament_id: str, local_retry_tracker: di
             
         finally:
             # Return the context to the pool
-            await release_context({'context':context, 'page':page, 'first_launch': False})
+            await release_context({'page':page, 'first_launch': False})
                 
 
     # Update DB status only after all local retries are exhausted
