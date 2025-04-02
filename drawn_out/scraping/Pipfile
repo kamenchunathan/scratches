@@ -8,7 +8,7 @@ asyncio = "*"
 beautifulsoup4 = "*"
 libsql-experimental = "*"
 urllib3 = "*"
-playwright = "==1.15.1"
+playwright = "*"
 
 [dev-packages]
 
