@@ -5,17 +5,23 @@ import boto3
 from botocore.config import Config
 
 
+SCREENSHOT_PATH = os.getenv("SCREENSHOT_PATH")
+BUCKET_NAME = os.getenv("BUCKET_NAME") 
+CLOUDFLARE_PUBLIC_URL = os.getenv("CLOUDFLARE_PUBLIC_URL") 
+ENDPOINT_URL = os.getenv("ENDPOINT_URL")
+AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
+AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
+
+
 s3 = boto3.client(
     "s3",
-    endpoint_url="https://f6d1d15e6f0b37b4b8fcad3c41a7922d.r2.cloudflarestorage.com",
-    aws_access_key_id="3d43ea1903ba006bc666503b0913150b",
-    aws_secret_access_key="8a9cdead6fa4762a10fae95122c630afe605c66dee317e5fc7e58287ba4a3399",
+    endpoint_url=ENDPOINT_URL,
+    aws_access_key_id=AWS_ACCESS_KEY_ID,
+    aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
     config=Config(signature_version="s3v4"),
 )
 
 
-BUCKET_NAME = "pregnant-yellow-perch-6ri27"
-CLOUDFLARE_PUBLIC_URL = "https://pregnant-yellow-perch-6ri27.sevalla.storage"
 
 def upload_to_cloudflare(file_path: str, object_name: Optional[str] = None) -> str:
     # If S3 object_name was not specified, use file_paths basename
@@ -38,7 +44,7 @@ def upload_to_cloudflare(file_path: str, object_name: Optional[str] = None) -> s
 
 
 def main():
-    dir = "/var/lib/data/"
+    dir = SCREENSHOT_PATH
     for filename in os.listdir(dir):
         path = os.path.join(dir, filename)
         if os.path.isfile(path):
