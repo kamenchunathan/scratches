@@ -446,7 +446,7 @@ async def async_main():
             # Close all contexts and the browser
             while not context_queue.empty():
                 context = await context_queue.get()
-                await context.get('context').close()
+                await context.get('page').close()
             
             await browser.close()
 
