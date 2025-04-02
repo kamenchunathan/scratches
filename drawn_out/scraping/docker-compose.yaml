@@ -39,3 +39,4 @@ services:
     environment:
       PLAYWRIGHT_URI: "ws://playwright:3000"
       DB_URI: "http://turso:8080"
+      MAX_TABS: 2

@@ -9,6 +9,8 @@ beautifulsoup4 = "*"
 libsql-experimental = "*"
 urllib3 = "*"
 playwright = "*"
+botocore = "*"
+boto3 = "*"
 
 [dev-packages]
 

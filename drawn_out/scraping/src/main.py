@@ -1,9 +1,10 @@
+import datetime
 import http.client
+import json
+import logging
 import os
 import time
 import urllib3
-import logging
-import json
 from time import sleep
 from typing import Optional, Tuple
 from datetime import datetime
@@ -17,6 +18,8 @@ DB_URI = os.getenv("DB_URI")
 DB_TOKEN = os.getenv("DB_TOKEN", '')
 PLAYWRIGHT_URI = os.getenv("PLAYWRIGHT_URI", "localhost")
 MAX_TABS = int(os.getenv("MAX_TABS", "11"))
+SCREENSHOT_PATH = os.getenv("SCREENSHOT_PATH")
+DEBUG = os.getenv("DEBUG", '0') == '1'
 
 
 API_HOST = 'www.chess.com'
@@ -28,35 +31,6 @@ logging.basicConfig(
     handlers=[ logging.StreamHandler() ]
 )
 logger = logging.getLogger("tt_scraper")
-
-# Add metrics dict to track timings
-metrics = {
-    "selenium_request_times": [],
-    "db_call_intervals": [],
-    "selenium_connect_times": [],
-    "last_db_call_time": None
-}
-
-
-
-
-def log_metrics():
-    """Log the current metrics to the console"""
-    if metrics["selenium_request_times"]:
-        avg_selenium_time = sum(metrics["selenium_request_times"]) / len(metrics["selenium_request_times"])
-        max_selenium_time = max(metrics["selenium_request_times"])
-        logger.info(f"Selenium metrics - Avg request time: {avg_selenium_time:.2f}s, Max: {max_selenium_time:.2f}s, Count: {len(metrics['selenium_request_times'])}")
-    
-    if metrics["db_call_intervals"]:
-        avg_db_interval = sum(metrics["db_call_intervals"]) / len(metrics["db_call_intervals"])
-        max_db_interval = max(metrics["db_call_intervals"])
-        logger.info(f"DB metrics - Avg interval between calls: {avg_db_interval:.2f}s, Max: {max_db_interval:.2f}s, Count: {len(metrics['db_call_intervals'])}")
-    
-    if metrics["selenium_connect_times"]:
-        avg_connect_time = sum(metrics["selenium_connect_times"]) / len(metrics["selenium_connect_times"])
-        max_connect_time = max(metrics["selenium_connect_times"])
-        logger.info(f"Selenium connection metrics - Avg connect time: {avg_connect_time:.2f}s, Max: {max_connect_time:.2f}s, Count: {len(metrics['selenium_connect_times'])}")
-
 
 # Global tab pool management
 semaphore = None
@@ -72,6 +46,7 @@ def connect_to_playwright():
 
 async def initialize_browser_pool(browser: Browser, max_tabs: int):
     """Initialize the browser context pool"""
+    logger.info(f'Initializing browser pool with {max_tabs} contexts')
     global semaphore, context_queue
     semaphore = asyncio.Semaphore(max_tabs)
     context_queue = asyncio.Queue()
@@ -80,7 +55,7 @@ async def initialize_browser_pool(browser: Browser, max_tabs: int):
     for _ in range(max_tabs):
         context = await browser.new_context()
         page = await context.new_page()
-        await context_queue.put({"context": context, "page": page})
+        await context_queue.put({"context": context, "page": page, 'first_launch': True})
 
 
 
@@ -241,16 +216,25 @@ def get_game_ids(tournament_id: str, tournament_round: int) -> [str]:
     return game_ids
 
 
-async def get_pgn(page: Page, game_id: str) -> Optional[str]:
+async def get_pgn(page: Page, game_id: str, first_launch=False) -> Optional[str]:
+    logger.info(f'Fetching pgn for {game_id}')
     try:
         await page.goto(f'https://www.chess.com/game/live/{game_id}', wait_until='domcontentloaded')
         
-        # Wait for and close the modal
-        await page.wait_for_selector('.board-modal-header-close[aria-label="Close"]', timeout=120000)
         # Small delay to account for layout shifts
-        await asyncio.sleep(2)
-        await page.click('.board-modal-header-close[aria-label="Close"]')
+        await asyncio.sleep(10 if first_launch else 2)
+
+        # Remove cookie banner 
+        cookie_banner = await page.locator(
+                '#onetrust-banner-sdk[aria-label="Cookie banner"]'
+            ).all()
+        if len(cookie_banner) > 0:
+            await page.click('#onetrust-reject-all-handler')
         
+        # Wait for and close the Game over modal
+        await page.wait_for_selector('.board-modal-header-close[aria-label="Close"]', timeout=120000)
+        await page.click('.board-modal-header-close[aria-label="Close"]')
+
         # Click share button
         await page.click('.share')
         
@@ -267,7 +251,10 @@ async def get_pgn(page: Page, game_id: str) -> Optional[str]:
         return pgn
 
     except Exception as e:
-        logging.error(f"Error fetching PGN for game {game_id}: {str(e)}")
+        logging.error(f"Error fetching PGN for game {game_id}: {e}")
+        await page.screenshot(
+            path = os.path.join(SCREENSHOT_PATH, f'share-button-debug-{datetime.now()}.png')
+        )
         return None
 
 
@@ -286,7 +273,7 @@ async def populate_tournament_rounds(tournament_id: str):
             return
         rounds_fetched = res[0]
         
-        if rounds_fetched > TT_ROUNDS:
+        if rounds_fetched >= TT_ROUNDS:
             return
 
         current_round = rounds_fetched + 1
@@ -319,9 +306,10 @@ async def process_game(game_id: str, tournament_id: str, local_retry_tracker: di
         ctx = await get_context()
         context = ctx.get('context')
         page = ctx.get('page')
+        first_launch = ctx.get('first_launch')
         try:
             start_time = time.time()
-            pgn = await get_pgn(page, game_id)
+            pgn = await get_pgn(page, game_id, first_launch)
             
             if pgn is not None:
                 db = libsql_connect()
@@ -342,7 +330,7 @@ async def process_game(game_id: str, tournament_id: str, local_retry_tracker: di
             
         finally:
             # Return the context to the pool
-            await release_context({'context':context, 'page':page})
+            await release_context({'context':context, 'page':page, 'first_launch': False})
                 
 
     # Update DB status only after all local retries are exhausted
@@ -367,7 +355,6 @@ async def populate_game_pgns(tournament_id: str, local_max_retries: int = 3):
     
     # Local retry tracking dictionary
     local_retry_tracker = {}  # game_id -> retry_count
-    
         
     while True:
         db = libsql_connect()
@@ -431,6 +418,7 @@ async def populate_game_pgns(tournament_id: str, local_max_retries: int = 3):
 
 async def async_main():
     logger.info('Starting data collection process')
+    logger.info(f'Debug: {DEBUG}')
     # if DB_URI is None or DB_TOKEN is None:
     #     logging.error("Missing required environment variables")
     #     return
@@ -439,13 +427,17 @@ async def async_main():
     run_migrations(db)
     
     async with async_playwright() as p:
-        browser = await p.chromium.connect(PLAYWRIGHT_URI)
+        browser = None
+        if DEBUG:
+            browser = await p.chromium.launch(headless=False)
+        else:
+            browser = await p.chromium.connect(PLAYWRIGHT_URI)
         await initialize_browser_pool(browser, MAX_TABS)
         
         try:
             while True:
                 tournament_id = fetch_current_job(db)
-                print('current job', tournament_id)
+                logger.info(f'current job: {tournament_id}' )
                 if tournament_id is None:
                     break
 
@@ -459,7 +451,7 @@ async def async_main():
             # Close all contexts and the browser
             while not context_queue.empty():
                 context = await context_queue.get()
-                await context.close()
+                await context.get('context').close()
             
             await browser.close()
 
