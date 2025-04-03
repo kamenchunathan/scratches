@@ -15,6 +15,7 @@ pub struct GameSummary {
     pub actual_outcome: String,
     pub termination: String,
     pub endgame_sequence: String,
+    pub end_piece_count: u32,
 }
 
 pub async fn get_unprocessed_pgns(
@@ -49,7 +50,7 @@ INSERT INTO summary (
   white_elo, black_elo, t_5men, t_4men, 
   t_3men, t_5men_wdl, t_4men_wdl, t_3men_wdl, 
   actual_outcome, termination, game_id, 
-  endgame_sequence
+  endgame_sequence, end_piece_count
 )
 VALUES
   ( "#;
@@ -68,7 +69,8 @@ VALUES
         .push_bind(summary.actual_outcome)
         .push_bind(summary.termination)
         .push_bind(game_id)
-        .push_bind(summary.endgame_sequence);
+        .push_bind(summary.endgame_sequence)
+        .push_bind(summary.end_piece_count);
     separated.push_unseparated(" ) ;");
 
     builder.build().execute(conn).await?;
@@ -90,7 +92,7 @@ INSERT INTO summary (
   white_elo, black_elo, t_5men, t_4men, 
   t_3men, t_5men_wdl, t_4men_wdl, t_3men_wdl, 
   actual_outcome, termination, game_id, 
-  endgame_sequence
+  endgame_sequence, end_piece_count
 )"#;
 
     let mut builder: QueryBuilder<Sqlite> = QueryBuilder::new(query_frag);
@@ -107,7 +109,8 @@ INSERT INTO summary (
             .push_bind(s.actual_outcome)
             .push_bind(s.termination)
             .push_bind(game_id)
-            .push_bind(s.endgame_sequence);
+            .push_bind(s.endgame_sequence)
+            .push_bind(s.end_piece_count);
     });
     builder.build().execute(conn).await?;
 

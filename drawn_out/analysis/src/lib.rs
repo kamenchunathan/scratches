@@ -154,6 +154,7 @@ impl Visitor for SummaryAnalysis {
             actual_outcome,
             termination: self.termination.clone(),
             endgame_sequence: self.endgame_sequence.clone(),
+            end_piece_count: self.position.board().iter().len() as u32,
         }
     }
 }

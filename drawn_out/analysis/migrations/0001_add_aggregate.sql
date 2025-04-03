@@ -1,5 +1,5 @@
 CREATE TABLE IF NOT EXISTS summary  (
-  id                  INTEGER PRIMARY KEY,
+  id                  INTEGER           PRIMARY KEY,
   white_elo           INTEGER,
   black_elo           INTEGER,
   t_5men              TEXT,
@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS summary  (
   t_3men_wdl          CHAR(2), 
   actual_outcome      CHAR(1) NOT NULL,
   termination         TEXT    NOT NULL,
-  game_id             TEXT    NOT NULL,
+  game_id             TEXT    NOT NULL  UNIQUE,
   endgame_sequence    TEXT    NOT NULL,
 
   FOREIGN KEY(game_id) REFERENCES game(id),
