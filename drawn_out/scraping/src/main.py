@@ -250,7 +250,7 @@ async def get_pgn(page: Page, game_id: str, first_launch=False) -> Optional[str]
         return pgn
 
     except Exception as e:
-        logging.error(f"Error fetching PGN for game {game_id}: {type(e)} {e}")
+        logger.error(f"Error fetching PGN for game {game_id}: {type(e)} {e}")
         return None
 
 
@@ -315,8 +315,9 @@ async def process_game(game_id: str, tournament_id: str, local_retry_tracker: di
                 db.commit()
                 success = True
             else:
-                raise Exception()
-        except:
+                raise Exception('Could not get pgn')
+        except Exception as e:
+            logger.error(f"Error processing game {game_id}: {type(e)} {e}")
             # Increment local retry count on failure
             local_retry_tracker[game_id] += 1
             # Wait before retry with exponential backoff
@@ -408,7 +409,6 @@ async def populate_game_pgns(tournament_id: str, local_max_retries: int = 3):
                 local_retry_tracker.pop(game_id, None)
 
     logger.info(f"Batch of games processed, logging interim metrics")
-    log_metrics()
 
 
 async def async_main():
@@ -441,6 +441,8 @@ async def async_main():
 
                 # Check for completion of a job and update
                 check_and_set_completed(tournament_id)
+        except Exception as e:
+            logger.error(f"Error {type(e)} {e}")
         
         finally:
             # Close all contexts and the browser
@@ -449,8 +451,6 @@ async def async_main():
                 await context.get('page').close()
             
             await browser.close()
-
-    log_metrics()  # Log final metrics summary
 
 
 def main():
