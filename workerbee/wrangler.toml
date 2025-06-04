@@ -4,3 +4,8 @@ compatibility_date = "2025-06-03"
 
 [build]
 command = "cargo install -q worker-build && worker-build --release"
+
+[[durable_objects.bindings]]
+name = "COUNTER"
+class_name = "Counter"
+

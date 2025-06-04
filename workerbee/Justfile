@@ -1,0 +1,5 @@
+default:
+  @just dev
+  
+dev:
+  pnpx wrangler dev
