@@ -28,14 +28,7 @@
           let
             rust = prev.rust-bin;
           in
-          if builtins.pathExists ./rust-toolchain.toml then
-            rust.fromRustupToolchainFile ./rust-toolchain.toml
-          else if builtins.pathExists ./rust-toolchain then
-            rust.fromRustupToolchainFile ./rust-toolchain
-          else
-            rust.stable.latest.default.override {
-              extensions = [ "rust-src" "rustfmt" ];
-            };
+          rust.fromRustupToolchainFile ./rust-toolchain.toml;
       };
 
       devShells = forEachSupportedSystem ({ pkgs }: {
@@ -45,9 +38,15 @@
             openssl
             pkg-config
             cargo-deny
-            cargo-edit
             cargo-watch
+            cargo-generate
             rust-analyzer
+
+
+            nodejs
+            nodePackages.pnpm
+
+            just
           ];
 
           env = {
