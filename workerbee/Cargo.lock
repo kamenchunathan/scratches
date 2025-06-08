@@ -992,9 +992,11 @@ dependencies = [
  "axum",
  "axum-macros",
  "console_error_panic_hook",
+ "futures-channel",
  "serde",
  "serde_json",
  "tower-service",
+ "wasm-bindgen-futures",
  "worker",
  "worker-macros",
 ]

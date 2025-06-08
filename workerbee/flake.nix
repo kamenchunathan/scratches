@@ -40,7 +40,12 @@
             cargo-deny
             cargo-watch
             cargo-generate
+            cargo-expand
             rust-analyzer
+
+            # coudlfare
+            worker-build
+            wrangler
 
 
             nodejs

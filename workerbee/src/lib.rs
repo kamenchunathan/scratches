@@ -1,7 +1,9 @@
 use axum::{routing::get, Router};
+use futures_channel::oneshot;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tower_service::Service;
+use wasm_bindgen_futures::spawn_local;
 use worker::*;
 
 #[derive(Clone)]
@@ -19,25 +21,31 @@ async fn fetch(
 
     Ok(Router::new()
         .route("/:user/value", get(value))
-        .with_state(AppState { env })
+        .with_state(AppState { env: env })
         .call(req)
         .await?)
 }
 
-#[axum_macros::debug_handler]
 async fn value(
     axum::extract::State(AppState { env }): axum::extract::State<AppState>,
 ) -> impl axum::response::IntoResponse {
-    let namespace = env.durable_object("data").unwrap();
-    let counter = namespace
-        .id_from_name("Counter")
-        .and_then(|id| id.get_stub())
-        .unwrap();
+    let (tx, mut rx) = oneshot::channel();
+    spawn_local(async move {
+        let namespace = env.durable_object("data").unwrap();
+        let counter = namespace
+            .id_from_name("Counter")
+            .and_then(|id| id.get_stub())
+            .unwrap();
 
-    let mut ret = counter.fetch_with_str("/increment").await.unwrap();
-    let CounterResponse { count } = ret.json().await.unwrap();
+        let mut ret = counter.fetch_with_str("/increment").await.unwrap();
+        let CounterResponse { count } = ret.json().await.unwrap();
+        tx.send(count).unwrap();
+    });
 
-    serde_json::to_string(&json!({"value": 0})).unwrap()
+    match rx.try_recv() {
+        Ok(count) => serde_json::to_string(&json!({"value": count})).unwrap(),
+        Err(_) => unimplemented!(),
+    }
 }
 
 #[durable_object]
