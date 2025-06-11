@@ -1,0 +1,95 @@
+:root {
+  --color-bg: #f0f2f5;
+  --color-card-bg: #ffffff;
+  --color-text: #333;
+  --color-primary: #007bff;
+  --color-primary-hover: #0056b3;
+  --color-status-connecting: #ffc107;
+  --color-status-open: #28a745;
+  --color-status-closed: #dc3545;
+  --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    Helvetica, Arial, sans-serif;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-family);
+  background-color: var(--color-bg);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  color: var(--color-text);
+}
+
+.counter-container {
+  background-color: var(--color-card-bg);
+  padding: 2rem 3rem;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  text-align: center;
+  width: 320px;
+}
+
+h1 {
+  margin-top: 0;
+  font-size: 1.75rem;
+  color: var(--color-text);
+}
+
+.status-bar {
+  margin-bottom: 1.5rem;
+  font-size: 0.9rem;
+  color: #666;
+}
+
+#status-display {
+  font-weight: bold;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+}
+
+.status-connecting {
+  color: #856404;
+  background-color: var(--color-status-connecting);
+}
+
+.status-open {
+  color: #fff;
+  background-color: var(--color-status-open);
+}
+
+.status-closed {
+  color: #fff;
+  background-color: var(--color-status-closed);
+}
+
+.counter-value {
+  font-size: 5rem;
+  font-weight: bold;
+  margin-bottom: 1.5rem;
+  line-height: 1;
+  color: var(--color-primary);
+}
+
+#increment-button {
+  width: 100%;
+  padding: 0.75rem;
+  font-size: 1rem;
+  font-weight: bold;
+  color: #fff;
+  background-color: var(--color-primary);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.2s ease-in-out;
+}
+
+#increment-button:hover:not(:disabled) {
+  background-color: var(--color-primary-hover);
+}
+
+#increment-button:disabled {
+  background-color: #a0a0a0;
+  cursor: not-allowed;
+}

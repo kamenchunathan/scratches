@@ -1,12 +1,16 @@
+mod durable_object;
+
+use askama::Template;
 use axum::{
     extract,
-    http::StatusCode,
+    http::{self, StatusCode},
     response::{self, IntoResponse},
     routing::get,
     Router,
 };
+use durable_object::CounterResponse;
 use futures_channel::oneshot;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use serde_json::json;
 use tower_service::Service;
 use wasm_bindgen_futures::spawn_local;
@@ -26,10 +30,47 @@ async fn fetch(
     console_error_panic_hook::set_once();
 
     Ok(Router::new()
+        .route("/", get(counter))
         .route("/:user_id/:action", get(value))
+        .route(
+            "/static/style.css",
+            get(async || {
+                (
+                    [(
+                        http::header::CONTENT_TYPE,
+                        http::HeaderValue::from_static(mime::TEXT_CSS.as_ref()),
+                    )],
+                    include_str!("static/style.css"),
+                )
+            }),
+        )
+        .route(
+            "/static/index.js",
+            get(async || {
+                (
+                    [(
+                        http::header::CONTENT_TYPE,
+                        http::HeaderValue::from_static(mime::APPLICATION_JAVASCRIPT.as_ref()),
+                    )],
+                    include_str!("static/index.js"),
+                )
+            }),
+        )
         .with_state(AppState { env })
         .call(req)
         .await?)
+}
+
+#[allow(unused)]
+#[derive(Template)]
+#[template(path = "index.html")]
+struct CounterPage {
+    count: i32,
+}
+
+async fn counter() -> impl IntoResponse {
+    let template = CounterPage { count: 0 };
+    axum::response::Html(template.render().unwrap_or("".to_string()))
 }
 
 #[derive(Deserialize)]
@@ -75,52 +116,5 @@ async fn value(
         Ok(Err(status)) => (status, "Error").into_response(),
 
         Err(err) => (StatusCode::INTERNAL_SERVER_ERROR, format!("{err:?}")).into_response(),
-    }
-}
-
-#[durable_object]
-struct Counter {
-    state: State,
-    _env: Env,
-    count: i32,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct CounterResponse {
-    count: i32,
-}
-
-#[durable_object]
-impl DurableObject for Counter {
-    fn new(state: State, env: Env) -> Self {
-        Self {
-            state,
-            _env: env,
-            count: 0,
-        }
-    }
-    async fn fetch(&mut self, req: Request) -> Result<Response> {
-        console_log!("-------------------------------------------------------------------------");
-        if self.count == 0 {
-            self.count = self.state.storage().get::<i32>("count").await.unwrap_or(0);
-        }
-
-        match dbg!(req.path().as_str()) {
-            "/value" => Response::from_json(&CounterResponse { count: self.count }),
-
-            "/increment" => {
-                self.count += 1;
-                self.state.storage().put("count", self.count).await?;
-                Response::from_json(&CounterResponse { count: self.count })
-            }
-
-            "/decrement" => {
-                self.count -= 1;
-                self.state.storage().put("count", self.count).await?;
-                Response::from_json(&CounterResponse { count: self.count })
-            }
-
-            _ => Response::error("Unrecognized method", 500),
-        }
     }
 }

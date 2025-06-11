@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Shared WebSocket Counter</title>
+    <link rel="stylesheet" href="/static/style.css" />
+  </head>
+  <body>
+    <div class="counter-container">
+      <h1>Shared Counter</h1>
+      <div class="status-bar">
+        <span>Status:</span>
+        <span id="status-display">Connecting...</span>
+      </div>
+      <div id="counter-value" class="counter-value">--</div>
+      <button id="increment-button" disabled>Increment</button>
+    </div>
+
+    <script src="/static/index.js"></script>
+  </body>
+</html>
