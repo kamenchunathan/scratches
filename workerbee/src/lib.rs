@@ -1,4 +1,11 @@
-use axum::{routing::get, Router};
+use axum::{
+    body::Body,
+    extract,
+    http::StatusCode,
+    response::{self, IntoResponse},
+    routing::get,
+    Router,
+};
 use futures_channel::oneshot;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -21,30 +28,58 @@ async fn fetch(
 
     Ok(Router::new()
         .route("/:user/value", get(value))
-        .with_state(AppState { env: env })
+        .with_state(AppState { env })
         .call(req)
         .await?)
 }
 
+// #[axum_macros::debug_handler]
 async fn value(
-    axum::extract::State(AppState { env }): axum::extract::State<AppState>,
+    extract::Path(user_id): extract::Path<String>,
+    extract::State(AppState { env }): axum::extract::State<AppState>,
 ) -> impl axum::response::IntoResponse {
-    let (tx, mut rx) = oneshot::channel();
+    let (tx, rx) = oneshot::channel::<Result<CounterResponse>>();
     spawn_local(async move {
-        let namespace = env.durable_object("data").unwrap();
+        let mut i: u64 = 0;
+        loop {
+            if i > 1000_000_000_000 {
+                break;
+            }
+            i += 1;
+        }
+
+        let namespace = env.durable_object("COUNTER").unwrap();
         let counter = namespace
-            .id_from_name("Counter")
+            .id_from_name(&user_id)
             .and_then(|id| id.get_stub())
             .unwrap();
 
-        let mut ret = counter.fetch_with_str("/increment").await.unwrap();
-        let CounterResponse { count } = ret.json().await.unwrap();
-        tx.send(count).unwrap();
+        match counter.fetch_with_str("http://stub/value").await {
+            Ok(mut ret) => {
+                tx.send(ret.json().await).unwrap();
+            }
+
+            Err(err) => {
+                console_log!("{err:?}")
+            }
+        }
     });
 
-    match rx.try_recv() {
-        Ok(count) => serde_json::to_string(&json!({"value": count})).unwrap(),
-        Err(_) => unimplemented!(),
+    match rx.await {
+        Ok(Ok(count)) => {
+            console_log!("{count:?}");
+            response::Json(json!({"value": count})).into_response()
+        }
+
+        Ok(err) => {
+            console_log!("{err:?}");
+            (StatusCode::INTERNAL_SERVER_ERROR, "").into_response()
+        }
+
+        Err(err) => {
+            console_log!("{err:?}");
+            response::Json(json!(0)).into_response()
+        }
     }
 }
 
@@ -55,7 +90,7 @@ struct Counter {
     count: i32,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 struct CounterResponse {
     count: i32,
 }
@@ -70,6 +105,7 @@ impl DurableObject for Counter {
         }
     }
     async fn fetch(&mut self, req: Request) -> Result<Response> {
+        console_log!("-------------------------------------------------------------------------");
         if self.count == 0 {
             self.count = self.state.storage().get::<i32>("count").await.unwrap_or(0);
         }
