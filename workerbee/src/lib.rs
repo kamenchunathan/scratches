@@ -1,5 +1,4 @@
 use axum::{
-    body::Body,
     extract,
     http::StatusCode,
     response::{self, IntoResponse},
@@ -27,36 +26,39 @@ async fn fetch(
     console_error_panic_hook::set_once();
 
     Ok(Router::new()
-        .route("/:user/value", get(value))
+        .route("/:user_id/:action", get(value))
         .with_state(AppState { env })
         .call(req)
         .await?)
 }
 
+#[derive(Deserialize)]
+struct Params {
+    user_id: String,
+    action: String,
+}
+
 // #[axum_macros::debug_handler]
 async fn value(
-    extract::Path(user_id): extract::Path<String>,
+    extract::Path(Params { user_id, action }): extract::Path<Params>,
     extract::State(AppState { env }): axum::extract::State<AppState>,
 ) -> impl axum::response::IntoResponse {
-    let (tx, rx) = oneshot::channel::<Result<CounterResponse>>();
+    let (tx, rx) = oneshot::channel();
     spawn_local(async move {
-        let mut i: u64 = 0;
-        loop {
-            if i > 1000_000_000_000 {
-                break;
-            }
-            i += 1;
-        }
-
         let namespace = env.durable_object("COUNTER").unwrap();
         let counter = namespace
             .id_from_name(&user_id)
             .and_then(|id| id.get_stub())
             .unwrap();
 
-        match counter.fetch_with_str("http://stub/value").await {
+        let uri = format!("http://stub/{action}");
+        match counter.fetch_with_str(&uri).await {
             Ok(mut ret) => {
-                tx.send(ret.json().await).unwrap();
+                tx.send(ret.json().await.map_err(|_| {
+                    StatusCode::from_u16(ret.status_code())
+                        .unwrap_or(StatusCode::INTERNAL_SERVER_ERROR)
+                }))
+                .unwrap();
             }
 
             Err(err) => {
@@ -66,20 +68,13 @@ async fn value(
     });
 
     match rx.await {
-        Ok(Ok(count)) => {
-            console_log!("{count:?}");
+        Ok(Ok(CounterResponse { count })) => {
             response::Json(json!({"value": count})).into_response()
         }
 
-        Ok(err) => {
-            console_log!("{err:?}");
-            (StatusCode::INTERNAL_SERVER_ERROR, "").into_response()
-        }
+        Ok(Err(status)) => (status, "Error").into_response(),
 
-        Err(err) => {
-            console_log!("{err:?}");
-            response::Json(json!(0)).into_response()
-        }
+        Err(err) => (StatusCode::INTERNAL_SERVER_ERROR, format!("{err:?}")).into_response(),
     }
 }
 
