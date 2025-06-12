@@ -9,3 +9,6 @@ command = "cargo install -q worker-build && worker-build --release"
 name = "COUNTER"
 class_name = "Counter"
 
+[[migrations]]
+tag = "v1"
+new_classes = ["Counter"]
