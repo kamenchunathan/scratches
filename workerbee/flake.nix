@@ -44,8 +44,8 @@
             rust-analyzer
 
             # coudlfare
-            worker-build
-            wrangler
+            # worker-build
+            # wrangler
 
 
             nodejs
