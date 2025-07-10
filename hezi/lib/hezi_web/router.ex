@@ -18,6 +18,8 @@ defmodule HeziWeb.Router do
     pipe_through :browser
 
     get "/", PageController, :home
+
+    live "/game", IndexLive.Index, :home
   end
 
   # Other scopes may use custom stacks.
