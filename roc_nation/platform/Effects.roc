@@ -1,0 +1,3 @@
+hosted [print!]
+
+print! : Str => {}
