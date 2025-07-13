@@ -10,4 +10,5 @@ name = "roc_host"
 
 [dependencies]
 roc_std.workspace = true
+roc_app = { path = "../roc_app" }
 libc = "0.2"

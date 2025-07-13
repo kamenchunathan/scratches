@@ -13,7 +13,8 @@ import Event exposing [Event]
 
 setup_callback_for_host : I32 -> (Event -> U32)
 setup_callback_for_host = |_|
-    (|_| 0)
+    a = 1
+    (|_| a)
 
 handle_callback_for_host : U32 -> {}
 handle_callback_for_host = |_|

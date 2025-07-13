@@ -1,6 +1,11 @@
 [workspace]
 resolver = "2"
-members = ["crates/roc_host", "crates/roc_host_lib", "crates/roc_host_bin"]
+members = [
+  "crates/roc_host",
+  "crates/roc_host_lib",
+  "crates/roc_host_bin",
+  "crates/roc_app",
+]
 
 [profile.release]
 lto = true
