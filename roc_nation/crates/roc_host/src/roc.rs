@@ -87,6 +87,11 @@ pub struct Msg {
     _marker: core::marker::PhantomData<(*mut u8, core::marker::PhantomPinned)>,
 }
 
+#[repr(C)]
+pub struct Event {
+    type_: RocStr,
+}
+
 pub fn call_roc_setup_callback() -> *const Captures {
     extern "C" {
         #[link_name = "roc__setup_callback_for_host_1_exposed_generic"]
@@ -95,9 +100,12 @@ pub fn call_roc_setup_callback() -> *const Captures {
         #[link_name = "roc__setup_callback_for_host_1_exposed_size"]
         fn size() -> usize;
     }
-
     unsafe {
-        let captures = roc_alloc(size(), 0) as *mut Captures;
+        let ret_size = size();
+        println!("Allocation size {ret_size}");
+
+        let captures = roc_alloc(ret_size, 0) as *mut Captures;
+
         caller(captures, 0);
         captures as *const Captures
     }
@@ -106,7 +114,7 @@ pub fn call_roc_setup_callback() -> *const Captures {
 pub fn call_roc_callback(captures: *const Captures) -> *mut *mut Msg {
     extern "C" {
         #[link_name = "roc__setup_callback_for_host_0_caller"]
-        fn caller(_: *const Captures, _: *const i32, _: *mut *mut Msg);
+        fn caller(_: *const Event, _: *const Captures, _: *mut *mut Msg);
 
         #[link_name = "roc__setup_callback_for_host_0_result_size"]
         fn size() -> isize;
@@ -114,7 +122,10 @@ pub fn call_roc_callback(captures: *const Captures) -> *mut *mut Msg {
 
     unsafe {
         let ret = roc_alloc(size() as usize, 0) as *mut *mut Msg;
-        caller(captures, &0, ret);
+        let event = Event {
+            type_: RocStr::from("event"),
+        };
+        caller(&event, captures, ret);
         ret as *mut *mut Msg
     }
 }
