@@ -94,3 +94,9 @@ clean:
     rm -rf examples/*.ll
     rm -rf "{{ build_dir }}"
 
+gen-glue:
+    #!/usr/bin/env bash
+    set -euxo pipefail
+    
+    roc glue "$ROC_SRC_CODE_PATH/crates/glue/src/RustGlue.roc" crates platform/glue.roc
+ 
