@@ -1,0 +1,21 @@
+platform "wow" requires { Msg } {
+    }
+    exposes [Effects, Event]
+    packages {
+    }
+    imports []
+    provides [
+        setup_callback_for_host,
+        handle_callback_for_host,
+    ]
+
+import Event exposing [Event]
+
+setup_callback_for_host : I32 -> (Event -> U32)
+setup_callback_for_host = |_|
+    (|_| 0)
+
+handle_callback_for_host : U32 -> {}
+handle_callback_for_host = |_|
+    {}
+
