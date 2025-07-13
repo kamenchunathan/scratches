@@ -111,7 +111,7 @@ pub fn call_roc_setup_callback() -> *const Captures {
     }
 }
 
-pub fn call_roc_callback(captures: *const Captures) -> *mut *mut Msg {
+pub fn call_roc_callback(captures: *const Captures, event: Event) -> *mut *mut Msg {
     extern "C" {
         #[link_name = "roc__setup_callback_for_host_0_caller"]
         fn caller(_: *const Event, _: *const Captures, _: *mut *mut Msg);
@@ -122,9 +122,7 @@ pub fn call_roc_callback(captures: *const Captures) -> *mut *mut Msg {
 
     unsafe {
         let ret = roc_alloc(size() as usize, 0) as *mut *mut Msg;
-        let event = Event {
-            type_: RocStr::from("event"),
-        };
+
         caller(&event, captures, ret);
         ret as *mut *mut Msg
     }
