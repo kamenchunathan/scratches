@@ -1,12 +1,14 @@
-app [Msg, on_event, handle!] { pf: platform "../platform/main.roc" }
+app [Msg, on_event!, handle!] { pf: platform "../platform/main.roc" }
 
 import pf.Event exposing [Event]
 import pf.Effects exposing [print!]
 
 Msg : {}
 
-on_event : Event -> Msg
-on_event = |_| {}
+on_event! : Event => Msg
+on_event! = |{ type }| 
+    print! type
+    {}
 
 handle! : Msg => {}
 handle! = |_|

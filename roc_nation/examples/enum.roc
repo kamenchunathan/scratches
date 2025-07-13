@@ -1,4 +1,4 @@
-app [Msg, on_event, handle!] { pf: platform "../platform/main.roc" }
+app [Msg, on_event!, handle!] { pf: platform "../platform/main.roc" }
 
 import pf.Event exposing [Event]
 import pf.Effects exposing [print!]
@@ -8,8 +8,8 @@ Msg : [
     NoOp,
 ]
 
-on_event : Event -> Msg
-on_event = |event|
+on_event! : Event => Msg
+on_event! = |event|
     when event is
         { type: "onInput" } -> OnInput "Hello world"
         _ -> NoOp
