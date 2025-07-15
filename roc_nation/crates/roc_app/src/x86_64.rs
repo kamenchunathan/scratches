@@ -38,50 +38,69 @@ impl roc_std::RocRefcounted for Event {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Hash)]
-#[repr(u64)]
-pub enum U1 {
-    C18_5 = 0,
+#[derive(Clone, Default, PartialEq, PartialOrd, Eq, Ord, Hash)]
+#[repr(transparent)]
+pub struct U1 {
+    f0: roc_std::RocStr,
+}
+
+impl U1 {
+    /// A tag named ``C18_5``, with the given payload.
+    pub fn C18_5(f0: roc_std::RocStr) -> Self {
+        Self { f0 }
+    }
+
+    /// Since `U1` only has one tag (namely, `C18_5`),
+    /// convert it to `C18_5`'s payload.
+    pub fn into_C18_5(self) -> roc_std::RocStr {
+        self.f0
+    }
+
+    /// Since `U1` only has one tag (namely, `C18_5`),
+    /// convert it to `C18_5`'s payload.
+    pub fn as_C18_5(&self) -> &roc_std::RocStr {
+        &self.f0
+    }
 }
 
 impl core::fmt::Debug for U1 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        match self {
-            Self::C18_5 => f.write_str("U1::C18_5"),
-        }
+        f.debug_tuple("U1::C18_5").field(&self.f0).finish()
     }
 }
 
-roc_refcounted_noop_impl!(U1);
-
-#[repr(C)]
-#[derive(Debug)]
-pub struct RocFunction_82 {
-    closure_data: Vec<u8>,
+impl roc_std::RocRefcounted for U1 {
+    fn inc(&mut self) {
+        unimplemented!();
+    }
+    fn dec(&mut self) {
+        unimplemented!();
+    }
+    fn is_refcounted() -> bool {
+        true
+    }
 }
 
-#[repr(C)]
-pub struct Msg {
-    _data: (),
-    _marker: core::marker::PhantomData<(*mut u8, core::marker::PhantomPinned)>,
+#[repr(transparent)]
+#[derive(Debug, Clone)]
+pub struct RocFunction_93(u64);
+
+extern "C" {
+    pub fn roc__setup_callback_for_host_0_caller(
+        arg0: *const Event,
+        closure_data: *const u8,
+        output: *mut RocBox<()>,
+    );
 }
 
-impl RocFunction_82 {
+impl RocFunction_93 {
     pub fn force_thunk(mut self, arg0: Event) -> RocBox<()> {
-        extern "C" {
-            fn roc__setup_callback_for_host_0_caller(
-                arg0: *const Event,
-                closure_data: *mut u8,
-                output: *mut RocBox<()>,
-            );
-        }
-
         let mut output = core::mem::MaybeUninit::uninit();
 
         unsafe {
             roc__setup_callback_for_host_0_caller(
                 &arg0,
-                self.closure_data.as_mut_ptr(),
+                &mut self.0 as *const _ as *const u8,
                 output.as_mut_ptr(),
             );
 
@@ -89,25 +108,33 @@ impl RocFunction_82 {
         }
     }
 }
-roc_refcounted_noop_impl!(RocFunction_82);
 
-pub fn setup_callback_for_host(arg0: i32) -> RocFunction_82 {
+impl roc_std::RocRefcounted for RocFunction_93 {
+    fn inc(&mut self) {
+        // unimplemented!();
+        // self.0.inc();
+    }
+    fn dec(&mut self) {
+        println!("Bingo");
+        // self.0.dec();
+        println!("Yellow");
+    }
+    fn is_refcounted() -> bool {
+        false
+    }
+}
+
+pub fn setup_callback_for_host(arg0: i32) -> roc_std::RocList<()> {
     extern "C" {
-        fn roc__setup_callback_for_host_1_exposed_generic(_: *mut u8, _: i32);
-        fn roc__setup_callback_for_host_1_exposed_size() -> i64;
+        fn roc__setup_callback_for_host_1_exposed_generic(_: *mut roc_std::RocList<()>, _: i32);
     }
 
+    let mut ret = core::mem::MaybeUninit::uninit();
+
     unsafe {
-        let capacity = roc__setup_callback_for_host_1_exposed_size() as usize;
+        roc__setup_callback_for_host_1_exposed_generic(ret.as_mut_ptr(), arg0);
 
-        let mut ret = RocFunction_82 {
-            closure_data: Vec::with_capacity(capacity),
-        };
-        ret.closure_data.resize(capacity, 0);
-
-        roc__setup_callback_for_host_1_exposed_generic(ret.closure_data.as_mut_ptr(), arg0);
-
-        ret
+        ret.assume_init()
     }
 }
 
@@ -124,4 +151,3 @@ pub fn handle_callback_for_host(arg0: RocBox<()>) -> () {
         ret.assume_init()
     }
 }
-
