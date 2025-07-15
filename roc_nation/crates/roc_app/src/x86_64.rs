@@ -147,11 +147,11 @@ impl core::fmt::Debug for Attr {
 }
 
 impl Attr {
-    pub fn unwrap_Color(mut self) -> roc_std::RocStr {
-        debug_assert_eq!(self.discriminant(), discriminant_Attr::Color);
-        let attr = &mut self as *mut _ as *mut union_Attr;
-        unsafe { core::mem::ManuallyDrop::take(&mut (*attr).Color) }
-    }
+    // pub fn unwrap_Color(mut self) -> roc_std::RocStr {
+    //     debug_assert_eq!(self.discriminant(), discriminant_Attr::Color);
+    //     let attr = &mut self as *mut _ as *mut union_Attr;
+    //     unsafe { core::mem::ManuallyDrop::take(&mut (*attr).Color) }
+    // }
 
     pub fn borrow_Color(&self) -> &roc_std::RocStr {
         debug_assert_eq!(self.discriminant(), discriminant_Attr::Color);
@@ -172,11 +172,11 @@ impl Attr {
         matches!(self.discriminant(), discriminant_Attr::Color)
     }
 
-    pub fn unwrap_OnEvent(mut self) -> ClosureData {
-        debug_assert_eq!(self.discriminant(), discriminant_Attr::OnEvent);
-        let attr = &mut self as *mut _ as *mut union_Attr;
-        unsafe { core::mem::ManuallyDrop::take(&mut (*attr).OnEvent) }
-    }
+    // pub fn unwrap_OnEvent(mut self) -> ClosureData {
+    //     debug_assert_eq!(self.discriminant(), discriminant_Attr::OnEvent);
+    //     let attr = &mut self as *mut _ as *mut union_Attr;
+    //     unsafe { core::mem::ManuallyDrop::take(&mut (*attr).OnEvent) }
+    // }
 
     pub fn borrow_OnEvent(&self) -> &ClosureData {
         debug_assert_eq!(self.discriminant(), discriminant_Attr::OnEvent);
@@ -200,16 +200,16 @@ impl Attr {
 impl Drop for Attr {
     fn drop(&mut self) {
         // Drop the payloads
-        match self.discriminant() {
-            discriminant_Attr::Color => unsafe {
-                let inner: &mut union_Attr = core::mem::transmute(self);
-                core::mem::ManuallyDrop::drop(&mut inner.Color);
-            },
-            discriminant_Attr::OnEvent => unsafe {
-                let inner: &mut union_Attr = core::mem::transmute(self);
-                core::mem::ManuallyDrop::drop(&mut inner.OnEvent);
-            },
-        }
+        // match self.discriminant() {
+        //     discriminant_Attr::Color => unsafe {
+        //         let inner: &mut union_Attr = core::mem::transmute(self);
+        //         core::mem::ManuallyDrop::drop(&mut inner.Color);
+        //     },
+        //     discriminant_Attr::OnEvent => unsafe {
+        //         let inner: &mut union_Attr = core::mem::transmute(self);
+        //         core::mem::ManuallyDrop::drop(&mut inner.OnEvent);
+        //     },
+        // }
     }
 }
 
@@ -257,36 +257,17 @@ pub fn handle_callback_for_host(arg0: RocBox<()>) -> () {
 #[repr(transparent)]
 pub struct Attrs(RocList<Attr>);
 
-impl<'a> IntoIterator for &'a Attrs {
-    type Item = &'a mut Attr;
-
-    type IntoIter = AttrsIterator<'a>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        AttrsIterator {
-            current_index: 0,
-            list: &self.0,
+impl Attrs {
+    pub fn for_each<F>(&mut self, f: F)
+    where
+        F: Fn(&mut Attr) -> (),
+    {
+        for i in 0..self.0.len() {
+            unsafe {
+                let elements_ptr = self.0.as_ptr() as *mut u8;
+                let attr: *mut Attr = unsafe { elements_ptr.add(Attr::size() * i).cast() };
+                f(&mut *attr);
+            }
         }
-    }
-}
-
-pub struct AttrsIterator<'a> {
-    current_index: usize,
-    list: &'a RocList<Attr>,
-}
-
-impl<'a> Iterator for AttrsIterator<'a> {
-    type Item = &'a mut Attr;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.current_index >= self.list.len() {
-            return None;
-        }
-
-        let elements_ptr = self.list.as_ptr() as *mut u8;
-        let attr: *mut Attr = unsafe { elements_ptr.add(Attr::size() * self.current_index).cast() };
-        self.current_index += 1;
-
-        return Some(unsafe { &mut *attr });
     }
 }
