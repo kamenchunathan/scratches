@@ -37,7 +37,7 @@ run-examples:
     fi
 
     find {{ build_dir }}/examples -type f -executable -print0 | while IFS= read -r -d $'\0' example; do
-        echo "Running $example"
+        echo -e "\nRunning $example"
         "$example" || true
     done
 

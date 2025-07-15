@@ -16,8 +16,11 @@
 #![allow(clippy::clone_on_copy)]
 #![allow(clippy::non_canonical_partial_ord_impl)]
 
+use std::marker::PhantomData;
+
 use roc_std::roc_refcounted_noop_impl;
 use roc_std::RocBox;
+use roc_std::RocList;
 use roc_std::RocRefcounted;
 
 #[derive(Clone, Default, Debug, PartialEq, PartialOrd, Eq, Ord, Hash)]
@@ -38,38 +41,179 @@ impl roc_std::RocRefcounted for Event {
     }
 }
 
-#[derive(Clone, Default, PartialEq, PartialOrd, Eq, Ord, Hash)]
-#[repr(transparent)]
-pub struct U1 {
-    f0: roc_std::RocStr,
+#[repr(C)]
+#[derive(Debug)]
+pub struct ClosureData {
+    _data: (),
+    _marker: core::marker::PhantomData<(*mut u8, core::marker::PhantomPinned)>,
 }
 
-impl U1 {
-    /// A tag named ``C18_5``, with the given payload.
-    pub fn C18_5(f0: roc_std::RocStr) -> Self {
-        Self { f0 }
-    }
+impl ClosureData {
+    pub fn force_thunk(&mut self, arg0: Event) -> RocBox<()> {
+        extern "C" {
+            fn roc__setup_callback_for_host_0_caller(
+                arg0: *const Event,
+                closure_data: *mut u8,
+                output: *mut RocBox<()>,
+            );
+        }
 
-    /// Since `U1` only has one tag (namely, `C18_5`),
-    /// convert it to `C18_5`'s payload.
-    pub fn into_C18_5(self) -> roc_std::RocStr {
-        self.f0
-    }
+        let mut output = core::mem::MaybeUninit::uninit();
 
-    /// Since `U1` only has one tag (namely, `C18_5`),
-    /// convert it to `C18_5`'s payload.
-    pub fn as_C18_5(&self) -> &roc_std::RocStr {
-        &self.f0
+        unsafe {
+            roc__setup_callback_for_host_0_caller(
+                &arg0,
+                self as *mut _ as *mut u8,
+                output.as_mut_ptr(),
+            );
+
+            output.assume_init()
+        }
     }
 }
 
-impl core::fmt::Debug for U1 {
+roc_refcounted_noop_impl!(ClosureData);
+
+#[derive(Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Hash)]
+#[repr(u8)]
+pub enum discriminant_Attr {
+    Color = 0,
+    OnEvent = 1,
+}
+
+impl core::fmt::Debug for discriminant_Attr {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_tuple("U1::C18_5").field(&self.f0).finish()
+        match self {
+            Self::Color => f.write_str("discriminant_Attr::Color"),
+            Self::OnEvent => f.write_str("discriminant_Attr::OnEvent"),
+        }
     }
 }
 
-impl roc_std::RocRefcounted for U1 {
+roc_refcounted_noop_impl!(discriminant_Attr);
+
+#[repr(C, align(8))]
+pub union union_Attr {
+    pub Color: core::mem::ManuallyDrop<roc_std::RocStr>,
+    pub OnEvent: core::mem::ManuallyDrop<ClosureData>,
+}
+
+impl Attr {
+    /// Returns which variant this tag union holds. Note that this never includes a payload!
+    pub fn discriminant(&self) -> discriminant_Attr {
+        unsafe {
+            let ptr_self = self as *const _ as *const u8;
+            // NOTE: Alignment is assumed to always be 8
+            core::mem::transmute::<u8, discriminant_Attr>(*ptr_self.add(Attr::size() - 8))
+        }
+    }
+}
+
+/// Attr is an opaque type whose size is uknown at compile time
+#[repr(C)]
+pub struct Attr {
+    _data: (),
+    _marker: core::marker::PhantomData<(*mut u8, core::marker::PhantomPinned)>,
+}
+
+impl Attr {
+    pub fn size() -> usize {
+        extern "C" {
+            #[link_name = "roc__setup_callback_for_host_1_exposed_size"]
+            fn caller() -> usize;
+        }
+
+        unsafe { caller() }
+    }
+}
+
+impl core::fmt::Debug for Attr {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        use discriminant_Attr::*;
+
+        unsafe {
+            match self.discriminant() {
+                Color => {
+                    let field: &roc_std::RocStr = &self.borrow_Color();
+                    f.debug_tuple("Attr::Color").field(field).finish()
+                }
+                OnEvent => {
+                    let field: &ClosureData = &self.borrow_OnEvent();
+                    f.debug_tuple("Attr::OnEvent").field(field).finish()
+                }
+            }
+        }
+    }
+}
+
+impl Attr {
+    pub fn unwrap_Color(mut self) -> roc_std::RocStr {
+        debug_assert_eq!(self.discriminant(), discriminant_Attr::Color);
+        let attr = &mut self as *mut _ as *mut union_Attr;
+        unsafe { core::mem::ManuallyDrop::take(&mut (*attr).Color) }
+    }
+
+    pub fn borrow_Color(&self) -> &roc_std::RocStr {
+        debug_assert_eq!(self.discriminant(), discriminant_Attr::Color);
+        use core::borrow::Borrow;
+
+        let attr = self as *const _ as *const union_Attr;
+        unsafe { (*attr).Color.borrow() }
+    }
+
+    pub fn borrow_mut_Color(&mut self) -> &mut roc_std::RocStr {
+        debug_assert_eq!(self.discriminant(), discriminant_Attr::Color);
+        use core::borrow::BorrowMut;
+        let attr = self as *mut _ as *mut union_Attr;
+        unsafe { (*attr).Color.borrow_mut() }
+    }
+
+    pub fn is_Color(&self) -> bool {
+        matches!(self.discriminant(), discriminant_Attr::Color)
+    }
+
+    pub fn unwrap_OnEvent(mut self) -> ClosureData {
+        debug_assert_eq!(self.discriminant(), discriminant_Attr::OnEvent);
+        let attr = &mut self as *mut _ as *mut union_Attr;
+        unsafe { core::mem::ManuallyDrop::take(&mut (*attr).OnEvent) }
+    }
+
+    pub fn borrow_OnEvent(&self) -> &ClosureData {
+        debug_assert_eq!(self.discriminant(), discriminant_Attr::OnEvent);
+        use core::borrow::Borrow;
+        let attr = self as *const _ as *const union_Attr;
+        unsafe { (*attr).OnEvent.borrow() }
+    }
+
+    pub fn borrow_mut_OnEvent(&mut self) -> &mut ClosureData {
+        debug_assert_eq!(self.discriminant(), discriminant_Attr::OnEvent);
+        use core::borrow::BorrowMut;
+        let attr = self as *mut _ as *mut union_Attr;
+        unsafe { (*attr).OnEvent.borrow_mut() }
+    }
+
+    pub fn is_OnEvent(&self) -> bool {
+        matches!(self.discriminant(), discriminant_Attr::OnEvent)
+    }
+}
+
+impl Drop for Attr {
+    fn drop(&mut self) {
+        // Drop the payloads
+        match self.discriminant() {
+            discriminant_Attr::Color => unsafe {
+                let inner: &mut union_Attr = core::mem::transmute(self);
+                core::mem::ManuallyDrop::drop(&mut inner.Color);
+            },
+            discriminant_Attr::OnEvent => unsafe {
+                let inner: &mut union_Attr = core::mem::transmute(self);
+                core::mem::ManuallyDrop::drop(&mut inner.OnEvent);
+            },
+        }
+    }
+}
+
+impl roc_std::RocRefcounted for Attr {
     fn inc(&mut self) {
         unimplemented!();
     }
@@ -81,52 +225,9 @@ impl roc_std::RocRefcounted for U1 {
     }
 }
 
-#[repr(transparent)]
-#[derive(Debug, Clone)]
-pub struct RocFunction_93(u64);
-
-extern "C" {
-    pub fn roc__setup_callback_for_host_0_caller(
-        arg0: *const Event,
-        closure_data: *const u8,
-        output: *mut RocBox<()>,
-    );
-}
-
-impl RocFunction_93 {
-    pub fn force_thunk(mut self, arg0: Event) -> RocBox<()> {
-        let mut output = core::mem::MaybeUninit::uninit();
-
-        unsafe {
-            roc__setup_callback_for_host_0_caller(
-                &arg0,
-                &mut self.0 as *const _ as *const u8,
-                output.as_mut_ptr(),
-            );
-
-            output.assume_init()
-        }
-    }
-}
-
-impl roc_std::RocRefcounted for RocFunction_93 {
-    fn inc(&mut self) {
-        // unimplemented!();
-        // self.0.inc();
-    }
-    fn dec(&mut self) {
-        println!("Bingo");
-        // self.0.dec();
-        println!("Yellow");
-    }
-    fn is_refcounted() -> bool {
-        false
-    }
-}
-
-pub fn setup_callback_for_host(arg0: i32) -> roc_std::RocList<()> {
+pub fn setup_callback_for_host(arg0: i32) -> Attrs {
     extern "C" {
-        fn roc__setup_callback_for_host_1_exposed_generic(_: *mut roc_std::RocList<()>, _: i32);
+        fn roc__setup_callback_for_host_1_exposed_generic(_: *mut Attrs, _: i32);
     }
 
     let mut ret = core::mem::MaybeUninit::uninit();
@@ -149,5 +250,43 @@ pub fn handle_callback_for_host(arg0: RocBox<()>) -> () {
         roc__handle_callback_for_host_1_exposed_generic(ret.as_mut_ptr(), arg0);
 
         ret.assume_init()
+    }
+}
+
+#[derive(Clone, Default, Debug)]
+#[repr(transparent)]
+pub struct Attrs(RocList<Attr>);
+
+impl<'a> IntoIterator for &'a Attrs {
+    type Item = &'a mut Attr;
+
+    type IntoIter = AttrsIterator<'a>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        AttrsIterator {
+            current_index: 0,
+            list: &self.0,
+        }
+    }
+}
+
+pub struct AttrsIterator<'a> {
+    current_index: usize,
+    list: &'a RocList<Attr>,
+}
+
+impl<'a> Iterator for AttrsIterator<'a> {
+    type Item = &'a mut Attr;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.current_index >= self.list.len() {
+            return None;
+        }
+
+        let elements_ptr = self.list.as_ptr() as *mut u8;
+        let attr: *mut Attr = unsafe { elements_ptr.add(Attr::size() * self.current_index).cast() };
+        self.current_index += 1;
+
+        return Some(unsafe { &mut *attr });
     }
 }

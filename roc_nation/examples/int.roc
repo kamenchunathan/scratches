@@ -1,12 +1,12 @@
-app [Msg, on_event!, handle!] { pf: platform "../platform/main.roc" }
+app [Msg, attrs, handle!] { pf: platform "../platform/main.roc" }
 
-import pf.Event exposing [Event]
+import pf.View exposing [Attr]
 import pf.Effects exposing [print!]
 
 Msg : I32
 
-on_event! : Event => Msg
-on_event! = |_| 892834
+attrs : I32 -> List (Attr Msg)
+attrs = |_| [ OnEvent  (|_| 892834)]
 
 handle! : Msg => {}
 handle! = |msg|

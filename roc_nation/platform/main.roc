@@ -1,8 +1,8 @@
 platform "wow" requires { Msg } {
-        on_event! : Event => Msg,
+        attrs : I32 -> List (Attr Msg),
         handle! : Msg => {},
     }
-    exposes [Effects, Event]
+    exposes [Effects, View]
     packages {
     }
     imports []
@@ -11,25 +11,18 @@ platform "wow" requires { Msg } {
         handle_callback_for_host!,
     ]
 
-import Event exposing [Event]
+import View exposing [Attr]
 
-setup_callback_for_host! : I32 => List (Event => Box Msg)
-setup_callback_for_host! = |_|
-    a = { bingo: "Yessir", tango: 56, b: 4 }
-    # a = Ok "Hello"
-    List.range({start: At 0, end: At 5})
+setup_callback_for_host! : I32 => List (Attr (Box Msg))
+setup_callback_for_host! = |init|
+    attrs init
         |> List.map 
-            (|_| 
-                (|e|
-                    event = { type: "${e.type} ${Inspect.to_str a}" }
-                    Box.box (on_event! event)
-                )
+            (|attr| 
+                when attr is
+                    Color col -> Color col
+                    OnEvent on_event! -> OnEvent (|event| Box.box (on_event! event))                           
+                
             )
-    # wrapped! = |e| 
-    #     event = { type: "${e.type} ${Inspect.to_str a}" }
-    #     Box.box (on_event! event)
-    #         
-    # [wrapped!]
 
 handle_callback_for_host! : Box Msg => {}
 handle_callback_for_host! = |boxed_msg|
