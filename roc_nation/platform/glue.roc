@@ -1,6 +1,6 @@
 platform "wow" requires { Msg } {
     }
-    exposes [Effects, Event]
+    exposes [Effects, View]
     packages {
     }
     imports []
@@ -9,10 +9,10 @@ platform "wow" requires { Msg } {
         handle_callback_for_host,
     ]
 
-import Event exposing [Event]
+import View exposing [Attr]
 
 
-setup_callback_for_host : I32 -> List (Event -> U32)
+setup_callback_for_host : I32 -> List (Attr U32)
 setup_callback_for_host = |_|
     []
 

@@ -1,14 +1,16 @@
-app [Msg, on_event!, handle!] { pf: platform "../platform/main.roc" }
+app [Msg, attrs, handle!] { pf: platform "../platform/main.roc" }
 
-import pf.Event exposing [Event]
+import pf.View exposing [Attr]
 import pf.Effects exposing [print!]
 
 Msg : Str
 
-on_event! : Event => Msg
-on_event! = |event|
-    when event is
-        _ -> "other"
+attrs : I32 -> List (Attr Msg)
+attrs = |_|
+    [(OnEvent |event|
+        when event is
+            _ -> "other"
+    )]
 
 handle! : Msg => {}
 handle! = |msg| print! "input ${msg}"
