@@ -1,11 +1,11 @@
-app [Msg, on_event!, handle!] { pf: platform "./main.roc" }
+app [Msg, attrs, handle!] { pf: platform "./main.roc" }
 
-import pf.Event exposing [Event]
+import pf.View exposing [Attr]
 
 Msg : {}
 
-on_event! : Event => Msg
-on_event! = |_| {}
+attrs : I32 -> List (Attr Msg)
+attrs = |_| []
 
 handle! : Msg => {}
 handle! = |_| {}
