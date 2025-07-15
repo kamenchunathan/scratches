@@ -11,23 +11,23 @@ pub extern "C" fn rust_main() -> i32 {
         r#type: RocStr::from("Bingo"),
     };
 
-    let thunklist = setup_callback_for_host(0);
+    let mut attrs = setup_callback_for_host(0);
 
-    for attr in thunklist.into_iter() {
+    attrs.for_each(|attr| {
         let discriminant = attr.discriminant();
+        println!("wow {:?}", discriminant);
         match discriminant {
             roc_app::discriminant_Attr::OnEvent => {
-                // NOTE: Won't print if this is not here
-                println!("bingo {:?}", discriminant);
-
                 let msg = attr.borrow_mut_OnEvent().force_thunk(event.clone());
                 roc_app::handle_callback_for_host(msg);
             }
 
-            roc_app::discriminant_Attr::Color => {}
+            roc_app::discriminant_Attr::Color => {
+                println!("Color {:?}", attr.borrow_Color());
+            }
         }
-    }
+    });
 
-    std::mem::forget(thunklist);
+    std::mem::forget(attrs);
     0
 }
