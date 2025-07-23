@@ -1,0 +1,7 @@
+.cache
+.direnv
+build
+
+# Commit only the wrap files
+subprojects/*
+!subprojects/*.wrap
