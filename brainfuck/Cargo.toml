@@ -1,0 +1,11 @@
+[package]
+name = "biffer"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+path = "src/lib.rs"
+
+
+[dependencies]
+anyhow = "1.0.99"
