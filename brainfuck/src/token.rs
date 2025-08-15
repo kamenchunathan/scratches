@@ -1,7 +1,43 @@
 use std::iter::Enumerate;
 use std::str::Chars;
 
-use crate::{Token, TokenType};
+#[derive(Debug, Clone)]
+pub struct Token<T = ()> {
+    pub r#type: TokenType,
+    pub data: T,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TokenType {
+    /// > Increment data pointer
+    IncrDp,
+
+    /// < Decrement the data pointer
+    DecrDp,
+
+    /// + Increment the byte at the data pointer by one.
+    IncrByte,
+
+    ///  - Decrement the byte at the data pointer by one.
+    DecrByte,
+
+    /// . Output the byte at the data pointer.
+    Output,
+
+    /// , Accept one byte of input, storing its value in the byte at the data
+    /// pointer.
+    Input,
+
+    /// [ If the byte at the data pointer is zero, then instead of moving the
+    /// instruction pointer forward to the next command, jump it forward to the
+    /// command after the matching ] command.
+    JmpLeft(u32),
+
+    /// ] If the byte at the data pointer is nonzero, then instead of moving the
+    /// instruction pointer forward to the next command, jump it back to the
+    /// command after the matching [ command
+    JmpRight(u32),
+}
 
 pub fn tokenize(input: &str) -> Vec<Token<()>> {
     let mut tokenizer = Tokenizer::new(input);
@@ -42,7 +78,7 @@ impl<'a> Tokenizer<'a> {
                 ',' => Some(Input),
 
                 '[' => {
-                    jump_stack.push(tokens.len() as u32);
+                    jump_stack.push(i);
                     // u32::MAX is used as a sentinel value
                     Some(JmpLeft(u32::MAX))
                 }
@@ -57,7 +93,7 @@ impl<'a> Tokenizer<'a> {
                     debug_assert_eq!(tokens[jmpl_token_idx as usize].r#type, JmpLeft(u32::MAX));
                     tokens[jmpl_token_idx as usize].r#type = JmpLeft(tokens.len() as u32);
 
-                    Some(JmpRight(jmpl_token_idx))
+                    Some(JmpRight(jmpl_token_idx as u32))
                 }
                 _ => {
                     // Any other character is treated as a comment
@@ -66,7 +102,10 @@ impl<'a> Tokenizer<'a> {
             };
 
             if let Some(t_type) = tok_type {
-                tokens.push(Token { r#type: t_type, data: () });
+                tokens.push(Token {
+                    r#type: t_type,
+                    data: (),
+                });
             }
         }
 
@@ -78,7 +117,7 @@ impl<'a> Tokenizer<'a> {
 
 #[cfg(test)]
 mod test {
-    use crate::{Token, TokenType, tokenizer::tokenize};
+    use super::*;
 
     #[test]
     fn single_incrdp() {
@@ -189,7 +228,10 @@ mod test {
         let inp = "[]";
         let tokens = tokenize(inp);
         use TokenType::*;
-        assert_eq!(tokens.iter().map(|t| t.r#type).collect::<Vec<TokenType>>(), vec![JmpLeft(1), JmpRight(0)]);
+        assert_eq!(
+            tokens.iter().map(|t| t.r#type).collect::<Vec<TokenType>>(),
+            vec![JmpLeft(1), JmpRight(0)]
+        );
     }
 
     #[test]
