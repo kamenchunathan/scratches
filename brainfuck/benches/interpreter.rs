@@ -1,6 +1,6 @@
 use criterion::{Criterion, criterion_group, criterion_main};
 
-use biffer::{interpreter::basic::BasicInterpreter, token::tokenize};
+use biffer::{instruction::tokenize, interpreter::basic::BasicInterpreter};
 
 fn bench_play_game(c: &mut Criterion) {
     let input = include_str!("../bf/morse_code.bf");
@@ -13,7 +13,7 @@ fn bench_play_game(c: &mut Criterion) {
 
     c.bench_function("bench interpreter ", |b| {
         b.iter(|| {
-            std::hint::black_box(for _ in 1..=100 {
+            std::hint::black_box(for _ in 1..=400 {
                 interpreter.run();
             });
         });

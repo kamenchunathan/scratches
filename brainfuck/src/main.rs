@@ -1,7 +1,7 @@
 use std::{fs::OpenOptions, io::Read};
 
 use anyhow::{self, Context};
-use biffer::{interpreter::basic::BasicInterpreter, token::tokenize};
+use biffer::{instruction::tokenize, interpreter::basic::BasicInterpreter};
 use clap::Parser;
 
 /// Biffer is an optimizing brainfuck compiler and interpreter

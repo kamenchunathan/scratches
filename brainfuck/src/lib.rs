@@ -1,3 +1,4 @@
+pub mod instruction;
 pub mod interpreter;
 pub mod ir;
-pub mod token;
+mod reporting;

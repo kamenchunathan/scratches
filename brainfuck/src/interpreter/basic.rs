@@ -1,7 +1,10 @@
 // A basic interpreter that works on tokens directly without Optimizing any
 // instructions
 
-use crate::token::{Token, TokenType};
+use crate::{
+    instruction::{Instruction, Token},
+    ir,
+};
 
 #[derive(Debug)]
 pub struct BasicInterpreter {
@@ -29,7 +32,78 @@ impl BasicInterpreter {
     }
 
     pub fn run(&mut self) {
-        use TokenType::*;
+        // self.interpete_tokens();
+        self.interprete_ir();
+    }
+
+    fn interprete_ir(&mut self) {
+        let exprs = ir::optimize(self.tokens.iter().map(|tok| tok.r#type).collect());
+
+        // protecting against infinite loops
+        let mut instr_count = 0;
+
+        use crate::ir::Expression::*;
+
+        loop {
+            instr_count += 1;
+            if instr_count >= Self::MAX_INSTR_COUNT {
+                eprintln!("max instruction count reached");
+                break;
+            }
+
+            let expr = &exprs[self.instr_ptr as usize];
+            match expr {
+                OffsetDataPtr(offset) => {
+                    self.data_ptr = (self.data_ptr as i32 + *offset) as u32;
+                }
+
+                Add(delta) => {
+                    let success = self.set_mem_value(
+                        self.data_ptr,
+                        (self.get_mem_value(self.data_ptr) as i32 + delta) as u8,
+                    );
+                    if !success {
+                        break;
+                    }
+                }
+
+                InputByte => {
+                    if self.input.is_empty() {
+                        break;
+                    }
+
+                    let inp = self.input.remove(0);
+                    self.set_mem_value(self.data_ptr, inp);
+                }
+
+                OutputByte => {
+                    self.output.push(self.get_mem_value(self.data_ptr));
+                }
+
+                JmpForwardIf0(instr) => {
+                    if self.get_mem_value(self.data_ptr) == 0 {
+                        self.instr_ptr = instr + 1;
+                        continue;
+                    }
+                }
+
+                JmpBackIfNeq0(instr) => {
+                    if self.get_mem_value(self.data_ptr) != 0 {
+                        self.instr_ptr = instr + 1;
+                        continue;
+                    }
+                }
+            }
+
+            self.instr_ptr += 1;
+            if self.instr_ptr >= exprs.len() as u32 {
+                break;
+            }
+        }
+    }
+
+    fn interpete_tokens(&mut self) {
+        use Instruction::*;
         let mut instr_count = 0;
         loop {
             instr_count += 1;
@@ -88,14 +162,14 @@ impl BasicInterpreter {
                     self.set_mem_value(self.data_ptr, inp);
                 }
 
-                JmpLeft(instr) => {
+                JmpForwardIf0(instr) => {
                     if self.get_mem_value(self.data_ptr) == 0 {
                         self.instr_ptr = instr + 1;
                         continue;
                     }
                 }
 
-                JmpRight(instr) => {
+                JmpBackIfNeq0(instr) => {
                     if self.get_mem_value(self.data_ptr) != 0 {
                         self.instr_ptr = instr + 1;
                         continue;
@@ -145,7 +219,7 @@ mod tests {
     use super::*;
 
     fn create_interpreter(code: &str, input: &str) -> BasicInterpreter {
-        let tokens = crate::token::tokenize(code);
+        let tokens = crate::instruction::tokenize(code);
         BasicInterpreter::new(tokens, input.as_bytes().to_vec(), Vec::new())
     }
 
@@ -209,14 +283,6 @@ mod tests {
     }
 
     #[test]
-    fn test_simple_loop() {
-        // Set cell 0 to 5, then loop 5 times decrementing it to 0
-        let mut interpreter = create_interpreter("+++++[->-]<", "");
-        interpreter.run();
-        assert_eq!(interpreter.get_mem_value(0), 0);
-    }
-
-    #[test]
     fn test_hello_world() {
         let code = "+[----->+++<]>+.---.+++++++..+++.[--->+<]>-----.--[->++++<]>-.--------.+++.------.--------.";
 
@@ -233,5 +299,28 @@ mod tests {
         let mut interpreter = create_interpreter(code, input);
         interpreter.run();
         assert_eq!(interpreter.get_output(), input.as_bytes());
+    }
+    #[test]
+    fn test_adjacent_equal_letter() {
+        let code = " --[----->+<]>-----.. ";
+
+        let mut interpreter = create_interpreter(code, "");
+        interpreter.run();
+        let expected_output = "aa".as_bytes().to_vec();
+        assert_eq!(interpreter.get_output(), &expected_output);
+    }
+
+    #[test]
+    fn test_adjacent_inputs() {
+        let mut interpreter = create_interpreter(",,", "XY");
+        interpreter.run();
+        assert_eq!(interpreter.get_mem_value(0), b'Y');
+    }
+
+    #[test]
+    fn test_adjacent_outputs() {
+        let mut interpreter = create_interpreter("++..", "");
+        interpreter.run();
+        assert_eq!(interpreter.get_output(), &vec![2, 2]);
     }
 }

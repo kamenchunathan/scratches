@@ -3,12 +3,12 @@ use std::str::Chars;
 
 #[derive(Debug, Clone)]
 pub struct Token<T = ()> {
-    pub r#type: TokenType,
+    pub r#type: Instruction,
     pub data: T,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TokenType {
+pub enum Instruction {
     /// > Increment data pointer
     IncrDp,
 
@@ -31,12 +31,12 @@ pub enum TokenType {
     /// [ If the byte at the data pointer is zero, then instead of moving the
     /// instruction pointer forward to the next command, jump it forward to the
     /// command after the matching ] command.
-    JmpLeft(u32),
+    JmpForwardIf0(u32),
 
     /// ] If the byte at the data pointer is nonzero, then instead of moving the
     /// instruction pointer forward to the next command, jump it back to the
     /// command after the matching [ command
-    JmpRight(u32),
+    JmpBackIfNeq0(u32),
 }
 
 pub fn tokenize(input: &str) -> Vec<Token<()>> {
@@ -58,7 +58,7 @@ impl<'a> Tokenizer<'a> {
     }
 
     fn tokenize(&mut self) -> Vec<Token<()>> {
-        use TokenType::*;
+        use Instruction::*;
 
         let mut jump_stack = Vec::new();
         let mut tokens: Vec<Token<()>> = Vec::with_capacity(self.input.len());
@@ -79,7 +79,7 @@ impl<'a> Tokenizer<'a> {
                 '[' => {
                     jump_stack.push(tokens.len());
                     // u32::MAX is used as a sentinel value
-                    Some(JmpLeft(u32::MAX))
+                    Some(JmpForwardIf0(u32::MAX))
                 }
 
                 ']' => {
@@ -89,10 +89,13 @@ impl<'a> Tokenizer<'a> {
 
                     // Assert that there is a matching uninitialized jumpleft
                     // before updating it's addres
-                    debug_assert_eq!(tokens[jmpl_token_idx as usize].r#type, JmpLeft(u32::MAX));
-                    tokens[jmpl_token_idx as usize].r#type = JmpLeft(tokens.len() as u32);
+                    debug_assert_eq!(
+                        tokens[jmpl_token_idx as usize].r#type,
+                        JmpForwardIf0(u32::MAX)
+                    );
+                    tokens[jmpl_token_idx as usize].r#type = JmpForwardIf0(tokens.len() as u32);
 
-                    Some(JmpRight(jmpl_token_idx as u32))
+                    Some(JmpBackIfNeq0(jmpl_token_idx as u32))
                 }
                 _ => {
                     // Any other character is treated as a comment
@@ -120,7 +123,7 @@ mod test {
 
     #[test]
     fn single_incrdp() {
-        use TokenType::*;
+        use Instruction::*;
         let inp = ">";
         let tokens = tokenize(inp);
 
@@ -129,7 +132,7 @@ mod test {
 
     #[test]
     fn single_decr_dp() {
-        use TokenType::*;
+        use Instruction::*;
         let inp = "<";
         let tokens = tokenize(inp);
         assert_eq!(tokens[0].r#type, DecrDp);
@@ -137,7 +140,7 @@ mod test {
 
     #[test]
     fn single_incr_byte() {
-        use TokenType::*;
+        use Instruction::*;
         let inp = "+";
         let tokens = tokenize(inp);
         assert_eq!(tokens[0].r#type, IncrByte);
@@ -145,7 +148,7 @@ mod test {
 
     #[test]
     fn single_decr_byte() {
-        use TokenType::*;
+        use Instruction::*;
         let inp = "-";
         let tokens = tokenize(inp);
         assert_eq!(tokens[0].r#type, DecrByte);
@@ -153,7 +156,7 @@ mod test {
 
     #[test]
     fn single_output() {
-        use TokenType::*;
+        use Instruction::*;
         let inp = ".";
         let tokens = tokenize(inp);
         assert_eq!(tokens[0].r#type, Output);
@@ -161,7 +164,7 @@ mod test {
 
     #[test]
     fn single_input() {
-        use TokenType::*;
+        use Instruction::*;
         let inp = ",";
         let tokens = tokenize(inp);
         assert_eq!(tokens[0].r#type, Input);
@@ -171,9 +174,12 @@ mod test {
     fn comments_are_ignored() {
         let inp = "><+-.,[]abcde";
         let tokens = tokenize(inp);
-        use TokenType::*;
+        use Instruction::*;
         assert_eq!(
-            tokens.iter().map(|t| t.r#type).collect::<Vec<TokenType>>(),
+            tokens
+                .iter()
+                .map(|t| t.r#type)
+                .collect::<Vec<Instruction>>(),
             vec![
                 IncrDp,
                 DecrDp,
@@ -181,8 +187,8 @@ mod test {
                 DecrByte,
                 Output,
                 Input,
-                JmpLeft(7),
-                JmpRight(6)
+                JmpForwardIf0(7),
+                JmpBackIfNeq0(6)
             ]
         );
     }
@@ -191,16 +197,19 @@ mod test {
     fn mixed_commands() {
         let inp = "++[><].,-";
         let tokens = tokenize(inp);
-        use TokenType::*;
+        use Instruction::*;
         assert_eq!(
-            tokens.iter().map(|t| t.r#type).collect::<Vec<TokenType>>(),
+            tokens
+                .iter()
+                .map(|t| t.r#type)
+                .collect::<Vec<Instruction>>(),
             vec![
                 IncrByte,
                 IncrByte,
-                JmpLeft(5),
+                JmpForwardIf0(5),
                 IncrDp,
                 DecrDp,
-                JmpRight(2),
+                JmpBackIfNeq0(2),
                 Output,
                 Input,
                 DecrByte
@@ -226,10 +235,13 @@ mod test {
     fn simple_loop() {
         let inp = "[]";
         let tokens = tokenize(inp);
-        use TokenType::*;
+        use Instruction::*;
         assert_eq!(
-            tokens.iter().map(|t| t.r#type).collect::<Vec<TokenType>>(),
-            vec![JmpLeft(1), JmpRight(0)]
+            tokens
+                .iter()
+                .map(|t| t.r#type)
+                .collect::<Vec<Instruction>>(),
+            vec![JmpForwardIf0(1), JmpBackIfNeq0(0)]
         );
     }
 
@@ -237,10 +249,18 @@ mod test {
     fn nested_loops() {
         let inp = "[[]]";
         let tokens = tokenize(inp);
-        use TokenType::*;
+        use Instruction::*;
         assert_eq!(
-            tokens.iter().map(|t| t.r#type).collect::<Vec<TokenType>>(),
-            vec![JmpLeft(3), JmpLeft(2), JmpRight(1), JmpRight(0)]
+            tokens
+                .iter()
+                .map(|t| t.r#type)
+                .collect::<Vec<Instruction>>(),
+            vec![
+                JmpForwardIf0(3),
+                JmpForwardIf0(2),
+                JmpBackIfNeq0(1),
+                JmpBackIfNeq0(0)
+            ]
         );
     }
 
@@ -248,18 +268,21 @@ mod test {
     fn complex_loop_structure() {
         let inp = "[[>+<]-]";
         let tokens = tokenize(inp);
-        use TokenType::*;
+        use Instruction::*;
         assert_eq!(
-            tokens.iter().map(|t| t.r#type).collect::<Vec<TokenType>>(),
+            tokens
+                .iter()
+                .map(|t| t.r#type)
+                .collect::<Vec<Instruction>>(),
             vec![
-                JmpLeft(7),
-                JmpLeft(5),
+                JmpForwardIf0(7),
+                JmpForwardIf0(5),
                 IncrDp,
                 IncrByte,
                 DecrDp,
-                JmpRight(1),
+                JmpBackIfNeq0(1),
                 DecrByte,
-                JmpRight(0)
+                JmpBackIfNeq0(0)
             ]
         );
     }
