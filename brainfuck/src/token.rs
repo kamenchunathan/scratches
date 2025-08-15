@@ -61,9 +61,8 @@ impl<'a> Tokenizer<'a> {
         use TokenType::*;
 
         let mut jump_stack = Vec::new();
-
         let mut tokens: Vec<Token<()>> = Vec::with_capacity(self.input.len());
-        while let Some((i, c)) = self.input_chars.next() {
+        while let Some((_i, c)) = self.input_chars.next() {
             let tok_type = match c {
                 '>' => Some(IncrDp),
 
@@ -78,7 +77,7 @@ impl<'a> Tokenizer<'a> {
                 ',' => Some(Input),
 
                 '[' => {
-                    jump_stack.push(i);
+                    jump_stack.push(tokens.len());
                     // u32::MAX is used as a sentinel value
                     Some(JmpLeft(u32::MAX))
                 }

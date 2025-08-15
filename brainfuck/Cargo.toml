@@ -9,3 +9,11 @@ path = "src/lib.rs"
 
 [dependencies]
 anyhow = "1.0.99"
+clap = { version = "4.5.45", features = ["derive"] }
+
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"]}
+
+[[bench]]
+name = "interpreter"
+harness = false

@@ -75,3 +75,28 @@
 >>>>>>>                        back to cell with blank
 ---------- ---------- --.      dec to 10 to get newline char
 
+read number
+>,[>++++++[-<-------->]>+++++++++[-<<<[->+>+<<]>>[-<<+>>]>]<<[-<+>],]
+
+print first numbers (1)
+<<+++++.-----.+++++.-----
+
+initialize sequence
+>-->+>+
+
+start loop
+<<
+[-
+  move / copy second
+  >>[->+>+<<]
+  sum first / second
+  <[->>>+<<<]
+  move second to first place
+  >>[-<<+>>]
+  move / copy sum
+  >[-<<+>>>+<]
+  print comma
+  <<<<<.
+  print number
+  >>>>>>[>>>>++++++++++<<<<[->+>>+>-[<-]<[->>+<<<<[->>>+<<<]>]<<]>+[-<+>]>>>[-]>[-<<<<+>>>>]<<<<]<[>++++++[<++++++++>-]<-.[-]<]<<<<
+]

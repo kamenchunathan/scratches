@@ -15,7 +15,7 @@ pub struct BasicInterpreter {
 
 impl BasicInterpreter {
     const MAX_MEMORY_SIZE: u32 = 1024 * 1024;
-    const MAX_INSTR_COUNT: u32 = 1024 * 1024;
+    const MAX_INSTR_COUNT: u32 = 1024 * 1024 * 1024;
 
     pub fn new(tokens: Vec<Token>, input: Vec<u8>, output: Vec<u8>) -> Self {
         Self {
@@ -131,7 +131,7 @@ impl BasicInterpreter {
             // "Allocate" memory
             self.memory.extend(std::iter::repeat_n(
                 0,
-                self.memory.len() - index as usize + 1,
+                index as usize - self.memory.len() + 1,
             ));
         }
 

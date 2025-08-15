@@ -1,3 +1,3 @@
-mod interpreter;
-mod ir;
-mod token;
+pub mod interpreter;
+pub mod ir;
+pub mod token;
