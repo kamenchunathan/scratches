@@ -54,7 +54,7 @@ The other dependencies (FTXUI and Asio) are managed by Meson and will be downloa
     ```
 3.  Compile the project with Ninja:
     ```bash
-    ninja -C build
+    meson -C build
     ```
 
 ## Usage
