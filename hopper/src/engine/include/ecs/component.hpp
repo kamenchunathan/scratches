@@ -1,4 +1,3 @@
-
 #pragma once
 
 #include <atomic>
@@ -7,13 +6,12 @@
 #include <cstdint>
 #include <functional>
 
-const std::uint32_t MAX_COMPONENTS = 64;
+namespace engine::ecs {
+constexpr std::uint32_t MAX_COMPONENTS = 64;
 
 using ComponentMask = std::bitset<MAX_COMPONENTS>;
+using ComponentId = std::uint32_t;
 
-// NOTE: The signature seems to be different when a type is passed in as an
-// lvalue and rvalue. I don't know why this is but it probbly results from hving
-// different component ids. Why? idk to fix later
 struct Signature {
   std::bitset<MAX_COMPONENTS> mask;
 
@@ -26,14 +24,16 @@ struct SignatureHash {
   }
 };
 
-using ComponentId = std::uint32_t;
-
 class ComponentIds {
-  static inline std::atomic<uint32_t> counter = 0;
-
 public:
-  template <typename T> static std::size_t get_id() {
-    static std::uint32_t id = counter.fetch_add(1, std::memory_order_seq_cst);
+  template <typename T> static ComponentId get_id() {
+    static ComponentId id = counter_.fetch_add(1, std::memory_order_seq_cst);
     return id;
   }
+
+private:
+  // NO need for this to be atomic currently but it may be needed to make the
+  // ECS system threadsafe for networking later on
+  static inline std::atomic<ComponentId> counter_{0};
 };
+} // namespace engine::ecs

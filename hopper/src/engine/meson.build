@@ -1,8 +1,14 @@
 engine_inc = include_directories('include')
 
+engine_sources = [
+  'src/engine.cpp',
+  'src/ecs/world.cpp',
+  'src/ecs/archetype.cpp',
+]
+
 engine_lib = static_library(
   'engine',
-  'src/engine.cpp',
+  engine_sources,
   include_directories: engine_inc,
   install: true,
   dependencies: [
@@ -13,4 +19,11 @@ engine_lib = static_library(
 engine_dep = declare_dependency(
   include_directories: engine_inc,
   link_with: engine_lib,
+)
+
+executable(
+  'ecs-test',
+  'test/ecs.cpp',
+  dependencies: [engine_dep],
+  install: false,
 )
