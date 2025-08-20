@@ -8,3 +8,4 @@ project(
 subdir('src/engine')
 subdir('src/server')
 subdir('src/client')
+subdir('labs')
