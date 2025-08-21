@@ -1,2 +1,19 @@
 build:
-  meson compile -C build
+    set -euxo pipefail; meson compile -C build
+
+setup:
+    set -euxo pipefail; meson setup build
+
+watch binary_name:
+    #!/bin/bash
+    clear
+    echo "Building..."
+    meson compile -C build {{binary_name}} && ./build/labs/{{binary_name}}
+    echo -e "\n"
+    
+    set -euxo pipefail; 
+    while inotifywait -e modify labs/{{binary_name}}.cpp; do
+        clear
+        echo "Rebuilding..."
+        meson compile -C build {{binary_name}} && ./build/labs/{{binary_name}}
+    done

@@ -2,6 +2,7 @@
 
 Hopper is a multiplayer terminal-based platformer game.
 
+
 ## Getting Started
 
 These instructions will get you a copy of the project up and running on your local machine for development and testing purposes.
@@ -54,7 +55,7 @@ The other dependencies (FTXUI and Asio) are managed by Meson and will be downloa
     ```
 3.  Compile the project with Ninja:
     ```bash
-    meson -C build
+    meson compile -C build
     ```
 
 ## Usage
@@ -74,3 +75,9 @@ To run the client:
 ```bash
 ./build/hopper-client
 ```
+
+
+
+## Project Structure
+
+The game consists of three projects all in the src directory, engine which contains core and shared components, the server and the client. The labs directory contain small self contained examples to explore c++ topics
