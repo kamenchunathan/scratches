@@ -65,7 +65,7 @@ public:
   class Iterator {
   public:
     Iterator(std::uint32_t start, std::uint32_t count,
-             const std::function<std::uint32_t()> &op)
+             const std::function<std::uint32_t()> op)
         : current_(start), count_(count), op_(op) {};
 
     using iterator_category = std::input_iterator_tag;
@@ -100,7 +100,7 @@ public:
 
   private:
     std::uint32_t current_, count_, computed_;
-    const std::function<std::uint32_t()> &op_;
+    const std::function<std::uint32_t()> op_;
   };
 
   Iterator begin() { return Iterator(0, count_, expenny); };
@@ -109,7 +109,7 @@ public:
 private:
   std::uint32_t count_;
   static std::uint32_t expenny() {
-    std::printf("Expensive operation");
+    std::printf("Expensive operation\n");
     return 30;
   }
 };
@@ -120,7 +120,7 @@ int main() {
     printf("%u ", v);
   }
 
-  for (auto v : Expenny(2)) {
+  for (auto v : Expenny(4)) {
     printf("bingo %u ", v);
   }
   printf("\n");
