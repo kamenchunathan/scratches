@@ -8,6 +8,7 @@
 #include <vector>
 
 namespace engine::ecs {
+
 class World {
 public:
   World() = default;
@@ -57,67 +58,11 @@ public:
     return entity_map_.find(entity) != entity_map_.end();
   }
 
-  template <typename... Components, typename Func> void each(Func &&func) {
-    auto archetypes = query<Components...>();
-
-    for (auto *archetype : archetypes) {
-      const auto &entities = archetype->get_entities();
-
-      if constexpr (sizeof...(Components) == 0) {
-        for (std::size_t i = 0; i < entities.size(); ++i) {
-          func(entities[i]);
-        }
-      } else {
-        for (std::size_t i = 0; i < entities.size(); ++i) {
-          func(entities[i], archetype->template get_component<Components>(
-                                static_cast<std::uint32_t>(i))...);
-        }
-      }
-    }
-  }
-
-  template <typename... Components, typename Func>
-  void each(Func &&func) const {
-    auto archetypes = query<Components...>();
-
-    for (const auto *archetype : archetypes) {
-      const auto &entities = archetype->get_entities();
-
-      if constexpr (sizeof...(Components) == 0) {
-        for (std::size_t i = 0; i < entities.size(); ++i) {
-          func(entities[i]);
-        }
-      } else {
-        for (std::size_t i = 0; i < entities.size(); ++i) {
-          func(entities[i], archetype->template get_component<Components>(
-                                static_cast<std::uint32_t>(i))...);
-        }
-      }
-    }
-  }
-
-  template <typename... Components> std::vector<Archetype *> query() {
-    ComponentMask query_mask;
-    (query_mask.set(ComponentIds::get_id<Components>()), ...);
-
+  std::vector<Archetype *> get_matching_archetypes(ComponentMask required,
+                                                   ComponentMask disallowed) {
     std::vector<Archetype *> matching_archetypes;
-    for (auto &[signature, archetype] : archetypes_) {
-      if (archetype->matches_query(query_mask)) {
-        matching_archetypes.push_back(archetype.get());
-      }
-    }
-
-    return matching_archetypes;
-  }
-
-  template <typename... Components>
-  std::vector<const Archetype *> query() const {
-    ComponentMask query_mask;
-    (query_mask.set(ComponentIds::get_id<Components>()), ...);
-
-    std::vector<const Archetype *> matching_archetypes;
     for (const auto &[signature, archetype] : archetypes_) {
-      if (archetype->matches_query(query_mask)) {
+      if (archetype->matches_query(required, disallowed)) {
         matching_archetypes.push_back(archetype.get());
       }
     }
@@ -145,4 +90,5 @@ private:
       archetypes_;
   std::unordered_map<Entity, std::pair<Archetype *, std::uint32_t>> entity_map_;
 };
+
 } // namespace engine::ecs

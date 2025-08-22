@@ -1,7 +1,9 @@
 # Task List
  - [ ] ECS System
   - [ ] Query API
-    - [ ] Return a non allocating iterator to go through elements
+    - [x]  iterator to go through elements
+      - [ ] Make it non-allocating
+    - [ ] Integrate the query API into systems
   - [ ] Allow for dynamic addition and removal of elements
 - [ ] Renderer
 
@@ -15,3 +17,4 @@ List of things that I've learnt building this project
 # Task Log
 1. `2025-08-19 13:20` AI assisted refactor of project structure after failed conversion of project to using c++ modules. no way of providing interface files as a static library was found. Modules depend on vendor specific implementation details and I gave up after banging my head and used AI to fix the broken project state
 2. `2025-08-20 21:29` Explore C++ iterators with the goal of using them for the query API
+3. `2025-08-22 14:32` Imlement query API
