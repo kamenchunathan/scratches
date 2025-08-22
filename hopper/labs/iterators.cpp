@@ -4,6 +4,9 @@
 #include <functional>
 #include <iterator>
 #include <ranges>
+#include <string>
+#include <tuple>
+#include <vector>
 
 /// An iterator that continuously returns the same value
 /// Following this tutorial
@@ -28,6 +31,7 @@ public:
       ++value_;
       return *this;
     };
+
     Iterator operator++(int) {
       Iterator tmp = *this;
       ++(*this);
@@ -114,6 +118,60 @@ private:
   }
 };
 
+struct MyData {
+  int id;
+  std::string name;
+  double value;
+};
+
+class SubsetIterator {
+public:
+  struct Iterator {
+    using iterator_concept = std::input_iterator_tag;
+    using iterator_category = std::input_iterator_tag;
+    using difference_type = std::ptrdiff_t;
+    using value_type = std::tuple<int, std::string>;
+    using reference = std::tuple<int &, std::string &>;
+    using pointer = void;
+
+    Iterator() = default;
+    explicit Iterator(std::vector<MyData>::iterator it) : it_(it) {}
+
+    reference operator*() const { return std::tie(it_->id, it_->name); }
+
+    Iterator &operator++() {
+      ++it_;
+      return *this;
+    }
+    Iterator operator++(int) {
+      Iterator tmp = *this;
+      ++(*this);
+      return tmp;
+    }
+
+    friend bool operator==(const Iterator &a, const Iterator &b) {
+      return a.it_ == b.it_;
+    }
+    friend bool operator!=(const Iterator &a, const Iterator &b) {
+      return a.it_ != b.it_;
+    }
+
+  private:
+    std::vector<MyData>::iterator it_{};
+  };
+
+  SubsetIterator() = default;
+  explicit SubsetIterator(std::vector<MyData> &data) : vec_(&data) {}
+
+  Iterator begin() { return Iterator(vec_->begin()); }
+  Iterator end() { return Iterator(vec_->end()); }
+
+  std::size_t size() const noexcept { return vec_ ? vec_->size() : 0; }
+
+private:
+  std::vector<MyData> *vec_ = nullptr;
+};
+
 int main() {
   Sequence infinite_numbers(1);
   for (auto v : infinite_numbers | std::ranges::views::take(5)) {
@@ -124,5 +182,29 @@ int main() {
     printf("bingo %u ", v);
   }
   printf("\n");
-  return 0;
+
+  std::vector<MyData> items = {
+      {1, "Alice", 10.5}, {2, "Bob", 20.5}, {3, "Charlie", 30.5}};
+
+  // Works as an lvalue range with views::take
+  SubsetIterator subset(items);
+  for (auto [id, name] : subset | std::views::take(2)) {
+    std::printf("Before edit: id=%d name=%s\n", id, name.c_str());
+
+    // Modify via references in the tuple
+    id += 100;
+    name += "_updated";
+
+    std::printf("After edit: id=%d name=%s\n", id, name.c_str());
+  }
+
+  std::puts("--- Original data after edits ---");
+  for (const auto &d : items) {
+    std::printf("id=%d name=%s value=%.1f\n", d.id, d.name.c_str(), d.value);
+  }
+
+  std::puts("--- Using as a temporary with views::drop ---");
+  for (auto [id, name] : SubsetIterator(items) | std::views::drop(1)) {
+    std::printf("id=%d name=%s\n", id, name.c_str());
+  }
 }
