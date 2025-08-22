@@ -11,23 +11,29 @@ namespace engine::ecs {
 template <typename... Components>
 class Query {
 public:
-  Query(World *world) : world_(world) {
+  explicit Query(World *world) : world_(world) {
     (required_.set(engine::ecs::ComponentIds::get_id<Components>()), ...);
-    matching_archetypes_ = world_->get_matching_archetypes(required_, disallowed_);
   }
 
   template <typename... DisallowedComponents> 
   Query &without() {
     (disallowed_.set(engine::ecs::ComponentIds::get_id<DisallowedComponents>()), ...);
-    matching_archetypes_ = world_->get_matching_archetypes(required_, disallowed_);
+    invalidate_cache();
     return *this;
   }
 
-  struct Iterator {
+  template <typename... RequiredComponents>
+  Query &with() {
+    (required_.set(engine::ecs::ComponentIds::get_id<RequiredComponents>()), ...);
+    invalidate_cache();
+    return *this;
+  }
+
+    struct Iterator {
     using iterator_category = std::forward_iterator_tag;
     using difference_type = std::ptrdiff_t;
     using value_type = std::tuple<Entity, Components...>;
-    using reference = std::tuple<Entity &, Components &...>;
+    using reference = std::tuple<Entity, Components &...>;
     using pointer = void;
 
     Iterator(std::vector<Archetype *>::iterator archetype_it,
@@ -44,7 +50,6 @@ public:
     Iterator &operator++() {
       ++entity_idx_;
       
-      // If we've gone past the current archetype's entities, move to next archetype
       if (archetype_it_ != archetype_end_ && entity_idx_ >= (*archetype_it_)->size()) {
         ++archetype_it_;
         entity_idx_ = 0;
@@ -84,18 +89,48 @@ public:
   };
 
   Iterator begin() { 
+    ensure_archetypes_cached();
     return Iterator(matching_archetypes_.begin(), matching_archetypes_.end()); 
   }
 
   Iterator end() { 
+    ensure_archetypes_cached();
     return Iterator(matching_archetypes_.end(), matching_archetypes_.end()); 
   }
 
+  bool empty() {
+    ensure_archetypes_cached();
+    return std::all_of(matching_archetypes_.begin(), matching_archetypes_.end(),
+                      [](Archetype* arch) { return arch->empty(); });
+  }
+
+  std::size_t count() {
+    ensure_archetypes_cached();
+    std::size_t total = 0;
+    for (Archetype* arch : matching_archetypes_) {
+      total += arch->size();
+    }
+    return total;
+  }
+
 private:
+  void ensure_archetypes_cached() const {
+    if (!archetypes_cached_) {
+      matching_archetypes_ = world_->get_matching_archetypes(required_, disallowed_);
+      archetypes_cached_ = true;
+    }
+  }
+
+  void invalidate_cache() {
+    archetypes_cached_ = false;
+    matching_archetypes_.clear();
+  }
+
   ComponentMask required_;
   ComponentMask disallowed_;
   World *world_;
-  std::vector<Archetype *> matching_archetypes_;
+  mutable std::vector<Archetype *> matching_archetypes_;
+  mutable bool archetypes_cached_ = false;
 };
 
 } // namespace engine::ecs
