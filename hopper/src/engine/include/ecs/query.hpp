@@ -12,13 +12,14 @@ template <typename... Components>
 class Query {
 public:
   Query(World *world) : world_(world) {
-    matching_archetypes_ =
-        world_->get_matching_archetypes(required_, disallowed_);
     (required_.set(engine::ecs::ComponentIds::get_id<Components>()), ...);
-  };
+    matching_archetypes_ = world_->get_matching_archetypes(required_, disallowed_);
+  }
 
-  template <typename... DisallowedComponents> Query &without() {
+  template <typename... DisallowedComponents> 
+  Query &without() {
     (disallowed_.set(engine::ecs::ComponentIds::get_id<DisallowedComponents>()), ...);
+    matching_archetypes_ = world_->get_matching_archetypes(required_, disallowed_);
     return *this;
   }
 
@@ -29,21 +30,27 @@ public:
     using reference = std::tuple<Entity &, Components &...>;
     using pointer = void;
 
-    Iterator( std::vector<Archetype *>::iterator matching_archetypes)
-        : matching_archetypes_(matching_archetypes) {}
+    Iterator(std::vector<Archetype *>::iterator archetype_it,
+             std::vector<Archetype *>::iterator archetype_end)
+        : archetype_it_(archetype_it), archetype_end_(archetype_end), entity_idx_(0) {
+      skip_empty_archetypes();
+    }
 
-    reference operator*()   {
-      std::uint32_t entity_index = (*matching_archetypes_)->get_entities()[curr_entity_id_];
-      
-      return std::tie(entity_index, (*matching_archetypes_)->template get_component<Components>( entity_index)...); }
+    reference operator*() {
+      Entity entity = (*archetype_it_)->get_entities()[entity_idx_];
+      return std::tie(entity, (*archetype_it_)->template get_component<Components>(entity_idx_)...);
+    }
 
     Iterator &operator++() {
-      if (curr_entity_id_ < (*matching_archetypes_)->get_entities().size()) {
-        ++curr_entity_id_;
-      } else {
-        curr_entity_id_ = 0;
-        ++matching_archetypes_;
+      ++entity_idx_;
+      
+      // If we've gone past the current archetype's entities, move to next archetype
+      if (archetype_it_ != archetype_end_ && entity_idx_ >= (*archetype_it_)->size()) {
+        ++archetype_it_;
+        entity_idx_ = 0;
+        skip_empty_archetypes();
       }
+      
       return *this;
     }
     
@@ -54,21 +61,35 @@ public:
     }
 
     friend bool operator==(const Iterator &a, const Iterator &b) {
-      return a.matching_archetypes_ == b.matching_archetypes_;
+      return a.archetype_it_ == b.archetype_it_ && 
+             (a.archetype_it_ == a.archetype_end_ || a.entity_idx_ == b.entity_idx_);
     }
 
     friend bool operator!=(const Iterator &a, const Iterator &b) {
-      return a.matching_archetypes_ != b.matching_archetypes_;
+      return !(a == b);
     }
 
   private:
-    std::vector<Archetype *>::iterator matching_archetypes_;
-    std::uint32_t curr_entity_id_ = 0;
+    void skip_empty_archetypes() {
+      while (archetype_it_ != archetype_end_ && 
+             ((*archetype_it_)->empty() || entity_idx_ >= (*archetype_it_)->size())) {
+        ++archetype_it_;
+        entity_idx_ = 0;
+      }
+    }
+
+    std::vector<Archetype *>::iterator archetype_it_;
+    std::vector<Archetype *>::iterator archetype_end_;
+    std::uint32_t entity_idx_;
   };
 
-  Iterator begin() { return Iterator(matching_archetypes_.begin()); }
+  Iterator begin() { 
+    return Iterator(matching_archetypes_.begin(), matching_archetypes_.end()); 
+  }
 
-  Iterator end() { return Iterator(matching_archetypes_.end()); }
+  Iterator end() { 
+    return Iterator(matching_archetypes_.end(), matching_archetypes_.end()); 
+  }
 
 private:
   ComponentMask required_;
