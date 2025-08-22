@@ -29,22 +29,28 @@ public:
     return *this;
   }
 
-    struct Iterator {
+  struct Iterator {
+  public:
     using iterator_category = std::forward_iterator_tag;
+    using iterator_concept = std::forward_iterator_tag;  
     using difference_type = std::ptrdiff_t;
     using value_type = std::tuple<Entity, Components...>;
-    using reference = std::tuple<Entity, Components &...>;
-    using pointer = void;
-
+    
+    Iterator() = default;
+    
     Iterator(std::vector<Archetype *>::iterator archetype_it,
              std::vector<Archetype *>::iterator archetype_end)
         : archetype_it_(archetype_it), archetype_end_(archetype_end), entity_idx_(0) {
       skip_empty_archetypes();
     }
 
-    reference operator*() {
+    value_type operator*() const {
       Entity entity = (*archetype_it_)->get_entities()[entity_idx_];
-      return std::tie(entity, (*archetype_it_)->template get_component<Components>(entity_idx_)...);
+      return std::make_tuple(entity, (*archetype_it_)->template get_component<Components>(entity_idx_)...);
+    }
+    
+    auto operator->() const {
+      return std::make_unique<value_type>(operator*());
     }
 
     Iterator &operator++() {
@@ -65,13 +71,17 @@ public:
       return tmp;
     }
 
-    friend bool operator==(const Iterator &a, const Iterator &b) {
-      return a.archetype_it_ == b.archetype_it_ && 
-             (a.archetype_it_ == a.archetype_end_ || a.entity_idx_ == b.entity_idx_);
+    bool operator==(const Iterator &other) const {
+      return archetype_it_ == other.archetype_it_ && 
+             (archetype_it_ == archetype_end_ || entity_idx_ == other.entity_idx_);
     }
 
-    friend bool operator!=(const Iterator &a, const Iterator &b) {
-      return !(a == b);
+    bool operator!=(const Iterator &other) const {
+      return !(*this == other);
+    }
+
+    bool operator==(std::default_sentinel_t) const {
+      return archetype_it_ == archetype_end_;
     }
 
   private:
@@ -85,26 +95,27 @@ public:
 
     std::vector<Archetype *>::iterator archetype_it_;
     std::vector<Archetype *>::iterator archetype_end_;
-    std::uint32_t entity_idx_;
+    std::uint32_t entity_idx_ = 0;
   };
 
-  Iterator begin() { 
+  using iterator = Iterator;
+  using const_iterator = Iterator;  // Query is conceptually const during iteration
+
+  // Range interface
+  Iterator begin() const { 
     ensure_archetypes_cached();
     return Iterator(matching_archetypes_.begin(), matching_archetypes_.end()); 
   }
 
-  Iterator end() { 
+  Iterator end() const { 
     ensure_archetypes_cached();
     return Iterator(matching_archetypes_.end(), matching_archetypes_.end()); 
   }
 
-  bool empty() {
-    ensure_archetypes_cached();
-    return std::all_of(matching_archetypes_.begin(), matching_archetypes_.end(),
-                      [](Archetype* arch) { return arch->empty(); });
-  }
-
-  std::size_t count() {
+  Iterator cbegin() const { return begin(); }
+  Iterator cend() const { return end(); }
+  
+  std::size_t size() const {
     ensure_archetypes_cached();
     std::size_t total = 0;
     for (Archetype* arch : matching_archetypes_) {
@@ -112,6 +123,14 @@ public:
     }
     return total;
   }
+
+  bool empty() const {
+    ensure_archetypes_cached();
+    return std::all_of(matching_archetypes_.begin(), matching_archetypes_.end(),
+                      [](Archetype* arch) { return arch->empty(); });
+  }
+
+  std::size_t count() const { return size(); } 
 
 private:
   void ensure_archetypes_cached() const {
@@ -134,3 +153,4 @@ private:
 };
 
 } // namespace engine::ecs
+

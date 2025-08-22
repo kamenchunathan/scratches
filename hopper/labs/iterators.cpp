@@ -68,9 +68,8 @@ public:
 
   class Iterator {
   public:
-    Iterator(std::uint32_t start, std::uint32_t count,
-             const std::function<std::uint32_t()> op)
-        : current_(start), count_(count), op_(op) {};
+    Iterator(std::uint32_t start, const std::function<std::uint32_t()> op)
+        : current_(start), op_(op) {};
 
     using iterator_category = std::input_iterator_tag;
     using difference_type = std::ptrdiff_t;
@@ -103,12 +102,12 @@ public:
     }
 
   private:
-    std::uint32_t current_, count_, computed_;
+    std::uint32_t current_, computed_;
     const std::function<std::uint32_t()> op_;
   };
 
-  Iterator begin() { return Iterator(0, count_, expenny); };
-  Iterator end() { return Iterator(count_, count_, expenny); };
+  Iterator begin() { return Iterator(0, expenny); };
+  Iterator end() { return Iterator(count_, expenny); };
 
 private:
   std::uint32_t count_;
