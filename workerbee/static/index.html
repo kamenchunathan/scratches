@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Chatterbox</title>
+    <link href="styles.css" rel="stylesheet" />
+  </head>
+  <body>
+    <nav>
+      <a href="/">Chatterbox</a>
+    </nav>
+    <main>
+      <div id="room-selection">
+        <h1>Join a Chatroom</h1>
+        <form id="join-form">
+          <input type="text" id="room-name-input" placeholder="Enter room name" required />
+          <button type="submit">Join</button>
+        </form>
+      </div>
+
+      <div id="chat-room" style="display: none;">
+        <h1 id="room-title"></h1>
+        <div id="messages"></div>
+        <form id="message-form">
+          <input type="text" id="message-input" placeholder="Type a message" required />
+          <button type="submit">Send</button>
+        </form>
+      </div>
+    </main>
+    <script src="script.js"></script>
+  </body>
+</html>
