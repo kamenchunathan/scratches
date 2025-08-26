@@ -5,10 +5,10 @@ compatibility_date = "2025-06-03"
 [build]
 command = "cargo install -q worker-build && worker-build --release"
 
-# [[durable_objects.bindings]]
-# name = "CHATROOM"
-# class_name = "ChatRoom"
-#
-# [[migrations]]
-# tag = "v1"
-# new_classes = ["ChatRoom"]
+[[durable_objects.bindings]]
+name = "CHATROOM"
+class_name = "Room"
+
+[[migrations]]
+tag = "v1"
+new_classes = ["Room"]

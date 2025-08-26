@@ -5,6 +5,7 @@ use tracing_subscriber::fmt::time::UtcTime;
 use tracing_subscriber::prelude::*;
 use tracing_web::{performance_layer, MakeConsoleWriter};
 
+use uuid::Uuid;
 use worker::*;
 
 #[event(start)]
@@ -23,6 +24,7 @@ fn start() {
 
 #[event(fetch)]
 async fn main(req: Request, env: Env, _ctx: Context) -> Result<Response> {
+    let router_env = env.clone();
     Router::new()
         .get_async("/", async move |_req, _ctx| {
             let mut headers = Headers::new();
@@ -39,9 +41,16 @@ async fn main(req: Request, env: Env, _ctx: Context) -> Result<Response> {
             headers.append("Content-Type", "application/javascript")?;
             Ok(Response::ok(include_str!("../static/script.js"))?.with_headers(headers))
         })
-        .get_async("/ws/:room", |req, ctx| async move {
-            Response::ok("wow")
-            // room::websocket_handler(req, ctx.params("room")?.to_string()).await
+        .get_async("/ws/:room", |req, ctx| {
+            let namespace = router_env
+                .durable_object("CHATROOM")
+                .expect("Chatroom not found");
+            let obj_id = namespace
+                .id_from_name(ctx.param("room").unwrap_or(&"missing".to_string()))
+                .expect("unable to get id");
+            let stub = obj_id.get_stub().expect("Could not get stub");
+
+            async move { stub.fetch_with_request(req).await }
         })
         .run(req, env)
         .await
