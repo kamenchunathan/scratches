@@ -44,7 +44,7 @@ impl DurableObject for Room {
 
         {
             let mut clients = self.connected_clients.lock().await;
-            clients.insert(client_id.clone(), client.clone());
+            clients.insert(client_id.clone(), server.clone());
         }
 
         let clients_arc = Arc::clone(&self.connected_clients);
@@ -68,8 +68,17 @@ impl DurableObject for Room {
 
                                         let clients = clients_arc.lock().await;
                                         for (_, c) in clients.iter() {
-                                            c.send_with_str(&serialized_msg)
-                                                .expect("Could not send message");
+                                            if let Err(e) = c.send_with_str(&serialized_msg) {
+                                                info!(
+                                                    "Failed to send message to client {}: {:?}",
+                                                    client_id, e
+                                                );
+                                            } else {
+                                                info!(
+                                                    "Successfully sent message to client {}",
+                                                    client_id
+                                                );
+                                            }
                                         }
                                     }
                                 }

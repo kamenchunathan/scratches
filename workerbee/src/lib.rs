@@ -5,7 +5,6 @@ use tracing_subscriber::fmt::time::UtcTime;
 use tracing_subscriber::prelude::*;
 use tracing_web::{performance_layer, MakeConsoleWriter};
 
-use uuid::Uuid;
 use worker::*;
 
 #[event(start)]
