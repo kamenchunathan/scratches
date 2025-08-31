@@ -1,0 +1,3 @@
+[target.x86_64-unknown-linux-gnu]
+linker = "/nix/store/6hyah654xshls0qdr5gqk5mpa5rvd43f-clang-wrapper-19.1.7/bin/clang"
+rustflags = ["-C", "link-arg=--ld-path=/nix/store/vzqp13w1hs2c83fdma3b2m1ng1rk16d9-mold-2.40.4/bin/mold"]

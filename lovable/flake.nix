@@ -48,7 +48,27 @@
             cargo-edit
             cargo-watch
             rust-analyzer
+            
+            # Optimizations
+            clang
+            mold
+
+            # Game dev deps
+            alsa-lib
+            systemd
+            udev
+            libx11
           ];
+          
+
+          shellHook = ''
+            mkdir -p .cargo
+            cat > .cargo/config.toml <<EOF
+            [target.x86_64-unknown-linux-gnu]
+            linker = "${pkgs.clang}/bin/clang"
+            rustflags = ["-C", "link-arg=--ld-path=${pkgs.mold}/bin/mold"]
+            EOF
+          '';
 
           env = {
             # Required by rust-analyzer
