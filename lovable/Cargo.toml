@@ -10,6 +10,7 @@ bevy = { version = "0.16.1", default-features = false, features = [
   "bevy_winit",
   "bevy_window",
   "bevy_render",
+  "png",
   "bevy_gltf",
   "bevy_scene",
   "bevy_animation",

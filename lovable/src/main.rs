@@ -11,7 +11,7 @@ use bevy::{
 };
 
 const WINDOW_SIZE: u32 = 256;
-const GLTF_PATH: &str = "models/lovable.glb";
+const GLTF_PATH: &str = "models/Lovable.glb";
 
 fn main() {
     App::new()
