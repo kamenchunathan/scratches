@@ -10,9 +10,9 @@ bevy = { version = "0.16.1", default-features = false, features = [
   "bevy_winit",
   "bevy_window",
   "bevy_render",
-  "bevy_sprite",
+  "bevy_gltf",
   "bevy_scene",
-  "png",
+  "bevy_animation",
 ] }
 
 [profile.dev.package."*"]
