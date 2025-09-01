@@ -7,10 +7,12 @@ edition = "2024"
 bevy = { version = "0.16.1", default-features = false, features = [
   "bevy_log",
   "bevy_asset",
+  "bevy_winit",
   "bevy_window",
   "bevy_render",
   "bevy_sprite",
   "bevy_scene",
+  "png",
 ] }
 
 [profile.dev.package."*"]
