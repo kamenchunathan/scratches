@@ -6,9 +6,12 @@ mod ui;
 
 use bevy::{asset::io::AssetSourceId, prelude::*, window::WindowTheme};
 
-use crate::preferences::{
-    Preferences, PreferencesLoader, access_prefs, monitor_preferences_loading,
-    save_preferences_on_exit,
+use crate::{
+    preferences::{
+        Preferences, PreferencesLoader, access_prefs, monitor_preferences_loading,
+        save_preferences_on_exit,
+    },
+    ui::LovableUI,
 };
 
 pub struct Lovable;
@@ -16,17 +19,21 @@ pub struct Lovable;
 impl Plugin for Lovable {
     fn build(&self, app: &mut bevy::app::App) {
         let app_data = store::appdata_asset_source();
+
         app.register_asset_source(AssetSourceId::new(Some("appdata")), app_data)
-            .add_plugins(DefaultPlugins.set(WindowPlugin {
-                primary_window: Some(Window {
-                    title: String::from("Lovable"),
-                    window_theme: Some(WindowTheme::Dark),
-                    decorations: false,
-                    position: WindowPosition::Centered(MonitorSelection::Primary),
+            .add_plugins((
+                DefaultPlugins.set(WindowPlugin {
+                    primary_window: Some(Window {
+                        title: String::from("Lovable"),
+                        window_theme: Some(WindowTheme::Dark),
+                        decorations: false,
+                        position: WindowPosition::Centered(MonitorSelection::Primary),
+                        ..default()
+                    }),
                     ..default()
                 }),
-                ..default()
-            }))
+                LovableUI,
+            ))
             .register_asset_loader(PreferencesLoader)
             .init_asset::<Preferences>()
             .add_systems(Startup, access_prefs)
