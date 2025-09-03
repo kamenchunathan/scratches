@@ -1,0 +1,9 @@
+// raddbg 0.9.20 project file
+
+target:
+{
+  executable: "target/debug/lovable.exe"
+  enabled: 1
+  label: Lovable
+  working_directory: ""
+}

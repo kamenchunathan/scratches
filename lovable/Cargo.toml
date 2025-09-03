@@ -4,17 +4,9 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-bevy = { version = "0.16.1", default-features = false, features = [
-  "bevy_log",
-  "bevy_asset",
-  "bevy_winit",
-  "bevy_window",
-  "bevy_render",
-  "png",
-  "bevy_gltf",
-  "bevy_scene",
-  "bevy_animation",
-] }
+bevy = "0.16.1"
+serde = { version = "1.0.219", features = ["derive"] }
+thiserror = "2.0.16"
 
 [profile.dev.package."*"]
 opt-level = 3
