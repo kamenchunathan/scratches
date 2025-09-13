@@ -5,10 +5,9 @@ project(
   default_options: ['warning_level=3', 'cpp_std=c++23'],
 )
 
-lib = static_library(
+executable(
   'remember',
-  ['./src/wrapper.cpp'],
-  include_directories: './src/include'
+  './src/showcase.cpp',
+  include_directories: './src/include',
+  install: false,
 )
-
-executable('wrapper', './labs/wrapper.cpp', install: false, link_with: [lib])
