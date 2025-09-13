@@ -39,8 +39,12 @@ public:
         byte_alloc.deallocate(pool_, pool_size_);
     }
 
-    T* allocate(std::size_t) {
+    T* allocate(std::size_t n) {
         if (!freelist_) {
+            throw std::bad_alloc();
+        }
+
+        if (n != 1) {
             throw std::bad_alloc();
         }
 
@@ -62,6 +66,7 @@ private:
     struct Block {
         Block* next;
     };
+
     const size_t header_size = (sizeof(Block) + std::max(alignof(T), alignof(Block)) - 1)
         & ~(std::max(alignof(T), alignof(Block)) - 1);
 
