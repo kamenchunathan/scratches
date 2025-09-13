@@ -4,9 +4,9 @@
 #include <vector>
 
 int main() {
-  Mallocator<int> alloc;
+  ArenaAllocator<int> alloc;
   {
-    std::vector<int, Mallocator<int>> vec(alloc);
+    std::vector<int, ArenaAllocator<int>> vec(alloc);
 
     for (auto i : std::ranges::views::iota(0, 64)) {
       vec.push_back(i);

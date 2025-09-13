@@ -1,4 +1,5 @@
 #include <cstddef>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <limits>
@@ -120,15 +121,62 @@ public:
   }
 
   void deallocate(T *p, std::size_t) { free(p); }
+
+  friend bool operator==(const Mallocator &, const Mallocator &) {
+    return true;
+  }
+
+  friend bool operator!=(const Mallocator &, const Mallocator &) {
+    return false;
+  }
 };
 
 template <typename T> class ArenaAllocator {
 public:
+  using value_type = T;
+
   ArenaAllocator() noexcept = default;
 
   ArenaAllocator(std::size_t alloc_size) noexcept : alloc_size_(alloc_size) {}
 
-  T *allocate(std::size_t n) {}
+  ~ArenaAllocator() { free(alloc_); }
+
+  T *allocate(std::size_t n) {
+    constexpr std::size_t byte_size =
+        (sizeof(T) + alignof(T) - 1) & ~(alignof(T) - 1);
+    std::size_t aligned_offset = (offset_ + alignof(T) - 1) & ~(alignof(T) - 1);
+
+    if (n == 0) {
+      return nullptr;
+    }
+
+    if (!alloc_) {
+      alloc_ = malloc(alloc_size_);
+
+      if (!alloc_) {
+        throw std::bad_alloc();
+      }
+    }
+
+    if ((byte_size * n) + aligned_offset > alloc_size_) {
+      throw std::bad_alloc();
+    }
+
+    T *allocation = reinterpret_cast<T *>(static_cast<std::uint8_t *>(alloc_) +
+                                          aligned_offset);
+    offset_ = aligned_offset + (byte_size * n);
+    return allocation;
+  }
+
+  void deallocate(T *, std::size_t) {}
+
+  friend bool operator==(const ArenaAllocator &a, const ArenaAllocator &b) {
+    return a.alloc_ == b.alloc_;
+  }
+
+  friend bool operator!=(const ArenaAllocator &a, const ArenaAllocator &b) {
+    return a.alloc_ != b.alloc_;
+  }
 
 private:
   void *alloc_ = nullptr;
