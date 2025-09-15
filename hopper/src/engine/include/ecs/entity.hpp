@@ -3,5 +3,7 @@
 #include <cstdint>
 
 namespace engine::ecs {
-    using Entity = std::uint32_t;
+
+using Entity = std::uint32_t;
+
 }

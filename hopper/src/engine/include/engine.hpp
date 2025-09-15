@@ -6,17 +6,21 @@
 namespace engine {
 class Engine {
 public:
-  Engine();
-  ~Engine();
+    Engine();
+    ~Engine();
 
-  void initialize();
-  void shutdown();
-  void run();
+    void initialize();
+    void shutdown();
+    void run();
 
-  ecs::World &get_world() { return *world_; }
-  const ecs::World &get_world() const { return *world_; }
+    ecs::World& get_world() {
+        return *world_;
+    }
+    const ecs::World& get_world() const {
+        return *world_;
+    }
 
 private:
-  std::unique_ptr<ecs::World> world_;
+    std::unique_ptr<ecs::World> world_;
 };
 } // namespace engine

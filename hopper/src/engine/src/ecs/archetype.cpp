@@ -1,3 +1,3 @@
 #include "ecs/archetype.hpp"
 
-namespace engine::ecs { }
+namespace engine::ecs {}

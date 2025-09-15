@@ -9,6 +9,7 @@
 
 namespace engine::ecs {
 
+/* A type erased component column */
 class ComponentColumn {
 public:
   virtual ~ComponentColumn() = default;
