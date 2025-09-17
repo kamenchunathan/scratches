@@ -1,11 +1,15 @@
-labs_sources = [
-  'iterators.cpp',
-]
+executable(
+  'manip',
+  'manip.cpp',
+  install: false,
+  dependencies: [
+    dependency('osmanip', fallback: ['osmanip', 'osmanip_dep'], required: true),
+  ],
+)
 
-foreach s : labs_sources
-  executable(
-    s.split('.')[0], # Using split as a fallback, though explicit listing is preferred.
-    s,
-    install: false,
-  )
-endforeach
+executable(
+  'iterators',
+  'iterators.cpp',
+  install: false,
+  dependencies: [],
+)
