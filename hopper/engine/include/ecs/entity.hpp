@@ -2,7 +2,7 @@
 
 #include <cstdint>
 
-namespace engine::ecs {
+namespace ecs {
 
 using Entity = std::uint32_t;
 

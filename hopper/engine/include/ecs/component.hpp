@@ -6,7 +6,7 @@
 #include <cstdint>
 #include <functional>
 
-namespace engine::ecs {
+namespace ecs {
 constexpr std::uint32_t MAX_COMPONENTS = 64;
 
 using ComponentMask = std::bitset<MAX_COMPONENTS>;
@@ -39,4 +39,4 @@ private:
     // ECS system threadsafe for networking later on
     static inline std::atomic<ComponentId> counter_ { 0 };
 };
-} // namespace engine::ecs
+} // namespace ecs

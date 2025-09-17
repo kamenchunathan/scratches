@@ -7,7 +7,7 @@
 #include <unordered_map>
 #include <vector>
 
-namespace engine::ecs {
+namespace ecs {
 
 class World {
 public:
@@ -94,4 +94,4 @@ private:
     std::unordered_map<Entity, std::pair<Archetype*, std::uint32_t>> entity_map_;
 };
 
-} // namespace engine::ecs
+} // namespace ecs

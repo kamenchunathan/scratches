@@ -6,18 +6,18 @@
 #include <iterator>
 #include <vector>
 
-namespace engine::ecs {
+namespace ecs {
 
 /* For constructing queryies e.g.
  * ```cpp
- *  auto living_entities = engine::ecs::Query<Position, Health>(&world).without<Dead>();
+ *  auto living_entities = ecs::Query<Position, Health>(&world).without<Dead>();
  * ```
  * */
 template<typename... Components>
 class Query {
 public:
     explicit Query(World* world): world_(world) {
-        (required_.set(engine::ecs::ComponentIds::get_id<Components>()), ...);
+        (required_.set(ecs::ComponentIds::get_id<Components>()), ...);
     }
 
     /* Iterate over entities with this additional component without including it in the query
@@ -41,7 +41,7 @@ public:
      * */
     template<typename... RequiredComponents>
     Query& with() {
-        (required_.set(engine::ecs::ComponentIds::get_id<RequiredComponents>()), ...);
+        (required_.set(ecs::ComponentIds::get_id<RequiredComponents>()), ...);
         invalidate_cache();
         return *this;
     }
@@ -49,7 +49,7 @@ public:
     /* Exclude entities with these components from the query */
     template<typename... DisallowedComponents>
     Query& without() {
-        (disallowed_.set(engine::ecs::ComponentIds::get_id<DisallowedComponents>()), ...);
+        (disallowed_.set(ecs::ComponentIds::get_id<DisallowedComponents>()), ...);
         invalidate_cache();
         return *this;
     }
@@ -195,4 +195,4 @@ private:
     mutable bool archetypes_cached_ = false;
 };
 
-} // namespace engine::ecs
+} // namespace ecs

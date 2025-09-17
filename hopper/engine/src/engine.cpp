@@ -1,9 +1,9 @@
 #include "engine.hpp"
 
-namespace engine {
+namespace core {
 Engine::~Engine() = default;
 
 void Engine::initialize() {}
 
 void Engine::shutdown() {}
-} // namespace engine
+} // namespace core

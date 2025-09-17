@@ -51,7 +51,7 @@ struct Collectible {
 
 struct Dead {};
 
-void spawn_grid_entities(engine::ecs::World& world, float spacing = 2.0f, int grid_size = 10) {
+void spawn_grid_entities(ecs::World& world, float spacing = 2.0f, int grid_size = 10) {
     std::random_device rd;
     std::mt19937 gen(rd());
     std::uniform_real_distribution<float> vel_dist(-2.0f, 2.0f);
@@ -106,7 +106,7 @@ void spawn_grid_entities(engine::ecs::World& world, float spacing = 2.0f, int gr
     }
 }
 
-void create_some_dead_entities(engine::ecs::World& world) {
+void create_some_dead_entities(ecs::World& world) {
     // Create some dead entities for filtering demonstration
     world.create_entity(Position { -5.0f, -5.0f }, Health { 0 }, Dead {});
     world.create_entity(Position { -3.0f, -3.0f }, Velocity { 0.0f, 0.0f }, Health { 0 }, Dead {});
@@ -137,7 +137,7 @@ void print_range_info(const std::string& name, Range&& range) {
 }
 
 int main() {
-    auto world = engine::ecs::World();
+    auto world = ecs::World();
 
     // Spawn a reasonable grid of entities
     spawn_grid_entities(world, 2.0f, 8); // 8x8 grid with 2m spacing
@@ -156,7 +156,7 @@ int main() {
     printf("%s\n", std::string(60, '=').c_str());
 
     // 1. All moving entities (Position + Velocity)
-    auto moving_entities = engine::ecs::Query<Position, Velocity>(&world);
+    auto moving_entities = ecs::Query<Position, Velocity>(&world);
 
     print_range_info("All Moving Entities", moving_entities);
 
@@ -184,7 +184,7 @@ int main() {
     }
 
     // 4. Living entities query with health filtering
-    auto living_entities = engine::ecs::Query<Position, Health>(&world).without<Dead>();
+    auto living_entities = ecs::Query<Position, Health>(&world).without<Dead>();
 
     auto healthy_entities = living_entities | std::views::filter([](const auto& tuple) {
                                 auto [entity, pos, health] = tuple;
@@ -194,7 +194,7 @@ int main() {
     print_range_info("Healthy Living Entities (>70% health)", healthy_entities);
 
     // 5. Enemy analysis pipeline
-    auto enemy_query = engine::ecs::Query<Position, Enemy, Health>(&world);
+    auto enemy_query = ecs::Query<Position, Enemy, Health>(&world);
 
     auto dangerous_enemies = enemy_query | std::views::filter([](const auto& tuple) {
                                  auto [entity, pos, enemy, health] = tuple;
@@ -211,7 +211,7 @@ int main() {
     }
 
     // 6. Collectibles by value
-    auto collectibles = engine::ecs::Query<Position, Collectible>(&world);
+    auto collectibles = ecs::Query<Position, Collectible>(&world);
 
     auto valuable_collectibles = collectibles | std::views::filter([](const auto& tuple) {
                                      auto [entity, pos, item] = tuple;
@@ -242,7 +242,7 @@ int main() {
     }
 
     // 8. Complex multi-stage pipeline
-    auto complex_pipeline = engine::ecs::Query<Position, Velocity, Health>(&world).without<Dead>()
+    auto complex_pipeline = ecs::Query<Position, Velocity, Health>(&world).without<Dead>()
         | std::views::filter([](const auto& tuple) {
                                 auto [entity, pos, vel, health] = tuple;
                                 return health.is_alive() && vel.magnitude() > 1.0f;
@@ -275,7 +275,7 @@ int main() {
     }
 
     // 9. Aggregate operations using ranges algorithms
-    auto all_health_entities = engine::ecs::Query<Health>(&world).without<Dead>();
+    auto all_health_entities = ecs::Query<Health>(&world).without<Dead>();
 
     auto health_values = all_health_entities | std::views::transform([](const auto& tuple) {
                              auto [entity, health] = tuple;

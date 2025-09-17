@@ -1,1 +1,1 @@
-namespace engine {} // namespace engine
+namespace ecs {} // namespace ecs
