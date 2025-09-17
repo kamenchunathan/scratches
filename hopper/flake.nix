@@ -38,6 +38,7 @@
                     cmake
                     cppcheck
                     doxygen
+                    doctest
                     gtest
 
                     meson

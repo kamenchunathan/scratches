@@ -8,7 +8,6 @@ project(
 cc = meson.get_compiler('cpp')
 assert(cc.get_id() == 'gcc', 'This project only support the Clang compiler.')
 
-subdir('src/engine')
-subdir('src/server')
-subdir('src/client')
+subdir('engine')
+subdir('hopper')
 subdir('labs')
