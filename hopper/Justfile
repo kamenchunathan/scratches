@@ -1,19 +1,36 @@
 build:
-    set -euxo pipefail; meson compile -C build
+    meson compile -C build
 
 setup:
-    set -euxo pipefail; meson setup build
+    meson setup build
 
-watch binary_name:
+watch_lab binary_name:
     #!/bin/bash
+    # set -euxo pipefail; 
+    
+    child_pid=""
+    trap 'kill $child_pid 2>/dev/null; exit' SIGINT
+    
+    run() {
+        if [ -n "$child_pid" ]; then
+            kill $child_pid 2>/dev/null
+        fi
+
+        meson compile -C build {{binary_name}}
+        if [ $? -eq 0 ]; then
+            clear
+            ./build/labs/{{binary_name}} &
+            child_pid=$!
+        fi
+    }
+    
     clear
     echo "Building..."
-    meson compile -C build {{binary_name}} && ./build/labs/{{binary_name}}
+    run
     echo -e "\n"
     
-    set -euxo pipefail; 
-    while inotifywait -e modify labs/{{binary_name}}.cpp; do
+    while inotifywait -q -e modify labs/{{binary_name}}.cpp; do
         clear
         echo "Rebuilding..."
-        meson compile -C build {{binary_name}} && ./build/labs/{{binary_name}}
+        run
     done
