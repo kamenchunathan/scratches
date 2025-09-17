@@ -1,10 +1,12 @@
 engine_inc = include_directories('include')
 
 engine_sources = [
-  'src/renderer.cpp',
   'src/engine.cpp',
   'src/ecs/world.cpp',
   'src/ecs/archetype.cpp',
+  'src/renderer.cpp',
+  'src/renderer/types.cpp',
+  'src/renderer/present/term.cpp',
 ]
 
 engine_lib = static_library(
