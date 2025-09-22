@@ -16,7 +16,6 @@ engine_lib = static_library(
   install: true,
   dependencies: [
     dependency('asio', version: '>=1.30'),
-    dependency('osmanip', fallback: ['osmanip', 'osmanip_dep'], required: true),
   ],
 )
 
@@ -28,6 +27,15 @@ engine_dep = declare_dependency(
 executable(
   'ecs-test',
   'test/ecs.cpp',
+  dependencies: [
+    engine_dep,
+  ],
+  install: false,
+)
+
+executable(
+  'test_renderer',
+  'test/renderer.cpp',
   dependencies: [
     engine_dep,
   ],
