@@ -1,3 +1,5 @@
+gtest_dep = dependency('gtest', main: true, fallback: ['gtest', 'gtest_dep'])
+
 engine_inc = include_directories('include')
 
 engine_sources = [
@@ -24,20 +26,26 @@ engine_dep = declare_dependency(
   link_with: engine_lib,
 )
 
-executable(
+ecs_test_exe = executable(
   'ecs-test',
   'test/ecs.cpp',
   dependencies: [
     engine_dep,
+    gtest_dep,
   ],
   install: false,
 )
 
-executable(
+test('ECS tests', ecs_test_exe)
+
+renderer_test_exe = executable(
   'test_renderer',
   'test/renderer.cpp',
   dependencies: [
     engine_dep,
+    gtest_dep,
   ],
   install: false,
 )
+
+test('Renderer tests', renderer_test_exe)
