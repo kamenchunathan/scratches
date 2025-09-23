@@ -9,7 +9,7 @@ namespace renderer {
 class Presenter {
 public:
     virtual ~Presenter() = default;
-    virtual void present(const OutputBuffers& front_buffer, const OutputBuffers& back_buffer) = 0;
+    virtual void present(const FrameBuffer& front_buffer, const FrameBuffer& back_buffer) = 0;
 };
 
 } // namespace renderer

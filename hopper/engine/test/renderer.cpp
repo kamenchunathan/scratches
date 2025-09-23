@@ -4,26 +4,52 @@
 
 #include "renderer.hpp"
 
-// Test fixture for the MyersDiff algorithm
-TEST(MyersDiffTest, SimpleDiff) {
-    // Input sequences from the original main() function
-    std::vector<char> as { 'A', 'B', 'C', 'A', 'B', 'A' };
-    std::vector<char> bs { 'C', 'A', 'B', 'B', 'A' };
+TEST(MyersDiffFindMiddleSnakeTest, Identity) {
+    std::vector<char> as { 'A', 'B', 'C' };
+    std::vector<char> bs { 'A', 'B', 'C' };
 
-    // The expected trace represents the pairs of indices for common elements.
-    // The common subsequence is C, A, B, A.
-    std::vector<std::pair<std::uint32_t, std::uint32_t>> expected_trace = {
-        { 2, 0 }, // C
-        { 3, 1 }, // A
-        { 4, 2 }, // B
-        { 5, 4 } // A
-    };
-
-    // Instantiate the differ and run the algorithm
     renderer::MyersDiff<char> differ(as, bs);
-    std::vector<std::pair<std::uint32_t, std::uint32_t>> actual_trace = differ.diff();
 
-    // Assert that the calculated trace is equal to the expected trace.
-    // std::vector has a built-in operator== that compares element by element.
-    ASSERT_EQ(actual_trace, expected_trace);
+    renderer::Box box(0, 0, as.size(), bs.size());
+    renderer::Snake snake = differ.find_middle_snake(box);
+
+    // For identical sequences, the middle snake should span the entire range.
+    // Note: A failing test here may indicate a bug in the even delta case of
+    // the find_middle_snake implementation.
+    renderer::Snake expected_snake = { 0, 0, 3, 3 };
+    EXPECT_EQ(snake, expected_snake);
+}
+
+TEST(MyersDiffFindMiddleSnakeTest, SimpleEvenDelta) {
+    std::vector<char> as { 'A', 'X', 'B' };
+    std::vector<char> bs { 'A', 'Y', 'B' };
+
+    renderer::MyersDiff<char> differ(as, bs);
+
+    renderer::Box box(0, 0, as.size(), bs.size());
+    renderer::Snake snake = differ.find_middle_snake(box);
+
+    // The algorithm should find one of the common snakes, 'A' or 'B'.
+    // Let's assume it finds 'B'.
+    // The snake for 'B' starts at a[2], b[2] and has length 1.
+    renderer::Snake expected_snake = { 2, 2, 3, 3 };
+
+    // This test is written for the logically correct output. A failure might
+    // indicate the implementation returns a meeting point instead of a snake.
+    EXPECT_EQ(snake, expected_snake);
+}
+
+TEST(MyersDiffFindMiddleSnakeTest, SimpleOddDelta) {
+    std::vector<char> as { 'A', 'B' };
+    std::vector<char> bs { 'A', 'C', 'B' };
+
+    renderer::MyersDiff<char> differ(as, bs);
+
+    renderer::Box box(0, 0, as.size(), bs.size());
+    renderer::Snake snake = differ.find_middle_snake(box);
+
+    // The middle snake should be 'B'.
+    // It starts at a[1], b[2] and has length 1.
+    renderer::Snake expected_snake = { 1, 2, 2, 3 };
+    EXPECT_EQ(snake, expected_snake);
 }
