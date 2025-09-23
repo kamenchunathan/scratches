@@ -2,7 +2,7 @@
 #include "renderer.hpp"
 
 void draw_filled_rect(
-    renderer::OutputBuffers& buffer,
+    renderer::FrameBuffer& buffer,
     int x,
     int y,
     int w,

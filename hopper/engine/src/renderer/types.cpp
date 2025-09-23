@@ -6,7 +6,7 @@
 
 namespace renderer {
 
-void OutputBuffers::clear(core::ColorRGBA32F clear_color) {
+void FrameBuffer::clear(core::ColorRGBA32F clear_color) {
     std::fill(pixel_buf.begin(), pixel_buf.end(), clear_color);
 
     const core::ColorRGB8 char_clear_color {

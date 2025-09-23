@@ -13,7 +13,7 @@ struct CharacterPixel {
     core::ColorRGB8 bg_color;
 };
 
-class OutputBuffers {
+class FrameBuffer {
 private:
     std::uint32_t char_height_, char_width_;
     std::uint32_t pixel_height_, pixel_width_;
@@ -23,7 +23,7 @@ public:
     std::vector<CharacterPixel> char_buf;
     std::vector<core::ColorRGBA32F> pixel_buf;
 
-    OutputBuffers(std::uint32_t canvas_height, std::uint32_t canvas_width):
+    FrameBuffer(std::uint32_t canvas_height, std::uint32_t canvas_width):
         char_height_(canvas_height),
         char_width_(canvas_width),
         pixel_height_(canvas_height / 2),

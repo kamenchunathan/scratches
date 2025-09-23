@@ -13,7 +13,7 @@ namespace renderer {
 
 class Renderer {
 public:
-    OutputBuffers front_buffer, back_buffer;
+    FrameBuffer front_buffer, back_buffer;
 
     Renderer(std::uint32_t canvas_width, std::uint32_t canvas_height):
         front_buffer(canvas_height, canvas_width),
