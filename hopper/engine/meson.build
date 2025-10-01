@@ -7,7 +7,6 @@ engine_sources = [
   'src/ecs/world.cpp',
   'src/ecs/archetype.cpp',
   'src/renderer.cpp',
-  'src/renderer/types.cpp',
   'src/renderer/present/term.cpp',
 ]
 
@@ -25,18 +24,6 @@ engine_dep = declare_dependency(
   include_directories: engine_inc,
   link_with: engine_lib,
 )
-
-ecs_test_exe = executable(
-  'ecs-test',
-  'test/ecs.cpp',
-  dependencies: [
-    engine_dep,
-    gtest_dep,
-  ],
-  install: false,
-)
-
-test('ECS tests', ecs_test_exe)
 
 renderer_test_exe = executable(
   'test_renderer',

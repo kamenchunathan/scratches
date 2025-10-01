@@ -1,32 +1,26 @@
 #include "color.hpp"
 #include "renderer.hpp"
+#include <cmath>
+#include <memory>
 
-void draw_filled_rect(
-    renderer::FrameBuffer& buffer,
-    int x,
-    int y,
-    int w,
-    int h,
-    core::ColorRGBA32F color
-) {
-    for (int i = x; i < x + w; ++i) {
-        for (int j = y; j < y + h; ++j) {
-            if (i >= 0 && i < buffer.pixel_width() && j >= 0 && j < buffer.pixel_height()) {
-                buffer.pixel_buf[j * buffer.pixel_width() + i] = color;
-            }
-        }
+class UnlitShader: public renderer::Shader<float, float, float> {
+public:
+    ~UnlitShader() override = default;
+    float vertex(const float&, const renderer::ResourcePack<>&) override {
+        return 0;
     }
-}
+
+    float fragment(const float&, const renderer::ResourcePack<>&) override {
+        return 0;
+    }
+};
+
+using UnlitPipeline = renderer::Pipeline<float, float, float>;
 
 int main() {
     renderer::Renderer app_renderer(160, 90);
-
-    app_renderer.front_buffer.clear({ 0.8f, 0.3f, 0.0f, 1.0f });
-
-    draw_filled_rect(app_renderer.front_buffer, 10, 10, 20, 20, { 0.0f, 1.0f, 0.0f, 1.0f });
-    draw_filled_rect(app_renderer.front_buffer, 40, 10, 20, 20, { 0.0f, 0.0f, 1.0f, 1.0f });
-    draw_filled_rect(app_renderer.front_buffer, 10, 40, 20, 20, { 1.0f, 0.0f, 0.0f, 1.0f });
-    draw_filled_rect(app_renderer.front_buffer, 40, 40, 20, 20, { 1.0f, 1.0f, 0.0f, 1.0f });
-
-    app_renderer.present();
+    app_renderer.register_pipeline(
+        std::make_unique<UnlitPipeline>(std::make_unique<UnlitShader>(), "unlit")
+    );
+    app_renderer.render_frame();
 }

@@ -3,29 +3,42 @@
 #include <cassert>
 #include <cstdint>
 #include <memory>
-#include <vector>
+#include <typeindex>
+#include <unordered_map>
 
+#include "renderer/buffer.hpp"
 #include "renderer/present.hpp"
-#include "renderer/present/term.hpp"
-#include "renderer/types.hpp"
+#include "renderer/shader.hpp"
 
 namespace renderer {
 
 class Renderer {
 public:
-    FrameBuffer front_buffer, back_buffer;
+    Renderer(std::uint32_t w, std::uint32_t h);
 
-    Renderer(std::uint32_t canvas_width, std::uint32_t canvas_height):
-        front_buffer(canvas_height, canvas_width),
-        back_buffer(canvas_height, canvas_width),
-        presenter_(std::make_unique<TerminalPresenter>()) {
-        assert(canvas_height % 2 == 0 && "The canvas height must be a multiple of 2");
-    };
+    void render_frame();
 
-    void present();
+    template<typename Pipeline>
+    void register_pipeline(std::unique_ptr<Pipeline> pipeline);
 
 private:
-    std::unique_ptr<Presenter> presenter_;
+    std::uint32_t viewport_width_, viewport_height_;
+    std::unique_ptr<Presenter> presenter_ = nullptr;
+
+    BufferRegistry buffer_registry_;
+    BufferHandle<CharacterPixel> front_buffer_;
+    BufferHandle<CharacterPixel> back_buffer_;
+    BufferHandle<bool> mask_buffer_;
+
+    std::unordered_map<std::type_index, std::unique_ptr<IPipeline>> pipelines_;
+
+    void present();
+    void swap_buffers();
 };
+
+template<typename Pipeline>
+void Renderer::register_pipeline(std::unique_ptr<Pipeline> pipeline) {
+    pipelines_.insert_or_assign(std::type_index(typeid(Pipeline)), std::move(pipeline));
+}
 
 } // namespace renderer

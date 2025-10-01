@@ -1,7 +1,6 @@
 #pragma once
 
-#include <memory>
-
+#include "renderer/buffer.hpp"
 #include "renderer/types.hpp"
 
 namespace renderer {
@@ -9,7 +8,10 @@ namespace renderer {
 class Presenter {
 public:
     virtual ~Presenter() = default;
-    virtual void present(const FrameBuffer& front_buffer, const FrameBuffer& back_buffer) = 0;
+    virtual void present(
+        const FrameBuffer<CharacterPixel>& front_buffer,
+        const FrameBuffer<CharacterPixel>& back_buffer
+    ) = 0;
 };
 
 } // namespace renderer

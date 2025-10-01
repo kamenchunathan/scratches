@@ -1,8 +1,6 @@
 #pragma once
 
-#include <algorithm>
 #include <cassert>
-#include <memory>
 #include <optional>
 #include <ostream>
 #include <print>
@@ -18,7 +16,10 @@ public:
     TerminalPresenter(std::ostream& output);
     ~TerminalPresenter();
 
-    void present(const FrameBuffer& front_buffer, const FrameBuffer& back_buffer);
+    void present(
+        const FrameBuffer<CharacterPixel>& front_buffer,
+        const FrameBuffer<CharacterPixel>& back_buffer
+    );
 
     std::optional<std::pair<std::uint32_t, std::uint32_t>> size();
 

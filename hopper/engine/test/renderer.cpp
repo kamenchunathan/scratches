@@ -1,8 +1,7 @@
 #include <gtest/gtest.h>
-#include <utility>
 #include <vector>
 
-#include "renderer.hpp"
+#include "renderer/present/term.hpp"
 
 TEST(MyersDiffFindMiddleSnakeTest, Identity) {
     std::vector<char> as { 'A', 'B', 'C' };
@@ -52,4 +51,9 @@ TEST(MyersDiffFindMiddleSnakeTest, SimpleOddDelta) {
     // It starts at a[1], b[2] and has length 1.
     renderer::Snake expected_snake = { 1, 2, 2, 3 };
     EXPECT_EQ(snake, expected_snake);
+}
+
+int main(int argc, char** argv) {
+    testing::InitGoogleTest(&argc, argv);
+    return RUN_ALL_TESTS();
 }
