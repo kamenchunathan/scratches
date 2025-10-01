@@ -3,34 +3,41 @@
 #include <cassert>
 #include <cstdint>
 #include <memory>
-#include <typeindex>
 #include <unordered_map>
 
-#include "renderer/buffer.hpp"
+#include "renderer/command.hpp"
+#include "renderer/graph.hpp"
 #include "renderer/present.hpp"
+#include "renderer/resource.hpp"
 #include "renderer/shader.hpp"
 
 namespace renderer {
 
 class Renderer {
 public:
-    Renderer(std::uint32_t w, std::uint32_t h);
+    PipelineRegistry pipeline_registry;
+    BufferRegistry buffer_registry;
+    ResourceRegistry resource_registry;
+    RenderGraph render_graph;
 
-    void render_frame();
+    Renderer(std::uint32_t w, std::uint32_t h);
 
     template<typename Pipeline>
     void register_pipeline(std::unique_ptr<Pipeline> pipeline);
+
+    void submit(std::unique_ptr<RenderCommand>);
+
+    void render_frame();
 
 private:
     std::uint32_t viewport_width_, viewport_height_;
     std::unique_ptr<Presenter> presenter_ = nullptr;
 
-    BufferRegistry buffer_registry_;
     BufferHandle<CharacterPixel> front_buffer_;
     BufferHandle<CharacterPixel> back_buffer_;
     BufferHandle<bool> mask_buffer_;
 
-    std::unordered_map<std::type_index, std::unique_ptr<IPipeline>> pipelines_;
+    std::unordered_map<std::string, std::vector<std::unique_ptr<RenderCommand>>> command_queues_;
 
     void present();
     void swap_buffers();
@@ -38,7 +45,7 @@ private:
 
 template<typename Pipeline>
 void Renderer::register_pipeline(std::unique_ptr<Pipeline> pipeline) {
-    pipelines_.insert_or_assign(std::type_index(typeid(Pipeline)), std::move(pipeline));
+    pipeline_registry.register_pipeline(std::move(pipeline));
 }
 
 } // namespace renderer

@@ -7,9 +7,7 @@
 
 namespace renderer {
 
-struct DefaultTag {};
-
-template<typename PixelType, typename Tag = DefaultTag>
+template<typename PixelType>
 class FrameBuffer {
 public:
     FrameBuffer(std::uint32_t w, std::uint32_t h): width_(w), height_(h) {

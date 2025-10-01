@@ -1,32 +1,13 @@
+#pragma once
+
 #include <any>
 #include <memory>
-#include <string>
-#include <tuple>
+#include <typeindex>
 #include <unordered_map>
 
+#include "renderer/resource.hpp"
+
 namespace renderer {
-
-template<typename... Resources>
-struct ResourcePack {
-    std::tuple<Resources...> resources;
-
-    template<typename T>
-    T& get() {
-        return std::get<T>(resources);
-    };
-
-    template<typename T>
-    const T& get() const {
-        return std::get<T>(resources);
-    };
-
-    template<typename NewResource>
-    auto add(NewResource&& resource) const {
-        return ResourcePack<Resources..., std::decay_t<NewResource>> {
-            std::tuple_cat(resources, std::make_tuple(std::forward<NewResource>(resource)))
-        };
-    }
-};
 
 template<typename VertexIn, typename VertexOut, typename FragOut, typename... RequiredResources>
 class Shader {
@@ -44,32 +25,23 @@ public:
 template<typename VertexIn, typename VertexOut, typename FragOut, typename... RequiredResources>
 class Pipeline: public IPipeline {
 public:
-    Pipeline(
-        std::unique_ptr<Shader<VertexIn, VertexOut, FragOut, RequiredResources...>> shader,
-        std::string name
-    ):
-        shader_(std::move(shader)),
-        name_(name) {}
-
-    const std::string& name() const {
-        return name_;
-    }
+    Pipeline(std::unique_ptr<Shader<VertexIn, VertexOut, FragOut, RequiredResources...>> shader):
+        shader_(std::move(shader)) {}
 
 private:
     std::unique_ptr<Shader<VertexIn, VertexOut, FragOut, RequiredResources...>> shader_;
-    std::string name_;
 };
 
 class PipelineRegistry {
 public:
-    template<typename T>
-    void register_pipeline(const std::string& name, std::unique_ptr<T> pipeline) {
-        pipelines_.try_emplace(name, std::move(pipeline));
+    template<typename Pipeline>
+    void register_pipeline(std::unique_ptr<Pipeline> pipeline) {
+        pipelines_.insert_or_assign(std::type_index(typeid(Pipeline)), std::move(pipeline));
     }
 
     template<typename T>
-    T* get_pipeline(const std::string& name) {
-        auto it = pipelines_.find(name);
+    T* get_pipeline() {
+        auto it = pipelines_.find(std::type_index(typeid(T)));
         if (it == pipelines_.end())
             return nullptr;
 
@@ -81,7 +53,7 @@ public:
     }
 
 private:
-    std::unordered_map<std::string, std::any> pipelines_;
+    std::unordered_map<std::type_index, std::unique_ptr<IPipeline>> pipelines_;
 };
 
 } // namespace renderer
