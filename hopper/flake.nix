@@ -28,18 +28,18 @@
           default =
             pkgs.mkShell.override
               {
-                stdenv = pkgs.gccStdenv;
+                stdenv = pkgs.clangStdenv;
               }
               {
                 packages =
                   with pkgs;
                   [
-                    libgcc
+                    clang-tools
+                    llvmPackages_21.libcxxClang
                     cmake
                     cppcheck
                     doxygen
                     doctest
-                    gtest
 
                     meson
                     ninja
