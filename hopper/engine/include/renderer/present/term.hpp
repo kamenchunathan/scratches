@@ -3,7 +3,6 @@
 #include <cassert>
 #include <optional>
 #include <ostream>
-#include <print>
 #include <utility>
 #include <vector>
 

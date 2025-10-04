@@ -7,6 +7,8 @@
 
 namespace renderer {
 
+// TODO: Find a way to separate buffer semantics and dimensionality from the buffer handle
+
 template<typename PixelType>
 class FrameBuffer {
 public:
@@ -17,6 +19,10 @@ public:
     void update_buffer(const std::vector<PixelType>& new_buffer) {
         // TODO: Add assertion for size
         buf_ = new_buffer;
+    }
+
+    const std::vector<PixelType>& data() const {
+        return buf_;
     }
 
 private:

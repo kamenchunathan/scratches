@@ -15,6 +15,8 @@ namespace renderer {
 
 class Renderer {
 public:
+    // TODO: for testing
+    BufferHandle<CharacterPixel> front_buffer_;
     PipelineRegistry pipeline_registry;
     BufferRegistry buffer_registry;
     ResourceRegistry resource_registry;
@@ -33,7 +35,6 @@ private:
     std::uint32_t viewport_width_, viewport_height_;
     std::unique_ptr<Presenter> presenter_ = nullptr;
 
-    BufferHandle<CharacterPixel> front_buffer_;
     BufferHandle<CharacterPixel> back_buffer_;
     BufferHandle<bool> mask_buffer_;
 

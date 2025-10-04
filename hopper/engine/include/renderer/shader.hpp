@@ -26,10 +26,9 @@ template<typename VertexIn, typename VertexOut, typename FragOut, typename... Re
 class Pipeline: public IPipeline {
 public:
     Pipeline(std::unique_ptr<Shader<VertexIn, VertexOut, FragOut, RequiredResources...>> shader):
-        shader_(std::move(shader)) {}
+        shader(std::move(shader)) {}
 
-private:
-    std::unique_ptr<Shader<VertexIn, VertexOut, FragOut, RequiredResources...>> shader_;
+    std::unique_ptr<Shader<VertexIn, VertexOut, FragOut, RequiredResources...>> shader;
 };
 
 class PipelineRegistry {
@@ -45,11 +44,7 @@ public:
         if (it == pipelines_.end())
             return nullptr;
 
-        try {
-            return std::any_cast<std::unique_ptr<T>>(&it->second)->get();
-        } catch (const std::bad_any_cast&) {
-            return nullptr;
-        }
+        return dynamic_cast<T*>(it->second.get());
     }
 
 private:
