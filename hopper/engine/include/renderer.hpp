@@ -16,7 +16,6 @@ namespace renderer {
 class Renderer {
 public:
     // TODO: for testing
-    BufferHandle<CharacterPixel> front_buffer_;
     PipelineRegistry pipeline_registry;
     BufferRegistry buffer_registry;
     ResourceRegistry resource_registry;
@@ -30,6 +29,8 @@ public:
     void submit(std::unique_ptr<RenderCommand>);
 
     void render_frame();
+
+    BufferHandle<CharacterPixel> front_buffer_;
 
 private:
     std::uint32_t viewport_width_, viewport_height_;
