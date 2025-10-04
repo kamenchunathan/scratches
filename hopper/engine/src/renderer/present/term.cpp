@@ -1,50 +1,139 @@
+#include <cerrno>
+#include <cstddef>
 #include <cstdio>
+#include <fcntl.h>
+#include <iostream>
 #include <print>
+#include <sstream>
 #include <sys/ioctl.h>
 #include <termios.h>
 #include <unistd.h>
 #include <utility>
 
+#include "ansi.hpp"
+#include "color.hpp"
 #include "renderer/present/term.hpp"
 #include "util/text.hpp"
 
 namespace renderer {
 
-TerminalPresenter::TerminalPresenter() {
-    if (isatty(STDOUT_FILENO)) {
-        // TODO: don't do this on creation
-        // define a separate initialize method for presenters
+Terminal::Terminal(FILE* input, FILE* output): input_(input), output_(output) {
+    auto input_fd = fileno(input_);
+    if (!isatty(input_fd)) {
+        // TODO: Add engine wide logging framework
+        ansi::scoped(
+            std::cerr,
+            [](std::ostream& s) { std::println(s, "file provided is not a terminal"); },
+            ansi::fg::scoped_color(core::ColorRGB8::rgb(100, 0, 0))
+        );
+        return;
+    }
 
-        // Switch to alternate screen buffer and hide cursor
-        std::print("\x1b[?1049h\x1b[?25l");
+    struct termios original_termios;
+    auto res = tcgetattr(input_fd, &original_termios);
+    if (res == -1) {
+        ansi::scoped(
+            std::cerr,
+            [](std::ostream& s) { std::println(s, "could not get original termios"); },
+            ansi::fg::scoped_color(core::ColorRGB8::rgb(100, 0, 0))
+        );
+        return;
+    }
+    orig_termios_ = original_termios;
+
+    // Enable raw mode, immediate input processing and not echoing characters
+    struct termios current_termios;
+    cfmakeraw(&current_termios);
+    tcsetattr(input_fd, TCSANOW, &current_termios);
+
+    // Set non-blocking
+    int flags = fcntl(input_fd, F_GETFL);
+    if (fcntl(input_fd, F_SETFL, flags | O_NONBLOCK) == -1) {
+        ansi::scoped(
+            std::cerr,
+            [](std::ostream& s) { std::println(s, "Error in setting flags"); },
+            ansi::fg::scoped_color(core::ColorRGB8::rgb(100, 0, 0))
+        );
     }
 }
 
-TerminalPresenter::~TerminalPresenter() {
-    if (isatty(STDOUT_FILENO)) {
-        // Restore screen buffer and show cursor
-        std::print("\x1b[?1049l\x1b[?25h");
+Terminal::~Terminal() {
+    auto input_fd = fileno(input_);
+    tcsetattr(input_fd, TCSANOW, &orig_termios_);
+}
+
+std::unique_ptr<TerminalPresenter> Terminal::presenter() {
+    return std::make_unique<TerminalPresenter>(output_);
+}
+
+TerminalPresenter::TerminalPresenter(FILE* output): output_(output) {}
+
+void TerminalPresenter::init() {
+    // TODO: Check bytes written and retry
+    std::ostringstream buf;
+    ansi::enter_alternate_screen(buf);
+    ansi::cursor::hide(buf);
+    write(fileno(output_), buf.str().c_str(), buf.str().size());
+}
+
+void TerminalPresenter::deinit() {
+    // TODO: Check bytes written and retry
+    std::ostringstream buf;
+    ansi::cursor::show(buf);
+    ansi::exit_alternate_screen(buf);
+    write(fileno(output_), buf.str().c_str(), buf.str().size());
+}
+
+void TerminalPresenter::flush() {
+    const std::string content = buf_.str();
+    if (content.empty()) {
+        return;
+    }
+
+    std::size_t total_written = 0;
+    while (total_written < content.size()) {
+        ssize_t bytes_written =
+            write(fileno(output_), content.c_str() + total_written, content.size() - total_written);
+
+        if (bytes_written >= 0) {
+            total_written += bytes_written;
+        } else {
+            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                // We're just going to go into a tight loop here
+                // TODO: Figure out alternative solutions for this
+                continue;
+            } else {
+                // Some other error.
+                ansi::scoped(
+                    std::cerr,
+                    [](std::ostream& s) { std::println(s, "Error writing to output"); },
+                    ansi::fg::scoped_color(core::ColorRGB8::rgb(100, 10, 80))
+                );
+            }
+            break;
+        }
+    }
+
+    if (total_written >= content.size()) {
+        // If everything was written, clear the stream for the next frame
+        buf_.str("");
+        buf_.clear();
+    } else if (total_written > 0) {
+        // If only part was written, store the remainder back in the stream
+        std::string remaining_content = content.substr(total_written);
+        buf_.str("");
+        buf_.clear();
+        buf_ << remaining_content;
     }
 }
 
-std::optional<std::pair<std::uint32_t, std::uint32_t>> TerminalPresenter::size() {
-    if (!isatty(STDOUT_FILENO)) {
-        return std::nullopt;
-    }
-    winsize ws;
-    if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) == -1) {
-        return std::nullopt;
-    }
-    // We can fit two pixels in every character cell, so we have double the rows.
-    return std::make_pair(ws.ws_col, ws.ws_row * 2);
-}
+std::optional<std::pair<std::uint32_t, std::uint32_t>> TerminalPresenter::size() {}
 
 void TerminalPresenter::present(
     const FrameBuffer<CharacterPixel>& front_buffer,
     const FrameBuffer<CharacterPixel>& /*back_buffer*/
 ) {
-    // Reset cursor to top-left
-    std::print("\x1b[H");
+    ansi::cursor::to(buf_, 1, 1);
 
     const auto& front_data = front_buffer.data();
     const auto width = front_buffer.width();
@@ -54,16 +143,17 @@ void TerminalPresenter::present(
         for (std::uint32_t i = 0; i < width; ++i) {
             const auto& pixel = front_data[j * width + i];
 
-            std::print("\x1b[38;2;{};{};{}m", pixel.fg_color.r, pixel.fg_color.g, pixel.fg_color.b);
-            std::print("\x1b[48;2;{};{};{}m", pixel.bg_color.r, pixel.bg_color.g, pixel.bg_color.b);
-            std::print("{}", util::to_utf8(pixel.codepoint));
+            ansi::scoped(
+                buf_,
+                [pixel](std::ostream& os) { os << util::to_utf8(pixel.codepoint); },
+                ansi::fg::scoped_color(pixel.fg_color),
+                ansi::bg::scoped_color(pixel.bg_color)
+            );
         }
-        std::println("");
+        ansi::cursor::to(buf_, j + 2, 1);
     }
 
-    // Reset attributes
-    std::print("\x1b[0m");
-    getchar(); // Wait for input
+    flush();
 }
 
 } // namespace renderer

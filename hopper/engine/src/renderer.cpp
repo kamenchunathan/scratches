@@ -3,7 +3,6 @@
 
 #include <cassert>
 #include <memory>
-#include <ostream>
 #include <print>
 
 namespace renderer {
@@ -15,7 +14,11 @@ Renderer::Renderer(std::uint32_t w, std::uint32_t h, std::unique_ptr<Presenter> 
     front_buffer_(buffer_registry.create_buffer<CharacterPixel>(w, h)),
     back_buffer_(buffer_registry.create_buffer<CharacterPixel>(w, h)),
     mask_buffer_(buffer_registry.create_buffer<bool>(w, h)) {
-    assert(h % 2 == 0 && "The canvas height must be a multiple of 2");
+    presenter_->init();
+}
+
+Renderer::~Renderer() {
+    presenter_->deinit();
 }
 
 BufferHandle<CharacterPixel> Renderer::render_target_handle() const {

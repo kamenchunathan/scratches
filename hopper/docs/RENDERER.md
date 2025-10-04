@@ -13,10 +13,10 @@ The presentation step which outputs to the terminal and in future to a DOM, then
 
 ## 1. Core Infrastructure
 - [ ] **Render Graph System**
-  - [ ] Implement graph node abstraction (inputs, outputs, dependencies)
-  - [ ] Implement graph scheduler (topological sort for execution order)
-  - [ ] Support multi-pass execution
-  - [ ] Allow dynamic registration of passes at runtime
+  - [x] Implement graph node abstraction (inputs, outputs, dependencies)
+  - [x] Implement graph scheduler (topological sort for execution order)
+  - [x] Support multi-pass execution
+  - [x] Allow dynamic registration of passes at runtime
 - [ ] **Framebuffer Management**
   - [ ] Define `Framebuffer` abstraction (attachments, formats, size)
   - [ ] Implement creation of framebuffers for different passes (G-buffer, lighting, presentation)
@@ -97,10 +97,25 @@ The presentation step which outputs to the terminal and in future to a DOM, then
 - [ ] **Data Extraction**
   - [ ] Implement system that packs ECS data (positions, textures, lights) into optimized buffers
   - [ ] Pass references of packed buffers to renderer
-- [ ] **Presentation**
+
+### 5.1. Presentation Layer
+
+- [x] Terminal Presenter Initialization/Deinitialization
+  - [x] Terminal state hanlding, changing and resetting
+  - [x] Set terminal to raw mode for input handling
+- [x] **Basic Frame Presentation (Cursor-based)**
+  - [x] Clear screen and set cursor to home position
+  - [x] Iterate through frame buffer, applying ANSI colors and printing characters
+  - [x] Use cursor positioning commands instead of newlines
+- [ ] **Redisplay Algorithm (Diffing)**
   - [ ] Implement double-buffering (current vs. previous frame)
-  - [ ] Diff buffers and emit terminal glyph commands
+  - [ ] Implement line-by-line diffing (e.g., Myers diff)
+  - [ ] Implement character-by-character diffing within changed lines
+  - [ ] Generate optimized ANSI escape sequences for updates (e.g., cursor movement, color changes, character writes)
   - [ ] Map pixel colors → terminal glyphs (presentation phase only)
+- [ ] **Web Presenter (Future)**
+  - [ ] Implement DOM manipulation for web output
+  - [ ] Optimize updates for web (e.g., virtual DOM, minimal re-renders)
 
 ## 6. Testing & Debugging Infrastructure
 

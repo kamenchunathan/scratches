@@ -22,6 +22,7 @@ public:
     RenderGraph render_graph;
 
     Renderer(std::uint32_t w, std::uint32_t h, std::unique_ptr<Presenter>);
+    ~Renderer();
 
     template<typename Pipeline>
     void register_pipeline(std::unique_ptr<Pipeline> pipeline);

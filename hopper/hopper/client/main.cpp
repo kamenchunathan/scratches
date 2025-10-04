@@ -1,6 +1,7 @@
 #include <cmath>
 #include <memory>
 #include <print>
+#include <thread>
 #include <vector>
 
 #include "color.hpp"
@@ -9,6 +10,8 @@
 #include "renderer/graph.hpp"
 #include "renderer/present/term.hpp"
 #include "renderer/types.hpp"
+
+using namespace std::chrono_literals;
 
 struct ColorVertex {
     float x, y;
@@ -66,10 +69,10 @@ private:
 
 int main() {
     const std::uint32_t width = 160;
-    const std::uint32_t height = 90;
+    const std::uint32_t height = 45;
 
-    auto term_presenter = std::make_unique<renderer::TerminalPresenter>();
-    renderer::Renderer app_renderer(width, height, std::move(term_presenter));
+    auto term = renderer::Terminal();
+    renderer::Renderer app_renderer(width, height, term.presenter());
     auto shader = std::make_unique<UnlitShader>();
     app_renderer.register_pipeline(std::make_unique<UnlitPipeline>(std::move(shader)));
 
@@ -108,4 +111,5 @@ int main() {
         vertices.size()
     ));
     app_renderer.render_frame();
+    std::this_thread::sleep_for(5s);
 }

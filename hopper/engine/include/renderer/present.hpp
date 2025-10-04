@@ -8,6 +8,8 @@ namespace renderer {
 class Presenter {
 public:
     virtual ~Presenter() = default;
+    virtual void init() = 0;
+    virtual void deinit() = 0;
     virtual void present(
         const FrameBuffer<CharacterPixel>& front_buffer,
         const FrameBuffer<CharacterPixel>& back_buffer

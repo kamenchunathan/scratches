@@ -1,8 +1,11 @@
-#pragma once
-
 #include <cassert>
+#include <cstddef>
+#include <cstdio>
+#include <memory>
 #include <optional>
 #include <ostream>
+#include <sstream>
+#include <termios.h>
 #include <utility>
 #include <vector>
 
@@ -10,17 +13,47 @@
 
 namespace renderer {
 
+class TerminalPresenter;
+
+/* Responsible for managing terminal state, attributes etc, creating a presenter to output to the terminal
+ * and polling input from the terminal
+ * */
+class Terminal {
+public:
+    Terminal(): Terminal(stdin, stdout) {}
+    explicit Terminal(FILE* input, FILE* output);
+    ~Terminal();
+
+    Terminal(const Terminal&) = delete;
+    Terminal& operator=(const Terminal&) = delete;
+    std::unique_ptr<TerminalPresenter> presenter();
+
+private:
+    FILE *input_, *output_;
+    termios orig_termios_;
+    std::vector<std::byte> input_buf_;
+};
+
 class TerminalPresenter: public Presenter {
 public:
-    TerminalPresenter();
-    ~TerminalPresenter();
+    TerminalPresenter(FILE* output);
+    ~TerminalPresenter() = default;
 
     void present(
         const FrameBuffer<CharacterPixel>& front_buffer,
         const FrameBuffer<CharacterPixel>& back_buffer
     );
 
+    void init();
+    void deinit();
+
     std::optional<std::pair<std::uint32_t, std::uint32_t>> size();
+
+private:
+    FILE* output_;
+    std::ostringstream buf_;
+
+    void flush();
 };
 
 /* This is a redisplay algorithm that reduces the number of characters sent to the terminal on each frame
