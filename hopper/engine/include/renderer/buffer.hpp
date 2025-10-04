@@ -25,6 +25,14 @@ public:
         return buf_;
     }
 
+    std::uint32_t width() const {
+        return width_;
+    }
+
+    std::uint32_t height() const {
+        return height_;
+    }
+
 private:
     std::vector<PixelType> buf_;
     std::uint32_t width_, height_;
@@ -60,7 +68,7 @@ public:
 
 private:
     std::unordered_map<std::uint32_t, std::any> buffers_;
-    int next_handle_ = 0;
+    int next_handle_ = 1;
 };
 
 template<typename PixelType>

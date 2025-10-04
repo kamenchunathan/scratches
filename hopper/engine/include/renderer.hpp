@@ -21,7 +21,7 @@ public:
     ResourceRegistry resource_registry;
     RenderGraph render_graph;
 
-    Renderer(std::uint32_t w, std::uint32_t h);
+    Renderer(std::uint32_t w, std::uint32_t h, std::unique_ptr<Presenter>);
 
     template<typename Pipeline>
     void register_pipeline(std::unique_ptr<Pipeline> pipeline);
@@ -30,12 +30,14 @@ public:
 
     void render_frame();
 
-    BufferHandle<CharacterPixel> front_buffer_;
+    BufferHandle<CharacterPixel> render_target_handle() const;
+    BufferHandle<bool> mask_buffer_handle() const;
 
 private:
     std::uint32_t viewport_width_, viewport_height_;
-    std::unique_ptr<Presenter> presenter_ = nullptr;
+    std::unique_ptr<Presenter> presenter_;
 
+    BufferHandle<CharacterPixel> front_buffer_;
     BufferHandle<CharacterPixel> back_buffer_;
     BufferHandle<bool> mask_buffer_;
 

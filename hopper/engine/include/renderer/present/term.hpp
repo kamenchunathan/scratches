@@ -12,7 +12,7 @@ namespace renderer {
 
 class TerminalPresenter: public Presenter {
 public:
-    TerminalPresenter(std::ostream& output);
+    TerminalPresenter();
     ~TerminalPresenter();
 
     void present(
@@ -21,9 +21,6 @@ public:
     );
 
     std::optional<std::pair<std::uint32_t, std::uint32_t>> size();
-
-private:
-    std::ostream& output_;
 };
 
 /* This is a redisplay algorithm that reduces the number of characters sent to the terminal on each frame

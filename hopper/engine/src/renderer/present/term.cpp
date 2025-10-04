@@ -1,25 +1,29 @@
 #include <cstdio>
-#include <ostream>
+#include <print>
 #include <sys/ioctl.h>
 #include <termios.h>
 #include <unistd.h>
 #include <utility>
 
 #include "renderer/present/term.hpp"
+#include "util/text.hpp"
 
 namespace renderer {
 
-TerminalPresenter::TerminalPresenter(std::ostream& output): output_(output) {
+TerminalPresenter::TerminalPresenter() {
     if (isatty(STDOUT_FILENO)) {
+        // TODO: don't do this on creation
+        // define a separate initialize method for presenters
+
         // Switch to alternate screen buffer and hide cursor
-        output_ << "\x1b[?1049h\x1b[?25l" << std::flush;
+        std::print("\x1b[?1049h\x1b[?25l");
     }
 }
 
 TerminalPresenter::~TerminalPresenter() {
     if (isatty(STDOUT_FILENO)) {
         // Restore screen buffer and show cursor
-        output_ << "\x1b[?1049l\x1b[?25h" << std::flush;
+        std::print("\x1b[?1049l\x1b[?25h");
     }
 }
 
@@ -35,29 +39,31 @@ std::optional<std::pair<std::uint32_t, std::uint32_t>> TerminalPresenter::size()
     return std::make_pair(ws.ws_col, ws.ws_row * 2);
 }
 
-void TerminalPresenter::
-    present(const FrameBuffer<CharacterPixel>& front_buffer, const FrameBuffer<CharacterPixel>&) {
+void TerminalPresenter::present(
+    const FrameBuffer<CharacterPixel>& front_buffer,
+    const FrameBuffer<CharacterPixel>& /*back_buffer*/
+) {
     // Reset cursor to top-left
-    output_ << "\x1b[H";
+    std::print("\x1b[H");
 
-    // for (std::uint32_t j = 0; j < front_buffer.pixel_height() - 1; j += 2) {
-    //     for (std::uint32_t i = 0; i < front_buffer.pixel_width(); ++i) {
-    //         const auto& upper_pixel_color =
-    //             front_buffer.pixel_buf[j * front_buffer.pixel_width() + i];
-    //         const auto& lower_pixel_color =
-    //             front_buffer.pixel_buf[(j + 1) * front_buffer.pixel_width() + i];
-    //
-    //         output_ << "\x1b[38;2;{};{};{}m\x1b[48;2;{};{};{}m▀",
-    //             static_cast<int>(upper_pixel_color.r * 255.0f),
-    //             static_cast<int>(upper_pixel_color.g * 255.0f),
-    //             static_cast<int>(upper_pixel_color.b * 255.0f),
-    //             static_cast<int>(lower_pixel_color.r * 255.0f),
-    //             static_cast<int>(lower_pixel_color.g * 255.0f),
-    //             static_cast<int>(lower_pixel_color.b * 255.0f);
-    //     }
-    //     output_ << '\n';
-    // }
-    // output_ << "\x1b[0m" << std::flush;
-};
+    const auto& front_data = front_buffer.data();
+    const auto width = front_buffer.width();
+    const auto height = front_buffer.height();
+
+    for (std::uint32_t j = 0; j < height; ++j) {
+        for (std::uint32_t i = 0; i < width; ++i) {
+            const auto& pixel = front_data[j * width + i];
+
+            std::print("\x1b[38;2;{};{};{}m", pixel.fg_color.r, pixel.fg_color.g, pixel.fg_color.b);
+            std::print("\x1b[48;2;{};{};{}m", pixel.bg_color.r, pixel.bg_color.g, pixel.bg_color.b);
+            std::print("{}", util::to_utf8(pixel.codepoint));
+        }
+        std::println("");
+    }
+
+    // Reset attributes
+    std::print("\x1b[0m");
+    getchar(); // Wait for input
+}
 
 } // namespace renderer

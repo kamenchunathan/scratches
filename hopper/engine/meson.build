@@ -7,7 +7,9 @@ engine_sources = [
   'src/ecs/world.cpp',
   'src/ecs/archetype.cpp',
   'src/renderer.cpp',
+  'src/renderer/graph.cpp',
   'src/renderer/present/term.cpp',
+  'src/util/text.cpp', # Added for UTF-8 conversion utility
 ]
 
 engine_lib = static_library(
