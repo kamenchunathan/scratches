@@ -37,19 +37,18 @@ The presentation step which outputs to the terminal and in future to a DOM, then
 ## 2. Rasterization & Primitive Handling
 
 - [ ] **Rasterizer Core**
-
   - [ ] Implement support for **points**
   - [ ] Implement support for **lines**
-  - [ ] Implement support for **triangles**
-  - [ ] Implement fragment interpolation (barycentric coordinates, etc.)
+  - [x] Implement support for **triangles**
+  - [x] Implement fragment interpolation (barycentric coordinates, etc.)
 - [ ] **Coverage Functions**
   - [ ] Implement `covers()` for point-in-primitive tests
   - [ ] Implement `interpolate()` for per-fragment attributes
 - [ ] **Pipeline Stages**
-  - [ ] Vertex processing stage (transform vertices → screen space)
-  - [ ] Primitive assembly (points, lines, triangles)
-  - [ ] Rasterization (convert primitives → fragments)
-  - [ ] Fragment shading (run bound shader program)
+  - [x] Vertex processing stage (transform vertices → screen space)
+  - [x] Primitive assembly (points, lines, triangles) - only for triangles
+  - [x] Rasterization (convert primitives → fragments)
+  - [x] Fragment shading (run bound shader program)
 
 ## 3. Deferred Shading Pipeline
 
