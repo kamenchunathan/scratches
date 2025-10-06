@@ -56,6 +56,7 @@ void Renderer::render_frame() {
             commands[i]->execute(encoder);
         }
     }
+    command_queues_.clear();
     present();
     swap_buffers();
 }
