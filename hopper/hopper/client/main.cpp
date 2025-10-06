@@ -9,33 +9,40 @@
 #include "renderer/buffer.hpp"
 #include "renderer/graph.hpp"
 #include "renderer/present/term.hpp"
+#include "renderer/shader.hpp"
 #include "renderer/types.hpp"
 
 using namespace std::chrono_literals;
 
 struct ColorVertex {
     float x, y;
+    core::ColorRGB8 character_color;
+};
+
+struct VOut {
+    Eigen::Vector4f position;
     core::ColorRGB8 color;
 };
 
-class UnlitShader: public renderer::Shader<ColorVertex, ColorVertex, renderer::CharacterPixel> {
+class SimpleShader: public renderer::Shader<ColorVertex, VOut, renderer::CharacterPixel> {
 public:
-    ColorVertex vertex(const ColorVertex& v, const renderer::ResourcePack<>&) override {
-        // Pass-through shader
-        return v;
+    VOut vertex(const ColorVertex& v, const renderer::ResourcePack<>&) override {
+        Eigen::Vector4f clip_pos(v.x, v.y, 0.0f, 1.0f);
+        return {clip_pos, v.character_color};
     }
 
-    renderer::CharacterPixel
-    fragment(const ColorVertex& v, const renderer::ResourcePack<>&) override {
-        return renderer::CharacterPixel { .codepoint = U'█',
-                                          .fg_color = v.color,
-                                          .bg_color = core::ColorRGB8::rgb(0, 0, 0) };
+    renderer::CharacterPixel fragment(const VOut& v, const renderer::ResourcePack<>&) override {
+        return renderer::CharacterPixel {
+            .codepoint = U'█',
+            .fg_color = v.color,
+            .bg_color = core::ColorRGB8::rgb(0, 0, 0)
+        };
     }
 
-    ~UnlitShader() override = default;
+    ~SimpleShader() override = default;
 };
 
-using UnlitPipeline = renderer::Pipeline<ColorVertex, ColorVertex, renderer::CharacterPixel>;
+using UnlitPipeline = renderer::Pipeline<ColorVertex, VOut, renderer::CharacterPixel>;
 
 class SimpleDrawCommand: public renderer::RenderCommand {
 public:
@@ -53,12 +60,7 @@ public:
     }
 
     void execute(renderer::RenderPassEncoder& encoder) override {
-        encoder.draw<ColorVertex, ColorVertex, renderer::CharacterPixel>(
-            vb_,
-            ob_,
-            count_, // Draw all vertices
-            0 // first vertex
-        );
+        encoder.draw<ColorVertex, VOut, renderer::CharacterPixel>(vb_, ob_, count_, 0);
     }
 
 private:
@@ -73,27 +75,16 @@ int main() {
 
     auto term = renderer::Terminal();
     renderer::Renderer app_renderer(width, height, term.presenter());
-    auto shader = std::make_unique<UnlitShader>();
-    app_renderer.register_pipeline(std::make_unique<UnlitPipeline>(std::move(shader)));
+    auto shader = std::make_unique<SimpleShader>();
+    app_renderer.register_pipeline(
+        std::make_unique<UnlitPipeline>(renderer::PipelineDescriptor {}, std::move(shader))
+    );
 
-    // Generate a vertex for each pixel on the canvas to create a gradient
-    std::vector<ColorVertex> vertices;
-    vertices.reserve(width * height);
-    for (std::uint32_t j = 0; j < height; ++j) {
-        for (std::uint32_t i = 0; i < width; ++i) {
-            float u = static_cast<float>(i) / (width - 1);
-            float v = static_cast<float>(j) / (height - 1);
-            vertices.push_back({
-                .x = u * 2.0f - 1.0f,
-                .y = v * 2.0f - 1.0f,
-                .color = core::ColorRGB8::rgb(
-                    static_cast<uint8_t>(u * 255),
-                    static_cast<uint8_t>(v * 255),
-                    0
-                ),
-            });
-        }
-    }
+    std::vector<ColorVertex> vertices = {
+        {.x = 0.0f, .y = 0.8f, .character_color = core::ColorRGB8::rgb(255, 0, 0)},
+        {.x = -0.8f, .y = -0.8f, .character_color = core::ColorRGB8::rgb(0, 255, 0)},
+        {.x = 0.8f, .y = -0.8f, .character_color = core::ColorRGB8::rgb(0, 0, 255)}
+    };
 
     auto output_buffer_handle = app_renderer.render_target_handle();
     auto vertex_buffer_handle =

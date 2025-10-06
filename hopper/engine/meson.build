@@ -1,5 +1,3 @@
-gtest_dep = dependency('gtest', main: true, fallback: ['gtest', 'gtest_dep'])
-
 engine_inc = include_directories('include')
 
 engine_sources = [
@@ -9,7 +7,7 @@ engine_sources = [
   'src/renderer.cpp',
   'src/renderer/graph.cpp',
   'src/renderer/present/term.cpp',
-  'src/util/text.cpp', # Added for UTF-8 conversion utility
+  'src/util/text.cpp',
 ]
 
 engine_lib = static_library(
@@ -19,12 +17,16 @@ engine_lib = static_library(
   install: true,
   dependencies: [
     dependency('asio', version: '>=1.30'),
+    dependency('eigen3', version: '>=-3.4'),
   ],
 )
 
 engine_dep = declare_dependency(
   include_directories: engine_inc,
   link_with: engine_lib,
+  dependencies: [
+    dependency('eigen3', version: '>=3.4'),
+  ],
 )
 
 renderer_test_exe = executable(
@@ -32,7 +34,7 @@ renderer_test_exe = executable(
   'test/renderer.cpp',
   dependencies: [
     engine_dep,
-    gtest_dep,
+    dependency('gtest', main: true, fallback: ['gtest', 'gtest_dep']),
   ],
   install: false,
 )
