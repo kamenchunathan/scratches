@@ -5,6 +5,7 @@
 #include <optional>
 #include <ostream>
 #include <sstream>
+#include <sys/ioctl.h>
 #include <termios.h>
 #include <utility>
 #include <vector>
@@ -17,7 +18,7 @@ class TerminalPresenter;
 
 /* Responsible for managing terminal state, attributes etc, creating a presenter to output to the terminal
  * and polling input from the terminal
- * */
+ */
 class Terminal {
 public:
     Terminal(): Terminal(stdin, stdout) {}
@@ -36,7 +37,7 @@ private:
 
 class TerminalPresenter: public Presenter {
 public:
-    TerminalPresenter(FILE* output);
+    TerminalPresenter(FILE* output, const winsize& ws);
     ~TerminalPresenter() = default;
 
     void present(
@@ -51,6 +52,7 @@ public:
 
 private:
     FILE* output_;
+    winsize term_dim_;
     std::ostringstream buf_;
 
     void flush();
@@ -215,13 +217,13 @@ Snake MyersDiff<T>::find_middle_snake(const Box& box) {
 
     // Base cases
     if (n == 0 && m == 0) {
-        return Snake { box.x1, box.y1, box.x1, box.y1 };
+        return Snake {box.x1, box.y1, box.x1, box.y1};
     }
     if (n == 0) {
-        return Snake { box.x1, box.y1, box.x1, box.y1 };
+        return Snake {box.x1, box.y1, box.x1, box.y1};
     }
     if (m == 0) {
-        return Snake { box.x1, box.y1, box.x1, box.y1 };
+        return Snake {box.x1, box.y1, box.x1, box.y1};
     }
 
     // V arrays are indexed by k, which can be negative. Use offset to map to positive indices.

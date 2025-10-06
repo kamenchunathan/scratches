@@ -1,4 +1,5 @@
 #include <cerrno>
+#include <csignal>
 #include <cstddef>
 #include <cstdio>
 #include <fcntl.h>
@@ -17,7 +18,15 @@
 
 namespace renderer {
 
+// TODO: Check this and update value on every output
+volatile std::sig_atomic_t term_size_changed;
+
+void handle_sigwinch(int) {
+    term_size_changed = 1;
+}
+
 Terminal::Terminal(FILE* input, FILE* output): input_(input), output_(output) {
+    // TODO: Enable mouse input tracking
     auto input_fd = fileno(input_);
     if (!isatty(input_fd)) {
         // TODO: Add engine wide logging framework
@@ -55,6 +64,8 @@ Terminal::Terminal(FILE* input, FILE* output): input_(input), output_(output) {
             ansi::fg::scoped_color(core::ColorRGB8::rgb(100, 0, 0))
         );
     }
+
+    signal(SIGWINCH, handle_sigwinch);
 }
 
 Terminal::~Terminal() {
@@ -63,10 +74,25 @@ Terminal::~Terminal() {
 }
 
 std::unique_ptr<TerminalPresenter> Terminal::presenter() {
-    return std::make_unique<TerminalPresenter>(output_);
+    struct winsize ws;
+    ioctl(fileno(output_), TIOCGWINSZ, &ws);
+    return std::make_unique<TerminalPresenter>(output_, ws);
 }
 
-TerminalPresenter::TerminalPresenter(FILE* output): output_(output) {}
+TerminalPresenter::TerminalPresenter(FILE* output, const winsize& ws):
+    output_(output),
+    term_dim_(ws) {}
+
+std::optional<std::pair<std::uint32_t, std::uint32_t>> TerminalPresenter::size() {
+    if (term_size_changed) {
+        struct winsize ws;
+        if (ioctl(fileno(output_), TIOCGWINSZ, &ws) != -1) {
+            term_dim_ = ws;
+        }
+        term_size_changed = 0;
+    }
+    return std::make_pair(term_dim_.ws_col, term_dim_.ws_row);
+}
 
 void TerminalPresenter::init() {
     // TODO: Check bytes written and retry
@@ -127,13 +153,28 @@ void TerminalPresenter::flush() {
     }
 }
 
-std::optional<std::pair<std::uint32_t, std::uint32_t>> TerminalPresenter::size() {}
-
 void TerminalPresenter::present(
     const FrameBuffer<CharacterPixel>& front_buffer,
     const FrameBuffer<CharacterPixel>& /*back_buffer*/
 ) {
-    ansi::cursor::to(buf_, 1, 1);
+    auto term_size_opt = size();
+
+    const auto term_width = term_size_opt->first;
+    const auto term_height = term_size_opt->second;
+    const auto buffer_width = front_buffer.width();
+    const auto buffer_height = front_buffer.height();
+
+    std::uint32_t start_col = 1;
+    std::uint32_t start_row = 1;
+
+    if (term_width > buffer_width) {
+        start_col = (term_width - buffer_width) / 2 + 1;
+    }
+    if (term_height > buffer_height) {
+        start_row = (term_height - buffer_height) / 2 + 1;
+    }
+
+    ansi::cursor::to(buf_, start_row, start_col);
 
     const auto& front_data = front_buffer.data();
     const auto width = front_buffer.width();
@@ -150,7 +191,7 @@ void TerminalPresenter::present(
                 ansi::bg::scoped_color(pixel.bg_color)
             );
         }
-        ansi::cursor::to(buf_, j + 2, 1);
+        ansi::cursor::to(buf_, start_row + j + 1, start_col);
     }
 
     flush();
