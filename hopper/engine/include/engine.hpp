@@ -1,26 +1,40 @@
 #pragma once
 
 #include "ecs/world.hpp"
-#include <memory>
+#include <functional>
 
 namespace core {
-class Engine {
-public:
-    Engine();
-    ~Engine();
 
-    void initialize();
-    void shutdown();
+class Application;
+
+template<typename T>
+concept Layer = requires(T t, core::Application& app) {
+    {
+        t.build(app)
+    } -> std::same_as<void>;
+};
+
+class Application {
+public:
+    Application();
+    ~Application();
+
+    ecs::World world;
+    using Runner = std::function<void(Application&)>;
+
+    template<Layer L>
+    void add_layer(L layer);
+
+    void set_runner(Runner);
     void run();
 
-    ecs::World& get_world() {
-        return *world_;
-    }
-    const ecs::World& get_world() const {
-        return *world_;
-    }
-
 private:
-    std::unique_ptr<ecs::World> world_;
+    Runner runner_;
 };
+
+template<Layer L>
+void Application::add_layer(L layer) {
+    layer.build(*this);
+}
+
 } // namespace core
