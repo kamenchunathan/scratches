@@ -2,16 +2,15 @@
 #include <csignal>
 #include <cstddef>
 #include <fcntl.h>
-#include <ostream>
 #include <print>
 #include <string_view>
 #include <termios.h>
 #include <thread>
 #include <variant>
 
-#include "ansi.hpp"
 #include "application.hpp"
-#include "input.hpp"
+#include "term/ansi.hpp"
+#include "term/input_manager.hpp"
 
 template<class... Ts>
 struct overload: Ts... {
@@ -84,7 +83,7 @@ public:
         while (true) {
             std::ptrdiff_t bytes_read = read(STDIN_FILENO, &buf, 1024);
             if (bytes_read > 0) {
-                ansi::InputParser input_parser(std::string_view(buf, bytes_read));
+                InputParser input_parser(std::string_view(buf, bytes_read));
                 auto input_events = input_parser.parse();
                 for (auto ev: input_events) {
                     std::visit(

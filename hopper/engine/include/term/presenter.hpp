@@ -1,9 +1,6 @@
 #include <cassert>
 #include <cstddef>
 #include <cstdio>
-#include <memory>
-#include <optional>
-#include <ostream>
 #include <sstream>
 #include <sys/ioctl.h>
 #include <termios.h>
@@ -11,27 +8,6 @@
 #include <vector>
 
 #include "renderer/present.hpp"
-
-class TerminalPresenter;
-
-/* Responsible for managing terminal state, attributes etc, creating a presenter to output to the terminal
- * and polling input from the terminal
- */
-class Terminal {
-public:
-    Terminal(): Terminal(stdin, stdout) {}
-    explicit Terminal(FILE* input, FILE* output);
-    ~Terminal();
-
-    Terminal(const Terminal&) = delete;
-    Terminal& operator=(const Terminal&) = delete;
-    std::unique_ptr<TerminalPresenter> presenter();
-
-private:
-    FILE *input_, *output_;
-    termios orig_termios_;
-    std::vector<std::byte> input_buf_;
-};
 
 class TerminalPresenter: public renderer::Presenter {
 public:

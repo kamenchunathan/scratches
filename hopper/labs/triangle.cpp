@@ -10,7 +10,7 @@
 #include "renderer/graph.hpp"
 #include "renderer/shader.hpp"
 #include "renderer/types.hpp"
-#include "term.hpp"
+#include "term/layer.hpp"
 
 using namespace std::chrono_literals;
 

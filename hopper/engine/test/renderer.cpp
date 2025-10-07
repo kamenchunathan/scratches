@@ -1,7 +1,7 @@
 #include <gtest/gtest.h>
 #include <vector>
 
-#include "term.hpp"
+#include "term/layer.hpp"
 
 TEST(MyersDiffFindMiddleSnakeTest, Identity) {
     std::vector<char> as {'A', 'B', 'C'};

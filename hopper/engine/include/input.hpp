@@ -102,6 +102,9 @@ struct MouseEvent {
     Action action;
     std::uint32_t row, col;
     std::optional<MouseButton> button;
+    bool shift = false;
+    bool ctrl = false;
+    bool alt = false;
 };
 
 struct ResizeEvent {
@@ -374,23 +377,23 @@ struct std::formatter<core::input::MouseButton>: std::formatter<std::string_view
 template<>
 struct std::formatter<core::input::MouseEvent>: std::formatter<std::string_view> {
     auto format(core::input::MouseEvent e, std::format_context& ctx) const {
+        auto base_format =
+            std::format("MouseEvent {{ action: {}, row: {}, col: {}", e.action, e.row, e.col);
+
         if (e.button) {
-            return std::format_to(
-                ctx.out(),
-                "MouseEvent {{ action: {}, row: {}, col: {}, button: {} }}",
-                e.action,
-                e.row,
-                e.col,
-                *e.button
-            );
+            base_format += std::format(", button: {}", *e.button);
         }
-        return std::format_to(
-            ctx.out(),
-            "MouseEvent {{ action: {}, row: {}, col: {} }}",
-            e.action,
-            e.row,
-            e.col
-        );
+
+        if (e.shift)
+            base_format += ", shift";
+        if (e.ctrl)
+            base_format += ", ctrl";
+        if (e.alt)
+            base_format += ", alt";
+
+        base_format += " }}";
+
+        return std::format_to(ctx.out(), "{}", base_format);
     }
 };
 

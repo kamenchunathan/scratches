@@ -1,12 +1,10 @@
 #pragma once
 
 #include <cstdint>
+#include <expected>
 #include <iostream>
-#include <optional>
-#include <vector>
 
 #include "color.hpp"
-#include "input.hpp"
 
 namespace ansi {
 
@@ -196,28 +194,5 @@ void scoped(std::ostream& os, Func&& func, Applicators&&... applicators) {
     func(os);
     reset(os);
 }
-
-/* Parses input text from the terminal to  input events
- * Eventually may be configurable with multiple input modes and formats but currently
- * only works with SGR_Extended as legacy modes are difficult
- */
-class InputParser {
-public:
-    InputParser(std::string_view input): input_(input) {}
-    std::vector<core::input::Event> parse();
-
-private:
-    enum class Mode { Normal, Escape };
-
-    std::string_view input_;
-    std::vector<core::input::Event> input_events_;
-    Mode mode_ = Mode::Normal;
-    std::uint32_t cursor_ = 0;
-
-    void parse_key_event();
-    void parse_escape_code();
-    bool try_parse_literal(char);
-    std::optional<std::uint32_t> parse_int();
-};
 
 } // namespace ansi

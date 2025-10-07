@@ -6,8 +6,8 @@ engine_sources = [
   'src/ecs/archetype.cpp',
   'src/renderer.cpp',
   'src/renderer/graph.cpp',
-  'src/term.cpp',
-  'src/ansi.cpp',
+  'src/term/layer.cpp',
+  'src/term/input_manager.cpp',
   'src/util/text.cpp',
 ]
 
