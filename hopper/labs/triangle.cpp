@@ -8,9 +8,9 @@
 #include "renderer.hpp"
 #include "renderer/buffer.hpp"
 #include "renderer/graph.hpp"
-#include "renderer/present/term.hpp"
 #include "renderer/shader.hpp"
 #include "renderer/types.hpp"
+#include "term.hpp"
 
 using namespace std::chrono_literals;
 
@@ -35,7 +35,7 @@ public:
         return renderer::CharacterPixel {
             .codepoint = U'█',
             .fg_color = v.color,
-            .bg_color = core::ColorRGB8::rgb(0, 0, 0)
+            .bg_color = core::ColorRGB8::rgb(100, 0, 0)
         };
     }
 
@@ -73,7 +73,7 @@ int main() {
     const std::uint32_t width = 160;
     const std::uint32_t height = 45;
 
-    auto term = renderer::Terminal();
+    auto term = Terminal();
     renderer::Renderer app_renderer(width, height, term.presenter());
     auto shader = std::make_unique<SimpleShader>();
     app_renderer.register_pipeline(
@@ -81,9 +81,9 @@ int main() {
     );
 
     std::vector<ColorVertex> vertices = {
-        {.x = 0.0f, .y = 0.8f, .character_color = core::ColorRGB8::rgb(255, 0, 0)},
-        {.x = -0.8f, .y = -0.8f, .character_color = core::ColorRGB8::rgb(0, 255, 0)},
-        {.x = 0.8f, .y = -0.8f, .character_color = core::ColorRGB8::rgb(0, 0, 255)}
+        {.x = 0.0f, .y = 0.8f, .character_color = core::ColorRGB8::rgb(255, 100, 200)},
+        {.x = -0.8f, .y = -0.8f, .character_color = core::ColorRGB8::rgb(100, 100, 255)},
+        {.x = 0.8f, .y = -0.8f, .character_color = core::ColorRGB8::rgb(100, 100, 255)}
     };
 
     auto output_buffer_handle = app_renderer.render_target_handle();

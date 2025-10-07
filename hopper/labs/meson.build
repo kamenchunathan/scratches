@@ -18,3 +18,10 @@ executable(
   install: false,
   dependencies: [engine_dep],
 )
+
+executable(
+  'input_handling',
+  'input_handling.cpp',
+  install: false,
+  dependencies: [engine_dep],
+)

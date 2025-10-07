@@ -7,6 +7,7 @@ engine_sources = [
   'src/renderer.cpp',
   'src/renderer/graph.cpp',
   'src/term.cpp',
+  'src/ansi.cpp',
   'src/util/text.cpp',
 ]
 
