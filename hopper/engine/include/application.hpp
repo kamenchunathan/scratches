@@ -1,7 +1,8 @@
 #pragma once
 
-#include "ecs/world.hpp"
 #include <functional>
+
+#include "ecs/world.hpp"
 
 namespace core {
 
@@ -16,8 +17,8 @@ concept Layer = requires(T t, core::Application& app) {
 
 class Application {
 public:
-    Application();
-    ~Application();
+    Application() = default;
+    ~Application() = default;
 
     ecs::World world;
     using Runner = std::function<void(Application&)>;

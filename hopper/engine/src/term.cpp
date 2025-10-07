@@ -13,10 +13,8 @@
 
 #include "ansi.hpp"
 #include "color.hpp"
-#include "renderer/present/term.hpp"
+#include "term.hpp"
 #include "util/text.hpp"
-
-namespace renderer {
 
 // TODO: Check this and update value on every output
 volatile std::sig_atomic_t term_size_changed;
@@ -154,8 +152,8 @@ void TerminalPresenter::flush() {
 }
 
 void TerminalPresenter::present(
-    const FrameBuffer<CharacterPixel>& front_buffer,
-    const FrameBuffer<CharacterPixel>& /*back_buffer*/
+    const renderer::FrameBuffer<renderer::CharacterPixel>& front_buffer,
+    const renderer::FrameBuffer<renderer::CharacterPixel>& /*back_buffer*/
 ) {
     auto term_size_opt = size();
 
@@ -196,5 +194,3 @@ void TerminalPresenter::present(
 
     flush();
 }
-
-} // namespace renderer

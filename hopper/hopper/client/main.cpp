@@ -8,9 +8,9 @@
 #include "renderer.hpp"
 #include "renderer/buffer.hpp"
 #include "renderer/graph.hpp"
-#include "renderer/present/term.hpp"
 #include "renderer/shader.hpp"
 #include "renderer/types.hpp"
+#include "term.hpp"
 
 using namespace std::chrono_literals;
 
@@ -73,7 +73,7 @@ int main() {
     const std::uint32_t width = 160;
     const std::uint32_t height = 45;
 
-    auto term = renderer::Terminal();
+    auto term = Terminal();
     renderer::Renderer app_renderer(width, height, term.presenter());
     auto shader = std::make_unique<SimpleShader>();
     app_renderer.register_pipeline(

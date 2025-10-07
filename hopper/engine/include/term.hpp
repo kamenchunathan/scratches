@@ -12,8 +12,6 @@
 
 #include "renderer/present.hpp"
 
-namespace renderer {
-
 class TerminalPresenter;
 
 /* Responsible for managing terminal state, attributes etc, creating a presenter to output to the terminal
@@ -35,14 +33,14 @@ private:
     std::vector<std::byte> input_buf_;
 };
 
-class TerminalPresenter: public Presenter {
+class TerminalPresenter: public renderer::Presenter {
 public:
     TerminalPresenter(FILE* output, const winsize& ws);
     ~TerminalPresenter() = default;
 
     void present(
-        const FrameBuffer<CharacterPixel>& front_buffer,
-        const FrameBuffer<CharacterPixel>& back_buffer
+        const renderer::FrameBuffer<renderer::CharacterPixel>& front_buffer,
+        const renderer::FrameBuffer<renderer::CharacterPixel>& back_buffer
     );
 
     void init();
@@ -306,5 +304,3 @@ Snake MyersDiff<T>::find_middle_snake(const Box& box) {
 
     std::unreachable();
 }
-
-} // namespace renderer
