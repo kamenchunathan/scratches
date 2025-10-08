@@ -203,8 +203,8 @@ template<typename VertexIn, typename VertexOut, typename FragOut, typename... Re
 class Shader {
 public:
     virtual ~Shader() = default;
-    virtual VertexOut vertex(const VertexIn&, const ResourcePack<RequiredResources...>&) = 0;
-    virtual FragOut fragment(const VertexOut&, const ResourcePack<RequiredResources...>&) = 0;
+    virtual VertexOut vertex(const VertexIn&, const ShaderResourcePack<RequiredResources...>&) = 0;
+    virtual FragOut fragment(const VertexOut&, const ShaderResourcePack<RequiredResources...>&) = 0;
 };
 
 class IPipeline {

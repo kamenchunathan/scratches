@@ -9,7 +9,7 @@
 namespace renderer {
 
 template<typename... Resources>
-struct ResourcePack {
+struct ShaderResourcePack {
     std::tuple<Resources...> resources;
 
     template<typename T>
@@ -23,7 +23,7 @@ struct ResourcePack {
     };
 };
 
-class ResourceRegistry {
+class ShaderResourceRegistry {
 public:
     template<typename T, typename... Args>
     void add(Args&&... args) {
@@ -52,11 +52,12 @@ public:
 
     template<typename... RequiredResources>
     auto extract() const {
-        return ResourcePack<RequiredResources...> { std::make_tuple(*get<RequiredResources>()...) };
+        return ShaderResourcePack<RequiredResources...> {std::make_tuple(*get<RequiredResources>(
+        )...)};
     }
 
 private:
-    std::unordered_map<std::type_index, std::any> resources_;
+    std::unordered_map<std::type_index, std::shared_ptr<std::any>> resources_;
 };
 
 } // namespace renderer

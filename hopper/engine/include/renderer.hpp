@@ -18,7 +18,7 @@ public:
     // TODO: for testing
     PipelineRegistry pipeline_registry;
     BufferRegistry buffer_registry;
-    ResourceRegistry resource_registry;
+    ShaderResourceRegistry resource_registry;
     RenderGraph render_graph;
 
     Renderer(std::uint32_t w, std::uint32_t h, std::unique_ptr<Presenter>);

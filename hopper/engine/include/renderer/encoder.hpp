@@ -34,7 +34,7 @@ private:
     RenderPassEncoder(
         PipelineRegistry& pipeline_registry,
         BufferRegistry& buffer_registry,
-        ResourceRegistry& resource_registry
+        ShaderResourceRegistry& resource_registry
     ):
         pipeline_registry_(pipeline_registry),
         buffer_registry_(buffer_registry),
@@ -42,7 +42,7 @@ private:
 
     PipelineRegistry& pipeline_registry_;
     BufferRegistry& buffer_registry_;
-    ResourceRegistry& resource_registry_;
+    ShaderResourceRegistry& resource_registry_;
 };
 
 // A rasterizer based on scratchapixel lesson
@@ -71,7 +71,7 @@ void RenderPassEncoder::draw(
 
     FrameBuffer<VertexIn>* vb = buffer_registry_.get_buffer(vertex_buffer_handle);
     FrameBuffer<FragOut>* out_buffer = buffer_registry_.get_buffer(output_buffer_handle);
-    ResourcePack<RequiredResources...> resources =
+    ShaderResourcePack<RequiredResources...> resources =
         resource_registry_.extract<RequiredResources...>();
 
     std::vector<VertexIn> vertex_data = vb->data();

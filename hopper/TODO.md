@@ -20,3 +20,4 @@ List of things that I've learnt building this project
 3. `2025-08-22 14:32` Imlement query API
 4. `2025-10-05 03:55` Primitive Assembly
 5. `2025-10-06 13:14` Rasterization and shading
+6. `2025-10-08 17:21` Add Resources to ECS
