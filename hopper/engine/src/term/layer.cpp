@@ -1,13 +1,17 @@
 #include <cerrno>
+#include <chrono>
 #include <csignal>
 #include <cstdio>
 #include <fcntl.h>
 #include <print>
 #include <sys/ioctl.h>
 #include <termios.h>
+#include <thread>
 #include <unistd.h>
 
+#include "input.hpp"
 #include "term/ansi.hpp"
+#include "term/input_manager.hpp"
 #include "term/layer.hpp"
 
 volatile std::sig_atomic_t term_size_changed;
@@ -17,7 +21,8 @@ void handle_sigwinch(int) {
 }
 
 Terminal::Terminal(FILE* input, FILE* output): input_(input), output_(output) {
-    // TODO: Enable mouse input tracking
+    input_buf_.resize(1024);
+
     auto input_fd = fileno(input_);
     if (!isatty(input_fd)) {
         // TODO: Add engine wide logging framework
@@ -57,9 +62,25 @@ Terminal::Terminal(FILE* input, FILE* output): input_(input), output_(output) {
     }
 
     signal(SIGWINCH, handle_sigwinch);
+
+    ansi::mouse_input_tracking(
+        std::cout,
+        true,
+        ansi::MouseInputMode::AnyEvent,
+        ansi::MouseEncodingMode::SGR_Extended
+    );
+    fflush(output_);
 }
 
 Terminal::~Terminal() {
+    ansi::mouse_input_tracking(
+        std::cout,
+        false,
+        ansi::MouseInputMode::AnyEvent,
+        ansi::MouseEncodingMode::SGR_Extended
+    );
+    fflush(output_);
+
     auto input_fd = fileno(input_);
     tcsetattr(input_fd, TCSANOW, &orig_termios_);
 }
@@ -68,4 +89,40 @@ std::unique_ptr<TerminalPresenter> Terminal::presenter() {
     struct winsize ws;
     ioctl(fileno(output_), TIOCGWINSZ, &ws);
     return std::make_unique<TerminalPresenter>(output_, ws);
+}
+
+std::vector<core::input::Event> Terminal::poll_input() {
+    ssize_t bytes_read = read(fileno(input_), input_buf_.data(), input_buf_.capacity());
+
+    if (bytes_read > 0) {
+        InputParser parser(
+            std::string_view {input_buf_.data(), static_cast<std::size_t>(bytes_read)}
+        );
+        return parser.parse();
+    }
+
+    return {};
+}
+
+void TerminalLayer::build(core::Application& app) {
+    app.set_runner([this](core::Application& app_ref) { run(app_ref); });
+}
+
+void TerminalLayer::run(core::Application& app) {
+    auto last_time = std::chrono::high_resolution_clock::now();
+
+    while (!app.should_exit()) {
+        auto current_time = std::chrono::high_resolution_clock::now();
+        auto delta_time = current_time - last_time;
+        last_time = current_time;
+
+        auto events = terminal->poll_input();
+        if (auto* input_state = app.world.get_resource<core::input::InputState>()) {
+            input_state->process_events(events);
+        }
+
+        app.tick(std::chrono::duration<double>(delta_time).count());
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000 / frame_rate));
+    }
 }

@@ -2,11 +2,13 @@ engine_inc = include_directories('include')
 
 engine_sources = [
   'src/application.cpp',
-  'src/ecs/world.cpp',
-  'src/ecs/archetype.cpp',
+  'src/input.cpp',
   'src/renderer.cpp',
+  'src/ecs/archetype.cpp',
+  'src/ecs/world.cpp',
   'src/renderer/graph.cpp',
   'src/term/layer.cpp',
+  'src/term/presenter.cpp',
   'src/term/input_manager.cpp',
   'src/util/text.cpp',
 ]

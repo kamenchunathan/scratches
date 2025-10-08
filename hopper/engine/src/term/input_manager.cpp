@@ -168,7 +168,7 @@ void InputParser::parse_char() {
     }
 
     if (key_code) {
-        input_events_.push_back(KeyEvent {key_code.value(), KeyEvent::Action::Press});
+        input_events_.push_back(KeyEvent {key_code.value()});
     }
 }
 
@@ -296,8 +296,7 @@ std::expected<void, InputParser::ParseError> InputParser::parse_escape_code() {
         }
 
         if (key_code) {
-            input_events_.push_back(KeyEvent {*key_code, KeyEvent::Action::Press, shift, ctrl, alt}
-            );
+            input_events_.push_back(KeyEvent {*key_code, shift, ctrl, alt});
         }
     }
 

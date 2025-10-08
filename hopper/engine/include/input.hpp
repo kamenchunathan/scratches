@@ -1,5 +1,8 @@
 #pragma once
 
+#include "application.hpp"
+#include "ecs/system.hpp"
+#include <array>
 #include <format>
 #include <optional>
 #include <variant>
@@ -74,13 +77,8 @@ enum class KeyCode {
 };
 
 struct KeyEvent {
-    enum class Action {
-        Press,
-        Release,
-    };
-
     KeyCode code;
-    Action action;
+    // TODO: Better modifier handling
     bool shift = false;
     bool ctrl = false;
     bool alt = false;
@@ -112,6 +110,34 @@ struct ResizeEvent {
 };
 
 using Event = std::variant<KeyEvent, MouseEvent, ResizeEvent>;
+
+class InputState {
+public:
+    std::array<bool, 256> keys_current {};
+    std::array<bool, 256> keys_previous {};
+
+    std::array<bool, 3> mouse_button_current {};
+    std::array<bool, 3> mouse_button_previous {};
+
+    std::pair<std::uint32_t, std::uint32_t> mouse_pos;
+
+    bool just_pressed(KeyCode);
+    bool just_pressed(MouseButton);
+
+    bool just_released(KeyCode);
+    bool just_released(MouseButton);
+
+    bool is_button_down(KeyCode);
+    bool is_button_down(MouseButton);
+
+    void process_events(std::vector<Event>);
+};
+
+// TODO: Make generic later
+class InputLayer {
+public:
+    void build(core::Application&);
+};
 
 } // namespace core::input
 
@@ -319,25 +345,12 @@ struct std::formatter<core::input::KeyCode>: std::formatter<std::string_view> {
 };
 
 template<>
-struct std::formatter<core::input::KeyEvent::Action>: std::formatter<std::string_view> {
-    auto format(core::input::KeyEvent::Action c, std::format_context& ctx) const {
-        switch (c) {
-            case core::input::KeyEvent::Action::Press:
-                return std::formatter<std::string_view>::format("Press", ctx);
-            case core::input::KeyEvent::Action::Release:
-                return std::formatter<std::string_view>::format("Release", ctx);
-        };
-    };
-};
-
-template<>
 struct std::formatter<core::input::KeyEvent>: std::formatter<std::string_view> {
     auto format(core::input::KeyEvent c, std::format_context& ctx) const {
         return std::format_to(
             ctx.out(),
-            "KeyEvent {{ code: {}, action: {}{}{}{} }}",
+            "KeyEvent {{ code: {} {}{}{} }}",
             c.code,
-            c.action,
             c.shift ? ", shift" : "",
             c.ctrl ? ", ctrl" : "",
             c.alt ? ", alt" : ""

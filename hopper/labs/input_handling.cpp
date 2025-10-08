@@ -114,6 +114,7 @@ public:
 
 int main() {
     core::Application app;
-    app.add_layer(TerminalInputLayer {});
+    TerminalInputLayer term_input_layer {};
+    app.add_layer(term_input_layer);
     app.run();
 }

@@ -34,10 +34,10 @@ public:
     void insert_resource(ResourceType&& res);
 
     template<typename ResourceType>
-    std::optional<ResourceType&> get_resource();
+    ResourceType* get_resource();
 
     template<typename ResourceType>
-    std::optional<const ResourceType&> get_resource() const;
+    const ResourceType* get_resource() const;
 
     std::vector<Archetype*>
     get_matching_archetypes(ComponentMask required, ComponentMask disallowed);
@@ -103,27 +103,21 @@ void World::insert_resource(ResourceType&& res) {
 }
 
 template<typename ResourceType>
-std::optional<ResourceType&> World::get_resource() {
+ResourceType* World::get_resource() {
     ResourceId id = ResourceIds::get_id<ResourceType>();
-    if (id >= resources_.size())
-        return std::nullopt;
-
-    if (auto p = std::any_cast<ResourceType&>(*resources_[id]))
-        return p;
-
-    return std::nullopt;
+    if (id >= resources_.size() || !resources_[id]) {
+        return nullptr;
+    }
+    return std::any_cast<ResourceType>(resources_[id].get());
 }
 
 template<typename ResourceType>
-std::optional<const ResourceType&> World::get_resource() const {
+const ResourceType* World::get_resource() const {
     ResourceId id = ResourceIds::get_id<ResourceType>();
-    if (id >= resources_.size())
-        return std::nullopt;
-
-    if (auto p = std::any_cast<ResourceType&>(*resources_[id]))
-        return p;
-
-    return std::nullopt;
+    if (id >= resources_.size() || !resources_[id]) {
+        return nullptr;
+    }
+    return std::any_cast<const ResourceType>(resources_[id].get());
 }
 
 } // namespace ecs

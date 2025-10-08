@@ -3,6 +3,7 @@
 #include "ecs/archetype.hpp"
 #include "ecs/component.hpp"
 #include "ecs/world.hpp"
+#include <algorithm>
 #include <iterator>
 #include <vector>
 

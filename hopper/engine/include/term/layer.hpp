@@ -1,11 +1,12 @@
 #include <cassert>
-#include <cstddef>
 #include <cstdio>
 #include <memory>
 #include <sys/ioctl.h>
 #include <termios.h>
 #include <vector>
 
+#include "application.hpp"
+#include "input.hpp"
 #include "term/presenter.hpp"
 
 /* Responsible for managing terminal state, attributes etc, creating a presenter to output to the terminal
@@ -19,10 +20,22 @@ public:
 
     Terminal(const Terminal&) = delete;
     Terminal& operator=(const Terminal&) = delete;
+
     std::unique_ptr<TerminalPresenter> presenter();
+
+    std::vector<core::input::Event> poll_input();
 
 private:
     FILE *input_, *output_;
     termios orig_termios_;
-    std::vector<std::byte> input_buf_;
+    std::vector<char> input_buf_;
+};
+
+class TerminalLayer {
+public:
+    std::uint32_t frame_rate = 60;
+    std::unique_ptr<Terminal> terminal;
+
+    void build(core::Application& app);
+    void run(core::Application& app);
 };

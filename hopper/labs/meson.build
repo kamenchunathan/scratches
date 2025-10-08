@@ -25,3 +25,10 @@ executable(
   install: false,
   dependencies: [engine_dep],
 )
+
+executable(
+  're_input_handling',
+  're_input_handling.cpp',
+  install: false,
+  dependencies: [engine_dep],
+)
