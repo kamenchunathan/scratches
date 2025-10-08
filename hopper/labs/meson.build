@@ -32,3 +32,10 @@ executable(
   install: false,
   dependencies: [engine_dep],
 )
+
+executable(
+  'triangle_2',
+  'triangle_2.cpp',
+  install: false,
+  dependencies: [engine_dep],
+)

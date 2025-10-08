@@ -1,16 +1,44 @@
 #pragma once
 
+#include <memory>
+#include <unordered_map>
+#include <vector>
+
 #include "archetype.hpp"
 #include "component.hpp"
 #include "ecs/resource.hpp"
 #include "entity.hpp"
-#include <any>
-#include <memory>
-#include <optional>
-#include <unordered_map>
-#include <vector>
 
 namespace ecs {
+
+namespace detail {
+    /* Type Erased ResourceStore to allow move only types
+     * Using std::any had downsides among which included not allowing move only types
+     */
+    class IResourceStore {
+    public:
+        virtual ~IResourceStore() = default;
+    };
+
+    template<typename T>
+    class ResourceStore: public IResourceStore {
+    public:
+        explicit ResourceStore(const T& resource): resource_(resource) {}
+        explicit ResourceStore(T&& resource): resource_(std::move(resource)) {}
+
+        T& get() {
+            return resource_;
+        }
+
+        const T& get() const {
+            return resource_;
+        }
+
+    private:
+        T resource_;
+    };
+
+} // namespace detail
 
 class World {
 public:
@@ -39,6 +67,12 @@ public:
     template<typename ResourceType>
     const ResourceType* get_resource() const;
 
+    template<typename ResourceType>
+    bool has_resource() const;
+
+    template<typename ResourceType>
+    void remove_resource();
+
     std::vector<Archetype*>
     get_matching_archetypes(ComponentMask required, ComponentMask disallowed);
 
@@ -56,7 +90,7 @@ private:
     std::uint32_t next_entity_id_ {1};
     std::unordered_map<Signature, std::unique_ptr<Archetype>, SignatureHash> archetypes_;
     std::unordered_map<Entity, std::pair<Archetype*, std::uint32_t>> entity_map_;
-    std::vector<std::unique_ptr<std::any>> resources_;
+    std::vector<std::unique_ptr<detail::IResourceStore>> resources_;
 };
 
 template<typename... Components>
@@ -96,28 +130,66 @@ void World::destroy(Entity entity) {
 
 template<typename ResourceType>
 void World::insert_resource(ResourceType&& res) {
-    ResourceId id = ResourceIds::get_id<ResourceType>();
-    if (id >= resources_.size())
+    using StoredType = std::remove_cvref_t<ResourceType>;
+    ResourceId id = ResourceIds::get_id<StoredType>();
+
+    if (id >= resources_.size()) {
         resources_.resize(id + 1);
-    resources_[id] = std::make_unique<std::any>(std::forward<ResourceType>(res));
+    }
+
+    // Create a new holder with the resource (supports both copy and move)
+    resources_[id] =
+        std::make_unique<detail::ResourceStore<StoredType>>(std::forward<ResourceType>(res));
 }
 
 template<typename ResourceType>
 ResourceType* World::get_resource() {
-    ResourceId id = ResourceIds::get_id<ResourceType>();
+    using StoredType = std::remove_cvref_t<ResourceType>;
+    ResourceId id = ResourceIds::get_id<StoredType>();
+
     if (id >= resources_.size() || !resources_[id]) {
         return nullptr;
     }
-    return std::any_cast<ResourceType>(resources_[id].get());
+
+    // Dynamic cast to the correct holder type and extract the resource
+    auto* holder = dynamic_cast<detail::ResourceStore<StoredType>*>(resources_[id].get());
+    return holder ? &holder->get() : nullptr;
 }
 
 template<typename ResourceType>
 const ResourceType* World::get_resource() const {
-    ResourceId id = ResourceIds::get_id<ResourceType>();
+    using StoredType = std::remove_cvref_t<ResourceType>;
+    ResourceId id = ResourceIds::get_id<StoredType>();
+
     if (id >= resources_.size() || !resources_[id]) {
         return nullptr;
     }
-    return std::any_cast<const ResourceType>(resources_[id].get());
+
+    const auto* holder =
+        dynamic_cast<const detail::ResourceStore<StoredType>*>(resources_[id].get());
+    return holder ? &holder->get() : nullptr;
+}
+
+template<typename ResourceType>
+bool World::has_resource() const {
+    using StoredType = std::remove_cvref_t<ResourceType>;
+    ResourceId id = ResourceIds::get_id<StoredType>();
+
+    if (id >= resources_.size() || !resources_[id]) {
+        return false;
+    }
+
+    return dynamic_cast<const detail::ResourceStore<StoredType>*>(resources_[id].get()) != nullptr;
+}
+
+template<typename ResourceType>
+void World::remove_resource() {
+    using StoredType = std::remove_cvref_t<ResourceType>;
+    ResourceId id = ResourceIds::get_id<StoredType>();
+
+    if (id < resources_.size()) {
+        resources_[id].reset();
+    }
 }
 
 } // namespace ecs
