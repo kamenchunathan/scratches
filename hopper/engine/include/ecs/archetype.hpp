@@ -64,6 +64,9 @@ private:
     std::vector<T> components_;
 };
 
+/* A table of entities with the same components
+ * Concepturally thought of as a
+ */
 class Archetype {
 public:
     explicit Archetype(const Signature& signature): signature_(signature) {
@@ -79,10 +82,7 @@ public:
     Archetype& operator=(Archetype&&) = default;
 
     template<typename T>
-    T& get_component(std::uint32_t index) {
-        auto* column = get_component_column<T>();
-        return column->get_component(index);
-    }
+    T& get_component(std::uint32_t index);
 
     template<typename T>
     const T& get_component(std::uint32_t index) const {
@@ -91,33 +91,14 @@ public:
     }
 
     template<typename... Components>
-    std::uint32_t add_entity(Entity entity, Components&&... components) {
-        entity_indices_.push_back(entity);
-        std::uint32_t index = static_cast<std::uint32_t>(entity_indices_.size() - 1);
+    std::uint32_t add_entity(Entity entity, Components&&... components);
 
-        (add_component_to_column(std::forward<Components>(components)), ...);
-
-        return index;
-    }
-
-    void remove_entity(std::uint32_t index) {
-        assert(index < entity_indices_.size());
-
-        // Move last entity to this position (swap and pop)
-        if (index < entity_indices_.size() - 1) {
-            entity_indices_[index] = entity_indices_.back();
-        }
-        entity_indices_.pop_back();
-
-        // Remove components using the same strategy
-        for (auto& [component_id, column]: components_) {
-            column->remove_component(index);
-        }
-    }
+    void remove_entity(std::uint32_t index);
 
     std::size_t size() const {
         return entity_indices_.size();
     }
+
     bool empty() const {
         return entity_indices_.empty();
     }
@@ -134,41 +115,66 @@ public:
     }
 
 private:
-    template<typename T>
-    TypedComponentColumn<T>* get_component_column() {
-        auto component_id = ComponentIds::get_id<T>();
-        auto it = components_.find(component_id);
-        assert(it != components_.end() && "Component not found in archetype");
-        return static_cast<TypedComponentColumn<T>*>(it->second.get());
-    }
-
-    template<typename T>
-    const TypedComponentColumn<T>* get_component_column() const {
-        auto component_id = ComponentIds::get_id<T>();
-        auto it = components_.find(component_id);
-        assert(it != components_.end() && "Component not found in archetype");
-        return static_cast<const TypedComponentColumn<T>*>(it->second.get());
-    }
-
-    template<typename T>
-    void add_component_to_column(T&& component) {
-        auto component_id = ComponentIds::get_id<T>();
-        auto it = components_.find(component_id);
-
-        if (it == components_.end()) {
-            auto column = std::make_unique<TypedComponentColumn<T>>();
-            column->reserve(entity_indices_.capacity());
-            column->add_component(std::forward<T>(component));
-            components_[component_id] = std::move(column);
-        } else {
-            auto* typed_column = static_cast<TypedComponentColumn<T>*>(it->second.get());
-            typed_column->add_component(std::forward<T>(component));
-        }
-    }
-
     Signature signature_;
     std::vector<Entity> entity_indices_;
     std::unordered_map<ComponentId, std::unique_ptr<ComponentColumn>> components_;
+
+    template<typename T>
+    TypedComponentColumn<T>* get_component_column();
+
+    template<typename T>
+    const TypedComponentColumn<T>* get_component_column() const;
+
+    template<typename T>
+    void add_component_to_column(T&& component);
 };
+
+template<typename... Components>
+std::uint32_t Archetype ::add_entity(Entity entity, Components&&... components) {
+    entity_indices_.push_back(entity);
+    std::uint32_t index = static_cast<std::uint32_t>(entity_indices_.size() - 1);
+
+    (add_component_to_column(std::forward<Components>(components)), ...);
+
+    return index;
+}
+
+template<typename T>
+T& Archetype::get_component(std::uint32_t index) {
+    auto* column = get_component_column<T>();
+    return column->get_component(index);
+}
+
+template<typename T>
+TypedComponentColumn<T>* Archetype::get_component_column() {
+    auto component_id = ComponentIds::get_id<T>();
+    auto it = components_.find(component_id);
+    assert(it != components_.end() && "Component not found in archetype");
+    return static_cast<TypedComponentColumn<T>*>(it->second.get());
+}
+
+template<typename T>
+const TypedComponentColumn<T>* Archetype::get_component_column() const {
+    auto component_id = ComponentIds::get_id<T>();
+    auto it = components_.find(component_id);
+    assert(it != components_.end() && "Component not found in archetype");
+    return static_cast<const TypedComponentColumn<T>*>(it->second.get());
+}
+
+template<typename T>
+void Archetype::add_component_to_column(T&& component) {
+    auto component_id = ComponentIds::get_id<T>();
+    auto it = components_.find(component_id);
+
+    if (it == components_.end()) {
+        auto column = std::make_unique<TypedComponentColumn<T>>();
+        column->reserve(entity_indices_.capacity());
+        column->add_component(std::forward<T>(component));
+        components_[component_id] = std::move(column);
+    } else {
+        auto* typed_column = static_cast<TypedComponentColumn<T>*>(it->second.get());
+        typed_column->add_component(std::forward<T>(component));
+    }
+}
 
 } // namespace ecs
