@@ -9,7 +9,7 @@ engine_sources = [
   'src/renderer/graph.cpp',
   'src/term/layer.cpp',
   'src/term/presenter.cpp',
-  'src/term/input_manager.cpp',
+  'src/term/input_parser.cpp',
   'src/util/text.cpp',
 ]
 

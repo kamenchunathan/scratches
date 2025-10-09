@@ -11,7 +11,7 @@
 
 #include "input.hpp"
 #include "term/ansi.hpp"
-#include "term/input_manager.hpp"
+#include "term/input_parser.hpp"
 #include "term/layer.hpp"
 
 volatile std::sig_atomic_t term_size_changed;

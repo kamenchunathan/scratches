@@ -1,6 +1,5 @@
 #include <cmath>
 #include <memory>
-#include <print>
 #include <vector>
 
 #include "application.hpp"
@@ -333,12 +332,12 @@ int main() {
     core::Application app;
 
     // Add layers
+
+    app.add_layer(core::input::InputLayer {});
     TerminalLayer term_layer {.frame_rate = 60, .terminal = std::make_unique<Terminal>()};
     app.world.insert_resource<TerminalLayer*>(&term_layer);
     app.world.insert_resource<core::Application*>(&app);
-
     app.add_layer(term_layer);
-    app.add_layer(core::input::InputLayer {});
     app.add_layer(RendererLayer {});
 
     // Create triangle entity
@@ -350,10 +349,6 @@ int main() {
             core::ColorRGB8::rgb(100, 100, 255)
         }
     );
-
-    app.scheduler.add_system(ecs::SystemStage::Startup, [](ecs::World&) {
-        std::print("Triangle Renderer - Use WASD or Arrow keys to move, Q/Esc to quit\r\n");
-    });
 
     app.scheduler.add_system(ecs::SystemStage::Update, input_system);
     app.scheduler.add_system(ecs::SystemStage::Update, render_system);

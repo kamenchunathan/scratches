@@ -1,6 +1,6 @@
 #include "gtest/gtest.h"
 
-#include "term/input_manager.hpp"
+#include "term/input_parser.hpp"
 
 using namespace core::input;
 

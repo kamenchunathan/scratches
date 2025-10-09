@@ -10,7 +10,7 @@
 
 #include "application.hpp"
 #include "term/ansi.hpp"
-#include "term/input_manager.hpp"
+#include "term/input_parser.hpp"
 
 template<class... Ts>
 struct overload: Ts... {
