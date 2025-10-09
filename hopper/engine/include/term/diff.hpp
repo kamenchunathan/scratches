@@ -246,7 +246,7 @@ Snake MyersDiff<T>::find_middle_snake(const Box& box) {
             const std::int32_t x_start = x;
             const std::int32_t y_start = y;
 
-            while (x < n && y < m && a_[box.x1 + n - 1 - x] == b_[box.y1 + m - 1 - y]) {
+            while (x < n && y < m && a_[box.x2 - 1 - x] == b_[box.y2 - 1 - y]) {
                 x++;
                 y++;
             }
@@ -256,14 +256,9 @@ Snake MyersDiff<T>::find_middle_snake(const Box& box) {
             // Check for overlap with forward search (even delta case)
             if (delta % 2 == 0 && c >= delta - d && c <= delta + d) {
                 if (forward_v_[offset + delta - c] + reverse_v_[offset + c] >= n) {
-                    // The middle snake is the diagonal run found by the reverse path.
-                    // We need to convert its start and end points from reverse coordinates
-                    // (counting from the end of the box) to forward coordinates.
-                    return Snake {
-                        // The snake's start is the end of the reverse diagonal run.
-                        .from = {box.x1 + n - x, box.y1 + m - y},
-                        // The snake's end is the start of the reverse diagonal run.
-                        .to = {box.x1 + n - x_start, box.y1 + m - y_start},
+                     return Snake {
+                        .from = {box.x2 - x, box.y2 - y},
+                        .to = {box.x2 - x_start, box.y2 - y_start},
                     };
                 }
             }
