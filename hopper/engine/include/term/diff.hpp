@@ -1,8 +1,6 @@
 #include <cassert>
 #include <cstddef>
 #include <format>
-#include <sys/ioctl.h>
-#include <termios.h>
 #include <utility>
 #include <vector>
 
@@ -26,31 +24,28 @@ struct std::formatter<Point> {
 };
 
 struct Box {
-    std::int32_t x1, y1; // Top left corner
-    std::int32_t x2, y2; // Bottom right corner
+    Point from, to;
+
+    Box(Point from, Point to): from(from), to(to) {
+        assert(from.x >= 0 && from.y >= 0 && to.x >= from.x && to.y >= from.y);
+    }
 
     Box(std::int32_t x1, std::int32_t y1, std::int32_t x2, std::int32_t y2):
-        x1(x1),
-        y1(y1),
-        x2(x2),
-        y2(y2) {
+        from({x1, y1}),
+        to({x2, y2}) {
         assert(x1 >= 0 && y1 >= 0 && x2 >= x1 && y2 >= y1);
     }
 
     [[nodiscard]] std::int32_t width() const {
-        return x2 - x1;
+        return to.x - from.x;
     }
 
     [[nodiscard]] std::int32_t height() const {
-        return y2 - y1;
+        return to.y - from.y;
     }
 
     [[nodiscard]] std::int32_t size() const {
         return width() + height();
-    }
-
-    [[nodiscard]] bool empty() const {
-        return width() == 0 && height() == 0;
     }
 };
 
@@ -61,14 +56,7 @@ struct std::formatter<Box> {
     }
 
     auto format(const Box& box, std::format_context& ctx) const {
-        return std::format_to(
-            ctx.out(),
-            "Box(x1: {}, y1: {}, x2: {}, y2: {})",
-            box.x1,
-            box.y1,
-            box.x2,
-            box.y2
-        );
+        return std::format_to(ctx.out(), "Box(from: {}, to: {})", box.from, box.to);
     }
 };
 
@@ -76,6 +64,10 @@ struct Snake {
     Point from, to;
 
     bool operator==(const Snake& other) const = default;
+
+    friend std::ostream& operator<<(std::ostream& os, const Snake& snake) {
+        return os << std::format("Snake(from: {}, to: {})", snake.from, snake.to);
+    }
 };
 
 template<>
@@ -143,16 +135,11 @@ void MyersDiff<T>::diff_recursive(
     const Box& box,
     std::vector<std::pair<std::uint32_t, std::uint32_t>>& trace
 ) {
-    // Base cases
-    if (box.empty()) {
-        return;
-    }
-
-    // Only insertions
+    // Only insertions (no matches in this region)
     if (box.width() == 0) {
         return;
     }
-    // Only deletions
+    // Only deletions (no matches in this region)
     if (box.height() == 0) {
         return;
     }
@@ -160,8 +147,9 @@ void MyersDiff<T>::diff_recursive(
     Snake snake = find_middle_snake(box);
 
     // Recursively handle the region before the snake
-    if (snake.from.x > box.x1 || snake.from.y > box.y1) {
-        diff_recursive(Box(box.x1, box.y1, snake.from.x, snake.from.y), trace);
+    Box before_region {box.from, snake.from};
+    if (before_region.width() != 0 && before_region.height() != 0) {
+        diff_recursive(before_region, trace);
     }
 
     // Add the snake (matching elements) to the trace
@@ -171,8 +159,9 @@ void MyersDiff<T>::diff_recursive(
     }
 
     // Recursively handle the region after the snake
-    if (snake.to.x < box.x2 || snake.to.y < box.y2) {
-        diff_recursive(Box(snake.to.x, snake.to.y, box.x2, box.y2), trace);
+    Box after_region {snake.to, box.to};
+    if (after_region.width() != 0 && after_region.height() != 0) {
+        diff_recursive(after_region, trace);
     }
 }
 
@@ -185,13 +174,13 @@ Snake MyersDiff<T>::find_middle_snake(const Box& box) {
 
     // Base cases
     if (n == 0 && m == 0) {
-        return Snake {{box.x1, box.y1}, {box.x1, box.y1}};
+        return Snake {box.from, box.from};
     }
     if (n == 0) {
-        return Snake {{box.x1, box.y1}, {box.x1, box.y1}};
+        return Snake {box.from, box.from};
     }
     if (m == 0) {
-        return Snake {{box.x1, box.y1}, {box.x1, box.y1}};
+        return Snake {box.from, box.from};
     }
 
     // V arrays are indexed by k, which can be negative. Use offset to map to positive indices.
@@ -215,7 +204,7 @@ Snake MyersDiff<T>::find_middle_snake(const Box& box) {
             const std::int32_t y_start = y;
 
             // Extend diagonal as far as possible
-            while (x < n && y < m && a_[box.x1 + x] == b_[box.y1 + y]) {
+            while (x < n && y < m && a_[box.from.x + x] == b_[box.from.y + y]) {
                 x++;
                 y++;
             }
@@ -225,8 +214,8 @@ Snake MyersDiff<T>::find_middle_snake(const Box& box) {
             if (delta % 2 != 0 && k >= delta - d + 1 && k <= delta + d - 1) {
                 if (forward_v_[offset + k] + reverse_v_[offset + delta - k] >= n) {
                     return Snake {
-                        .from = {box.x1 + x_start, box.y1 + y_start},
-                        .to = {box.x1 + x, box.y1 + y},
+                        .from = {box.from.x + x_start, box.from.y + y_start},
+                        .to = {box.from.x + x, box.from.y + y},
                     };
                 }
             }
@@ -246,7 +235,7 @@ Snake MyersDiff<T>::find_middle_snake(const Box& box) {
             const std::int32_t x_start = x;
             const std::int32_t y_start = y;
 
-            while (x < n && y < m && a_[box.x2 - 1 - x] == b_[box.y2 - 1 - y]) {
+            while (x < n && y < m && a_[box.to.x - 1 - x] == b_[box.to.y - 1 - y]) {
                 x++;
                 y++;
             }
@@ -256,9 +245,9 @@ Snake MyersDiff<T>::find_middle_snake(const Box& box) {
             // Check for overlap with forward search (even delta case)
             if (delta % 2 == 0 && c >= delta - d && c <= delta + d) {
                 if (forward_v_[offset + delta - c] + reverse_v_[offset + c] >= n) {
-                     return Snake {
-                        .from = {box.x2 - x, box.y2 - y},
-                        .to = {box.x2 - x_start, box.y2 - y_start},
+                    return Snake {
+                        .from = {box.to.x - x, box.to.y - y},
+                        .to = {box.to.x - x_start, box.to.y - y_start},
                     };
                 }
             }
