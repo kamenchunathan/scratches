@@ -39,6 +39,13 @@ struct ColorRGB8 {
             static_cast<std::uint8_t>(std::min(255, b + other.b)),
         };
     }
+    bool operator==(const ColorRGB8& other) const {
+        return r == other.r && g == other.g && b == other.b;
+    }
+
+    bool operator!=(const ColorRGB8& other) const {
+        return r != other.r || g != other.g || b != other.b;
+    }
 };
 
 struct ColorRGBA8 {
@@ -79,6 +86,14 @@ struct ColorRGBA8 {
             static_cast<std::uint8_t>(std::min(255, b + other.b)),
             static_cast<std::uint8_t>(std::min(255, a + other.a)),
         };
+    }
+
+    bool operator==(const ColorRGBA8& other) const {
+        return r == other.r && g == other.g && b == other.b && a == other.a;
+    }
+
+    bool operator!=(const ColorRGBA8& other) const {
+        return r != other.r || g != other.g || b != other.b || a != other.a;
     }
 };
 
@@ -121,6 +136,14 @@ struct ColorRGBA32F {
             b + other.b,
             a + other.a,
         };
+    }
+
+    bool operator==(const ColorRGBA32F& other) const {
+        return r == other.r && g == other.g && b == other.b && a == other.a;
+    }
+
+    bool operator!=(const ColorRGBA32F& other) const {
+        return r != other.r || g != other.g || b != other.b || a != other.a;
     }
 };
 

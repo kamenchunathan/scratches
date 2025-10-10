@@ -1,7 +1,6 @@
 #include <cassert>
 #include <cstddef>
 #include <format>
-#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -82,49 +81,6 @@ struct std::formatter<Snake> {
     }
 };
 
-enum class EditTag {
-    Match,
-    Delete,
-    Insert,
-
-};
-
-template<>
-struct std::formatter<EditTag> {
-    constexpr auto parse(std::format_parse_context& ctx) {
-        return ctx.begin();
-    }
-
-    auto format(const EditTag& tag, std::format_context& ctx) const {
-        std::string_view tag_str;
-        switch (tag) {
-            break;
-            case EditTag::Match:
-                tag_str = "Match";
-                break;
-
-            case EditTag::Delete:
-                tag_str = "Delete";
-                break;
-
-            case EditTag::Insert:
-                tag_str = "Insert";
-                break;
-        }
-        return std::format_to(ctx.out(), "EditTag::{}", tag_str);
-    }
-};
-
-inline std::ostream& operator<<(std::ostream& os, const EditTag& edit) {
-    return os << std::format("{}", edit);
-}
-
-struct Edit {
-    EditTag tag;
-    std::int32_t a_index;
-    std::int32_t b_index;
-};
-
 /* An implementation of linear space myer's search algorithm based on the original
  * [Myer's Diff Algorithm paper](http://www.xmailserver.org/diff2.pdf)
  * and a [Series of tutorials](https://blog.jcoglan.com/2017/02/12/the-myers-diff-algorithm-part-1/) on building
@@ -193,6 +149,7 @@ void MyersDiff<T>::build_trace(const Box& box, std::vector<Snake>& trace) {
         build_trace(right, trace);
     }
 }
+
 template<typename T>
 Snake MyersDiff<T>::find_middle_snake(const Box& box) {
     const std::int32_t n = box.width();
