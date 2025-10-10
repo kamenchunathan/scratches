@@ -1,6 +1,7 @@
 #include <cassert>
 #include <cstddef>
 #include <format>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -81,6 +82,49 @@ struct std::formatter<Snake> {
     }
 };
 
+enum class EditTag {
+    Match,
+    Delete,
+    Insert,
+
+};
+
+template<>
+struct std::formatter<EditTag> {
+    constexpr auto parse(std::format_parse_context& ctx) {
+        return ctx.begin();
+    }
+
+    auto format(const EditTag& tag, std::format_context& ctx) const {
+        std::string_view tag_str;
+        switch (tag) {
+            break;
+            case EditTag::Match:
+                tag_str = "Match";
+                break;
+
+            case EditTag::Delete:
+                tag_str = "Delete";
+                break;
+
+            case EditTag::Insert:
+                tag_str = "Insert";
+                break;
+        }
+        return std::format_to(ctx.out(), "EditTag::{}", tag_str);
+    }
+};
+
+inline std::ostream& operator<<(std::ostream& os, const EditTag& edit) {
+    return os << std::format("{}", edit);
+}
+
+struct Edit {
+    EditTag tag;
+    std::int32_t a_index;
+    std::int32_t b_index;
+};
+
 /* An implementation of linear space myer's search algorithm based on the original
  * [Myer's Diff Algorithm paper](http://www.xmailserver.org/diff2.pdf)
  * and a [Series of tutorials](https://blog.jcoglan.com/2017/02/12/the-myers-diff-algorithm-part-1/) on building
@@ -93,13 +137,10 @@ public:
      */
     explicit MyersDiff(const std::vector<T>& a, const std::vector<T>& b);
 
-    std::vector<std::pair<std::uint32_t, std::uint32_t>> diff();
-
-    // Public only for testing
-    Snake find_middle_snake(const Box&);
+    void build_trace(const Box& box, std::vector<Snake>& out);
 
 private:
-    void diff_recursive(const Box&, std::vector<std::pair<std::uint32_t, std::uint32_t>>&);
+    Snake find_middle_snake(const Box&);
 
     std::vector<std::int32_t> forward_v_;
     std::vector<std::int32_t> reverse_v_;
@@ -120,51 +161,38 @@ MyersDiff<T>::MyersDiff(const std::vector<T>& a, const std::vector<T>& b): a_(a)
 }
 
 template<typename T>
-std::vector<std::pair<std::uint32_t, std::uint32_t>> MyersDiff<T>::diff() {
-    if (a_.empty() && b_.empty()) {
-        return {};
-    }
+void MyersDiff<T>::build_trace(const Box& box, std::vector<Snake>& trace) {
+    const std::int32_t N = box.to.x - box.from.x;
+    const std::int32_t M = box.to.y - box.from.y;
 
-    std::vector<std::pair<std::uint32_t, std::uint32_t>> trace;
-    diff_recursive(Box(0, 0, a_.size(), b_.size()), trace);
-    return trace;
-}
-
-template<typename T>
-void MyersDiff<T>::diff_recursive(
-    const Box& box,
-    std::vector<std::pair<std::uint32_t, std::uint32_t>>& trace
-) {
-    // Only insertions (no matches in this region)
-    if (box.width() == 0) {
+    // Base case: if one side is empty, no more snakes to find
+    if (N == 0 || M == 0)
         return;
-    }
-    // Only deletions (no matches in this region)
-    if (box.height() == 0) {
+
+    // Find the middle snake
+    Snake mid = find_middle_snake(box);
+
+    // If the snake covers the whole box or is degenerate, stop recursion
+    if ((mid.from == box.from && mid.to == box.to) || (mid.from == mid.to)) {
+        trace.push_back(mid);
         return;
     }
 
-    Snake snake = find_middle_snake(box);
-
-    // Recursively handle the region before the snake
-    Box before_region {box.from, snake.from};
-    if (before_region.width() != 0 && before_region.height() != 0) {
-        diff_recursive(before_region, trace);
+    // Recurse on left part (before the snake)
+    if (mid.from.x > box.from.x || mid.from.y > box.from.y) {
+        Box left(box.from, mid.from);
+        build_trace(left, trace);
     }
 
-    // Add the snake (matching elements) to the trace
-    const std::int32_t snake_length = snake.to.x - snake.from.x;
-    for (std::int32_t i = 0; i < snake_length; ++i) {
-        trace.emplace_back(snake.from.x + i, snake.from.y + i);
-    }
+    // Add the middle snake itself
+    trace.push_back(mid);
 
-    // Recursively handle the region after the snake
-    Box after_region {snake.to, box.to};
-    if (after_region.width() != 0 && after_region.height() != 0) {
-        diff_recursive(after_region, trace);
+    // Recurse on right part (after the snake)
+    if (mid.to.x < box.to.x || mid.to.y < box.to.y) {
+        Box right(mid.to, box.to);
+        build_trace(right, trace);
     }
 }
-
 template<typename T>
 Snake MyersDiff<T>::find_middle_snake(const Box& box) {
     const std::int32_t n = box.width();

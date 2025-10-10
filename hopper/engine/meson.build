@@ -32,9 +32,9 @@ engine_dep = declare_dependency(
   ],
 )
 
-renderer_test_exe = executable(
-  'test_renderer',
-  'test/renderer.cpp',
+diff_test_exe = executable(
+  'diff_test',
+  'test/diff.cpp',
   dependencies: [
     engine_dep,
     dependency('gtest', main: true, fallback: ['gtest', 'gtest_dep']),
@@ -42,4 +42,4 @@ renderer_test_exe = executable(
   install: false,
 )
 
-test('Renderer tests', renderer_test_exe)
+test('Diff tests', diff_test_exe)
