@@ -5,6 +5,7 @@
 #include "ecs/world.hpp"
 #include <algorithm>
 #include <iterator>
+#include <tuple>
 #include <vector>
 
 namespace ecs {
@@ -60,7 +61,7 @@ public:
         using iterator_category = std::forward_iterator_tag;
         using iterator_concept = std::forward_iterator_tag;
         using difference_type = std::ptrdiff_t;
-        using value_type = std::tuple<Entity, Components...>;
+        using value_type = std::tuple<Entity, Components&...>;
 
         Iterator() = default;
 
@@ -76,7 +77,7 @@ public:
 
         value_type operator*() const {
             Entity entity = (*archetype_it_)->get_entities()[entity_idx_];
-            return std::make_tuple(
+            return std::forward_as_tuple(
                 entity,
                 (*archetype_it_)->template get_component<Components>(entity_idx_)...
             );
