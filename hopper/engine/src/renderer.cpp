@@ -11,8 +11,8 @@ Renderer::Renderer(std::uint32_t w, std::uint32_t h, std::unique_ptr<Presenter> 
     viewport_width_(w),
     viewport_height_(h),
     presenter_(std::move(presenter)),
-    front_buffer_(buffer_registry.create_buffer<CharacterPixel>(w, h)),
-    back_buffer_(buffer_registry.create_buffer<CharacterPixel>(w, h)),
+    front_buffer_handle_(buffer_registry.create_buffer<CharacterPixel>(w, h)),
+    back_buffer_handle_(buffer_registry.create_buffer<CharacterPixel>(w, h)),
     mask_buffer_(buffer_registry.create_buffer<bool>(w, h)) {
     presenter_->init();
 }
@@ -22,7 +22,7 @@ Renderer::~Renderer() {
 }
 
 BufferHandle<CharacterPixel> Renderer::render_target_handle() const {
-    return front_buffer_;
+    return front_buffer_handle_;
 }
 
 BufferHandle<bool> Renderer::mask_buffer_handle() const {
@@ -34,13 +34,16 @@ void Renderer::submit(std::unique_ptr<RenderCommand> command) {
 }
 
 void Renderer::present() {
-    auto* front = buffer_registry.get_buffer(front_buffer_);
-    auto* back = buffer_registry.get_buffer(back_buffer_);
+    auto* front = buffer_registry.get_buffer(front_buffer_handle_);
+    auto* back = buffer_registry.get_buffer(back_buffer_handle_);
     presenter_->present(*front, *back);
 }
 
 void Renderer::swap_buffers() {
-    std::swap(front_buffer_, back_buffer_);
+    auto* front = buffer_registry.get_buffer(front_buffer_handle_);
+    auto* back = buffer_registry.get_buffer(back_buffer_handle_);
+
+    std::swap(front->data(), back->data());
 }
 
 void Renderer::render_frame() {

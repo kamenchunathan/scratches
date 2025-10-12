@@ -16,12 +16,16 @@ public:
         buf_.resize(width_ * height_);
     };
 
-    void update_buffer(const std::vector<PixelType>& new_buffer) {
+    void update_buffer(std::vector<PixelType> new_buffer) {
         // TODO: Add assertion for size
-        buf_ = new_buffer;
+        buf_ = std::move(new_buffer);
     }
 
     const std::vector<PixelType>& data() const {
+        return buf_;
+    }
+
+    std::vector<PixelType>& data() {
         return buf_;
     }
 

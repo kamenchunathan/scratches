@@ -38,8 +38,8 @@ private:
     std::uint32_t viewport_width_, viewport_height_;
     std::unique_ptr<Presenter> presenter_;
 
-    BufferHandle<CharacterPixel> front_buffer_;
-    BufferHandle<CharacterPixel> back_buffer_;
+    BufferHandle<CharacterPixel> front_buffer_handle_;
+    BufferHandle<CharacterPixel> back_buffer_handle_;
     BufferHandle<bool> mask_buffer_;
 
     std::unordered_map<std::string, std::vector<std::unique_ptr<RenderCommand>>> command_queues_;

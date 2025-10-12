@@ -1,5 +1,8 @@
 #include <cmath>
+#include <format>
+#include <iterator>
 #include <memory>
+#include <string_view>
 #include <vector>
 
 #include "application.hpp"
@@ -21,6 +24,15 @@ struct Transform {
     float x = 0.0f;
     float y = 0.0f;
     float rotation = 0.0f;
+};
+
+template<>
+struct std::formatter<Transform>: public std::formatter<std::string_view> {
+    auto format(const Transform& t, std::format_context& ctx) const {
+        std::string tmp;
+        std::format_to(std::back_inserter(tmp), "Transform {} {}", t.x, t.y);
+        return std::formatter<std::string_view>::format(tmp, ctx);
+    }
 };
 
 struct Triangle {
@@ -195,10 +207,12 @@ public:
 
         // Register shader for first pass only
         auto color_shader = std::make_unique<ColorShader>();
-        renderer->register_pipeline(std::make_unique<ColorPipeline>(
-            renderer::PipelineDescriptor {},
-            std::move(color_shader)
-        ));
+        renderer->register_pipeline(
+            std::make_unique<ColorPipeline>(
+                renderer::PipelineDescriptor {},
+                std::move(color_shader)
+            )
+        );
 
         // Create buffers
         auto color_buffer =
@@ -313,11 +327,13 @@ void render_system(ecs::World& world) {
 
         // Submit render commands
         // First pass: render triangle to color buffer
-        (*renderer)->submit(std::make_unique<ColorPassCommand>(
-            vertex_buffer_res->handle,
-            color_buffer_res->handle,
-            vertices.size()
-        ));
+        (*renderer)->submit(
+            std::make_unique<ColorPassCommand>(
+                vertex_buffer_res->handle,
+                color_buffer_res->handle,
+                vertices.size()
+            )
+        );
 
         // Second pass: convert color buffer to character pixels
         (*renderer)->submit(
@@ -331,11 +347,12 @@ void render_system(ecs::World& world) {
 int main() {
     core::Application app;
 
-    // Add layers
-
     app.add_layer(core::input::InputLayer {});
-    TerminalLayer term_layer {.frame_rate = 60, .terminal = std::make_unique<Terminal>()};
+    TerminalLayer term_layer {.frame_rate = 10, .terminal = std::make_unique<Terminal>()};
     app.world.insert_resource<TerminalLayer*>(&term_layer);
+    // NOTE: Workaround to allow the input system to send, the should_exist flag on the
+    // application. Other fixes include writing an event system and using a resource,
+    // will remove if I decide to do an event bus
     app.world.insert_resource<core::Application*>(&app);
     app.add_layer(term_layer);
     app.add_layer(RendererLayer {});
