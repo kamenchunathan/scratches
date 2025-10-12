@@ -1,7 +1,6 @@
 #pragma once
 
 #include <cstdint>
-#include <expected>
 #include <iostream>
 
 #include "color.hpp"
@@ -179,6 +178,24 @@ namespace cursor {
     }
 
 } // namespace cursor
+
+namespace edit {
+    inline void insert_char(std::ostream& os, int n = 1) {
+        os << "\x1b[" << n << '@';
+    }
+
+    inline void delete_char(std::ostream& os, int n = 1) {
+        os << "\x1b[" << n << 'P';
+    }
+
+    inline void insert_line(std::ostream& os, int n = 1) {
+        os << "\x1b[" << n << 'L';
+    }
+
+    inline void delete_line(std::ostream& os, int n = 1) {
+        os << "\x1b[" << n << 'M';
+    }
+} // namespace edit
 
 inline void enter_alternate_screen(std::ostream& os) {
     os << "\x1b[?1049h";
