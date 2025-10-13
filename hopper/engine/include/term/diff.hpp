@@ -1,13 +1,15 @@
 #include <cassert>
 #include <cstddef>
 #include <format>
+#include <print>
 #include <utility>
+#include <variant>
 #include <vector>
 
 /* Structures for the Myer's linear space diff implementation
  */
 struct Point {
-    std::int32_t x, y;
+    std::uint32_t x, y;
 
     bool operator==(const Point& other) const = default;
 };
@@ -30,7 +32,7 @@ struct Box {
         assert(from.x >= 0 && from.y >= 0 && to.x >= from.x && to.y >= from.y);
     }
 
-    Box(std::int32_t x1, std::int32_t y1, std::int32_t x2, std::int32_t y2):
+    Box(std::uint32_t x1, std::uint32_t y1, std::uint32_t x2, std::uint32_t y2):
         from({x1, y1}),
         to({x2, y2}) {
         assert(x1 >= 0 && y1 >= 0 && x2 >= x1 && y2 >= y1);
@@ -240,4 +242,115 @@ Snake MyersDiff<T>::find_middle_snake(const Box& box) {
     }
 
     std::unreachable();
+}
+
+template<typename T>
+struct Insert {
+    T value;
+
+    bool operator==(const Insert& other) const = default;
+};
+
+struct Delete {
+    bool operator==(const Delete& other) const = default;
+};
+
+struct Match {
+    bool operator==(const Match& other) const = default;
+};
+
+template<typename T>
+using Edit = std::variant<Insert<T>, Match, Delete>;
+
+template<typename T>
+using EditSequence = std::vector<Edit<T>>;
+
+template<typename T>
+[[nodiscard]] std::uint32_t get_position(const Edit<T>& edit) {
+    return std::visit([](const auto& e) { return e.pos; }, edit);
+}
+
+template<typename T>
+[[nodiscard]] bool is_insert(const Edit<T>& edit) {
+    return std::holds_alternative<Insert<T>>(edit);
+}
+
+template<typename T>
+[[nodiscard]] bool is_delete(const Edit<T>& edit) {
+    return std::holds_alternative<Delete>(edit);
+}
+
+template<typename T>
+[[nodiscard]] bool is_match(const Edit<T>& edit) {
+    return std::holds_alternative<Match>(edit);
+}
+
+template<typename T>
+struct std::formatter<Edit<T>> {
+    constexpr auto parse(std::format_parse_context& ctx) {
+        return ctx.begin();
+    }
+
+    auto format(const Edit<T>& edit, std::format_context& ctx) const {
+        return std::visit(
+            [&ctx](const auto& e) {
+                using EditType = std::decay_t<decltype(e)>;
+                if constexpr (std::is_same_v<EditType, Delete>) {
+                    return std::format_to(ctx.out(), "Delete");
+                } else if constexpr (std::is_same_v<EditType, Match>) {
+                    return std::format_to(ctx.out(), "Match");
+                } else {
+                    return std::format_to(ctx.out(), "Insert({})", e.value);
+                }
+            },
+            edit
+        );
+    }
+};
+
+/* Build edit sequence from Myers diff trace: deletions, then insertions before
+ * any sequence of matches. This maintains our invariant that the total length of
+ * a line is always less than or equal to avoid issues due to shifting
+ */
+template<typename T>
+EditSequence<T> build_edit_sequence(
+    const std::vector<T>& source,
+    const std::vector<T>& target,
+    const std::vector<Snake>& trace
+) {
+    EditSequence<T> edits;
+
+    std::uint32_t src_idx = 0;
+    std::uint32_t tgt_idx = 0;
+
+    for (const auto& snake: trace) {
+        while (src_idx < snake.from.x) {
+            edits.push_back(Delete {});
+            src_idx++;
+        }
+
+        while (tgt_idx < snake.from.y) {
+            edits.push_back(Insert<T> {.value = target[tgt_idx]});
+            tgt_idx++;
+        }
+
+        while (src_idx < snake.to.x && tgt_idx < snake.to.y) {
+            edits.push_back(Match {});
+            src_idx++;
+            tgt_idx++;
+        }
+    }
+
+    // Deletions and Insertions after the last snake
+    while (src_idx < source.size()) {
+        edits.push_back(Delete {});
+        src_idx++;
+    }
+
+    while (tgt_idx < target.size()) {
+        edits.push_back(Insert<T> {.value = target[tgt_idx]});
+        tgt_idx++;
+    }
+
+    return edits;
 }

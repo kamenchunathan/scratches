@@ -207,12 +207,10 @@ public:
 
         // Register shader for first pass only
         auto color_shader = std::make_unique<ColorShader>();
-        renderer->register_pipeline(
-            std::make_unique<ColorPipeline>(
-                renderer::PipelineDescriptor {},
-                std::move(color_shader)
-            )
-        );
+        renderer->register_pipeline(std::make_unique<ColorPipeline>(
+            renderer::PipelineDescriptor {},
+            std::move(color_shader)
+        ));
 
         // Create buffers
         auto color_buffer =
@@ -327,13 +325,11 @@ void render_system(ecs::World& world) {
 
         // Submit render commands
         // First pass: render triangle to color buffer
-        (*renderer)->submit(
-            std::make_unique<ColorPassCommand>(
-                vertex_buffer_res->handle,
-                color_buffer_res->handle,
-                vertices.size()
-            )
-        );
+        (*renderer)->submit(std::make_unique<ColorPassCommand>(
+            vertex_buffer_res->handle,
+            color_buffer_res->handle,
+            vertices.size()
+        ));
 
         // Second pass: convert color buffer to character pixels
         (*renderer)->submit(
@@ -348,7 +344,7 @@ int main() {
     core::Application app;
 
     app.add_layer(core::input::InputLayer {});
-    TerminalLayer term_layer {.frame_rate = 10, .terminal = std::make_unique<Terminal>()};
+    TerminalLayer term_layer {.frame_rate = 60, .terminal = std::make_unique<Terminal>()};
     app.world.insert_resource<TerminalLayer*>(&term_layer);
     // NOTE: Workaround to allow the input system to send, the should_exist flag on the
     // application. Other fixes include writing an event system and using a resource,
