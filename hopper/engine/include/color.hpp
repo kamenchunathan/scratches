@@ -2,6 +2,8 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <format>
+#include <iostream>
 
 namespace core {
 
@@ -177,3 +179,50 @@ inline const ColorRGBA32F ColorRGBA32F::CYAN = {0.0f, 1.0f, 1.0f, 1.0f};
 inline const ColorRGBA32F ColorRGBA32F::TRANSPARENT = {0.0f, 0.0f, 0.0f, 0.0f};
 
 } // namespace core
+
+template<>
+struct std::formatter<core::ColorRGB8> {
+    constexpr auto parse(std::format_parse_context& ctx) {
+        return ctx.begin();
+    }
+
+    auto format(const core::ColorRGB8& color, std::format_context& ctx) const {
+        return std::format_to(ctx.out(), "ColorRGB8({}, {}, {})", color.r, color.g, color.b);
+    }
+};
+
+template<>
+struct std::formatter<core::ColorRGBA8> {
+    constexpr auto parse(std::format_parse_context& ctx) {
+        return ctx.begin();
+    }
+
+    auto format(const core::ColorRGBA8& color, std::format_context& ctx) const {
+        return std::format_to(
+            ctx.out(),
+            "ColorRGBA8({}, {}, {}, {})",
+            color.r,
+            color.g,
+            color.b,
+            color.a
+        );
+    }
+};
+
+template<>
+struct std::formatter<core::ColorRGBA32F> {
+    constexpr auto parse(std::format_parse_context& ctx) {
+        return ctx.begin();
+    }
+
+    auto format(const core::ColorRGBA32F& color, std::format_context& ctx) const {
+        return std::format_to(
+            ctx.out(),
+            "ColorRGBA32F({}, {}, {}, {})",
+            color.r,
+            color.g,
+            color.b,
+            color.a
+        );
+    }
+};
