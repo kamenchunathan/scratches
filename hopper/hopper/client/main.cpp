@@ -26,13 +26,13 @@ struct VOut {
 
 class SimpleShader: public renderer::Shader<ColorVertex, VOut, renderer::CharacterPixel> {
 public:
-    VOut vertex(const ColorVertex& v, const renderer::ShaderResourcePack<>&) override {
+    VOut vertex(const ColorVertex& v) override {
         Eigen::Vector4f clip_pos(v.x, v.y, 0.0f, 1.0f);
         return {clip_pos, v.character_color};
     }
 
     renderer::CharacterPixel
-    fragment(const VOut& v, const renderer::ShaderResourcePack<>&) override {
+    fragment(const VOut& v) override {
         return renderer::CharacterPixel {
             .codepoint = U'█',
             .fg_color = v.color,

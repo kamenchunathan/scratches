@@ -71,8 +71,7 @@ void RenderPassEncoder::draw(
 
     FrameBuffer<VertexIn>* vb = buffer_registry_.get_buffer(vertex_buffer_handle);
     FrameBuffer<FragOut>* out_buffer = buffer_registry_.get_buffer(output_buffer_handle);
-    ShaderResourcePack<RequiredResources...> resources =
-        resource_registry_.extract<RequiredResources...>();
+    auto resources = resource_registry_.extract<RequiredResources...>();
 
     std::vector<VertexIn> vertex_data = vb->data();
     if (first_vertex >= vertex_data.size()) {
@@ -87,7 +86,12 @@ void RenderPassEncoder::draw(
     v_out.reserve(actual_vertex_count);
 
     for (std::size_t i = 0; i < actual_vertex_count; ++i) {
-        v_out.push_back(pipeline->shader->vertex(vertex_data[first_vertex + i], resources));
+        v_out.push_back(std::apply(
+            [&](auto&&... args) {
+                return pipeline->shader->vertex(vertex_data[first_vertex + i], args...);
+            },
+            resources
+        ));
     }
 
     const std::uint32_t imageWidth = out_buffer->width();
@@ -209,8 +213,12 @@ void RenderPassEncoder::draw(
                             detail::construct_from_tuple<VertexOut>(std::move(interpolated_tuple));
 
                         z_buffer[y * imageWidth + x] = z_interpolated;
-                        new_frame_buffer_data[y * imageWidth + x] =
-                            pipeline->shader->fragment(interpolated_v, resources);
+                        new_frame_buffer_data[y * imageWidth + x] = std::apply(
+                            [&](auto&&... args) {
+                                return pipeline->shader->fragment(interpolated_v, args...);
+                            },
+                            resources
+                        );
                     }
                 }
             }

@@ -41,6 +41,13 @@ executable(
 )
 
 executable(
+  'sprite',
+  'sprite.cpp',
+  install: false,
+  dependencies: [engine_dep],
+)
+
+executable(
   'edit_seq',
   'edit_seq.cpp',
   install: false,
