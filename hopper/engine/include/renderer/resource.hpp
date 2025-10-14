@@ -6,10 +6,17 @@
 #include <unordered_map>
 #include <utility>
 
+#include "renderer/texture.hpp"
+
 namespace renderer {
 
-
-
+/* Wrapper type to specify tags and allow multiple texture2Ds to exist in resources
+ * TODO: Return type in binding directly rather than the binding struct in the shader
+ */
+template<typename PixelType, typename Tag>
+struct Binding {
+    Texture2D<PixelType> inner;
+};
 
 class ShaderResourceRegistry {
 public:
@@ -22,6 +29,7 @@ public:
     void unbind() {
         resources_.erase(std::type_index(typeid(T)));
     }
+
     template<typename T>
     T* get() {
         auto it = resources_.find(std::type_index(typeid(T)));
@@ -44,6 +52,9 @@ public:
 
     template<typename... RequiredResources>
     auto extract() const {
+        // NOTE: Get returns a possibly null pointer but we cast it to a reference
+        // This looks like a problem.
+        // Perhaps replace it with an optional type if not bound
         return std::make_tuple(*get<RequiredResources>()...);
     }
 
