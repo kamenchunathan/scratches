@@ -7,6 +7,7 @@ engine_sources = [
   'src/ecs/archetype.cpp',
   'src/ecs/world.cpp',
   'src/renderer/graph.cpp',
+  'src/renderer/sprite.cpp',
   'src/term/layer.cpp',
   'src/term/presenter.cpp',
   'src/term/input_parser.cpp',
@@ -21,6 +22,7 @@ engine_lib = static_library(
   dependencies: [
     dependency('asio', version: '>=1.30'),
     dependency('eigen3', version: '>=-3.4'),
+    dependency('libpng', static: true),
   ],
 )
 
@@ -29,6 +31,7 @@ engine_dep = declare_dependency(
   link_with: engine_lib,
   dependencies: [
     dependency('eigen3', version: '>=3.4'),
+    dependency('libpng', static: true),
   ],
 )
 
