@@ -215,14 +215,15 @@ void TerminalPresenter::present(
     const renderer::FrameBuffer<renderer::CharacterPixel>& front_buffer,
     const renderer::FrameBuffer<renderer::CharacterPixel>& back_buffer
 ) {
-    const auto& front_buffer_data = front_buffer.data();
-    const auto& back_buffer_data = back_buffer.data();
-    const auto width = front_buffer.width();
-    const auto height = front_buffer.height();
+    // const auto& front_buffer_data = front_buffer.data();
+    // const auto& back_buffer_data = back_buffer.data();
+    // const auto width = front_buffer.width();
+    // const auto height = front_buffer.height();
 
     // The diffed rendering is artefacted and my be slower than rendering full frames
     // so it's not turned on for now
     // render_diff(front_buffer_data, back_buffer_data, width, height);
+    // TODO: Set the render backend used as an option definable by arguments
     render_full_frame(front_buffer);
     flush();
 }
