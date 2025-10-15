@@ -97,7 +97,7 @@ void RenderPassEncoder::draw(
     const std::uint32_t imageWidth = out_buffer->width();
     const std::uint32_t imageHeight = out_buffer->height();
 
-    std::vector<FragOut> new_frame_buffer_data(imageWidth * imageHeight);
+    std::vector<FragOut>& new_frame_buffer_data = out_buffer->data();
     std::vector<float> z_buffer(imageWidth * imageHeight, std::numeric_limits<float>::infinity());
 
     for (std::size_t i = 0; i < v_out.size(); i += 3) {
@@ -225,7 +225,7 @@ void RenderPassEncoder::draw(
         }
     }
 
-    out_buffer->update_buffer(new_frame_buffer_data);
+
 }
 
 } // namespace renderer
