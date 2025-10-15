@@ -53,6 +53,7 @@ void Renderer::render_frame() {
         auto it = command_queues_.find(pass->name());
         if (it == command_queues_.end()) {
             std::println("Command submitted with a target renderpass that is not set up");
+            continue;
         }
         std::vector<std::unique_ptr<renderer::RenderCommand>>& commands = it->second;
         for (std::size_t i = 0; i < commands.size(); ++i) {
