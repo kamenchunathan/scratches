@@ -44,7 +44,9 @@ executable(
   'sprite',
   'sprite.cpp',
   install: false,
-  dependencies: [engine_dep],
+  dependencies: [
+    engine_dep,
+  ],
 )
 
 executable(

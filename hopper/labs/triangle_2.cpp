@@ -108,9 +108,9 @@ private:
 };
 
 // Second pass command - directly converts float buffer to character pixels
-class PixelConversionCommand: public renderer::RenderCommand {
+class HalfBlockCommand: public renderer::RenderCommand {
 public:
-    PixelConversionCommand(renderer::BufferRegistry* buffer_registry, ecs::World* world):
+    HalfBlockCommand(renderer::BufferRegistry* buffer_registry, ecs::World* world):
         buffer_registry_(buffer_registry),
         world_(world) {}
 
@@ -333,7 +333,7 @@ void render_system(ecs::World& world) {
 
         // Second pass: convert color buffer to character pixels
         (*renderer)->submit(
-            std::make_unique<PixelConversionCommand>(&(*renderer)->buffer_registry, &world)
+            std::make_unique<HalfBlockCommand>(&(*renderer)->buffer_registry, &world)
         );
     }
 
