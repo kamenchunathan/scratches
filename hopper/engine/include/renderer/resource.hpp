@@ -20,9 +20,9 @@ struct Binding {
 
 class ShaderResourceRegistry {
 public:
-    template<typename T, typename Args>
-    void bind(Args&& args) {
-        resources_[std::type_index(typeid(T))] = std::make_unique<T>(std::forward<Args>(args));
+    template<typename T, typename... Args>
+    void bind(Args&&... args) {
+        resources_[std::type_index(typeid(T))] = std::make_shared<T>(std::forward<Args>(args)...);
     }
 
     template<typename T>
@@ -36,8 +36,10 @@ public:
         if (it == resources_.end()) {
             return nullptr;
         }
-        auto* ptr = std::any_cast<std::unique_ptr<T>>(&it->second);
-        return ptr ? ptr->get() : nullptr;
+        if (auto* ptr = std::any_cast<std::shared_ptr<T>>(&it->second)) {
+            return ptr->get();
+        }
+        return nullptr;
     }
 
     template<typename T>
@@ -46,8 +48,10 @@ public:
         if (it == resources_.end()) {
             return nullptr;
         }
-        const auto* ptr = std::any_cast<std::unique_ptr<T>>(&it->second);
-        return ptr ? ptr->get() : nullptr;
+        if (const auto* ptr = std::any_cast<std::shared_ptr<T>>(&it->second)) {
+            return ptr->get();
+        }
+        return nullptr;
     }
 
     template<typename... RequiredResources>
@@ -59,7 +63,7 @@ public:
     }
 
 private:
-    std::unordered_map<std::type_index, std::unique_ptr<std::any>> resources_;
+    std::unordered_map<std::type_index, std::any> resources_;
 };
 
 } // namespace renderer
