@@ -1,21 +1,45 @@
-#pragma once
+#include "renderer/texture.hpp"
+#include "color.hpp"
 
 #include <csetjmp>
-#include <cstdint>
-#include <cstdio>
 #include <memory>
 #include <optional>
-#include <string>
-#include <vector>
-
 #include <png.h>
-
-#include "color.hpp"
-#include "renderer/sprite.hpp"
+#include <vector>
 
 namespace renderer {
 
-std::optional<Sprite> load_png(const std::string& path) {
+class PngReader {
+public:
+    png_structp png_ptr = nullptr;
+    png_infop info_ptr = nullptr;
+
+    PngReader() {
+        png_ptr = png_create_read_struct(PNG_LIBPNG_VER_STRING, nullptr, nullptr, nullptr);
+        if (png_ptr) {
+            info_ptr = png_create_info_struct(png_ptr);
+        }
+    }
+
+    ~PngReader() {
+        if (png_ptr) {
+            png_destroy_read_struct(&png_ptr, &info_ptr, nullptr);
+        }
+    }
+
+    PngReader(const PngReader&) = delete;
+    PngReader& operator=(const PngReader&) = delete;
+    PngReader(PngReader&&) = delete;
+    PngReader& operator=(PngReader&&) = delete;
+
+    operator bool() const {
+        return png_ptr && info_ptr;
+    }
+};
+
+template<>
+std::optional<Texture2D<core::ColorRGBA8>>
+Texture2D<core::ColorRGBA8>::load_png(const std::string& path) {
     auto file_closer = [](FILE* f) {
         if (f)
             fclose(f);
@@ -31,7 +55,6 @@ std::optional<Sprite> load_png(const std::string& path) {
         return std::nullopt;
     }
 
-    // libpng uses setjmp/longjmp for error handling.
     if (setjmp(png_jmpbuf(reader.png_ptr))) {
         return std::nullopt;
     }
@@ -59,13 +82,10 @@ std::optional<Sprite> load_png(const std::string& path) {
 
     png_read_update_info(reader.png_ptr, reader.info_ptr);
 
-    Sprite sprite;
-    sprite.width = width;
-    sprite.height = height;
-    std::vector<std::uint8_t> raw_data(width * height * 4);
-    sprite.data.resize(width * height);
-
+    std::vector<core::ColorRGBA8> texture_data(width * height);
     std::vector<png_bytep> row_pointers(height);
+    std::vector<uint8_t> raw_data(width * height * 4);
+
     for (std::size_t y = 0; y < height; ++y) {
         row_pointers[y] = raw_data.data() + (y * width * 4);
     }
@@ -73,16 +93,16 @@ std::optional<Sprite> load_png(const std::string& path) {
     png_read_image(reader.png_ptr, row_pointers.data());
 
     for (std::size_t i = 0; i < width * height; ++i) {
-        std::size_t raw_idx = i * 4;
-        sprite.data[i] = core::ColorRGBA8::rgba(
-            raw_data[raw_idx],
-            raw_data[raw_idx + 1],
-            raw_data[raw_idx + 2],
-            raw_data[raw_idx + 3]
-        );
+        texture_data[i].r = raw_data[i * 4 + 0];
+        texture_data[i].g = raw_data[i * 4 + 1];
+        texture_data[i].b = raw_data[i * 4 + 2];
+        texture_data[i].a = raw_data[i * 4 + 3];
     }
 
-    return sprite;
+    return Texture2D<core::ColorRGBA8>(width, height, std::move(texture_data));
 }
+
+// Explicit instantiation for the linker
+template class Texture2D<core::ColorRGBA8>;
 
 } // namespace renderer
