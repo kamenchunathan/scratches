@@ -5,6 +5,7 @@
 #include <memory>
 #include <unordered_map>
 
+#include "renderer/buffer.hpp"
 #include "renderer/command.hpp"
 #include "renderer/graph.hpp"
 #include "renderer/present.hpp"
@@ -23,6 +24,34 @@ public:
 
     Renderer(std::uint32_t w, std::uint32_t h, std::unique_ptr<Presenter>);
     ~Renderer();
+
+    void render_frame();
+
+    Framebuffer<Attachment<CharacterPixel>> render_target() const;
+
+private:
+    std::uint32_t viewport_width_, viewport_height_;
+    std::unique_ptr<Presenter> presenter_;
+
+    Framebuffer<Attachment<CharacterPixel>> front_buffer_;
+    Framebuffer<Attachment<CharacterPixel>> back_buffer_;
+
+    std::unordered_map<std::string, std::vector<std::unique_ptr<RenderCommand>>> command_queues_;
+
+    void present();
+    void swap_buffers();
+};
+
+class RendererPrev {
+public:
+    // TODO: for testing
+    PipelineRegistry pipeline_registry;
+    BufferRegistry buffer_registry;
+    ShaderResourceRegistry resource_registry;
+    RenderGraph render_graph;
+
+    RendererPrev(std::uint32_t w, std::uint32_t h, std::unique_ptr<Presenter>);
+    ~RendererPrev();
 
     template<typename Pipeline>
     void register_pipeline(std::unique_ptr<Pipeline> pipeline);
@@ -49,7 +78,7 @@ private:
 };
 
 template<typename Pipeline>
-void Renderer::register_pipeline(std::unique_ptr<Pipeline> pipeline) {
+void RendererPrev::register_pipeline(std::unique_ptr<Pipeline> pipeline) {
     pipeline_registry.register_pipeline(std::move(pipeline));
 }
 

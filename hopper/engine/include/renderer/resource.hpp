@@ -10,6 +10,45 @@
 
 namespace renderer {
 
+template<typename, typename Tag>
+struct ResourceId {
+private:
+    ResourceId(std::uint32_t index, std::uint32_t generation):
+        index_(index),
+        generation_(generation) {}
+
+    std::uint32_t index_;
+    std::uint32_t generation_;
+};
+
+struct BuffferTag {};
+struct PipelineTag {};
+struct TextureTag {};
+
+class ResourceManager {
+public:
+    template<typename T>
+    ResourceId<T, BuffferTag> create_buffer(T&& resource);
+
+    template<typename T>
+    ResourceId<T, PipelineTag> create_pipeline(T&& resource);
+
+    // template<typename T>
+    // ResourceId<T> create(T&& resource);
+
+    // template<typename T>
+    // void destroy(ResourceId<T> id);
+    //
+    // template<typename T>
+    // bool is_valid(ResourceId<T> id) const;
+    //
+    // template<typename T>
+    // T& get(ResourceId<T> id);
+
+private:
+    // Internal registries for textures, buffers, etc.
+};
+
 /* Wrapper type to specify tags and allow multiple texture2Ds to exist in resources
  * TODO: Return type in binding directly rather than the binding struct in the shader
  */

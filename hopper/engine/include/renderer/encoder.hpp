@@ -12,12 +12,30 @@
 
 namespace renderer {
 
-class RenderPassEncoder {
+template<typename Pipeline, typename... Attachments>
+    requires FragOutMatchesAttachments<typename Pipeline::frag_out, Attachments...>
+struct DrawDescriptor {
+    Framebuffer<Attachments...> target;
+    BufferHandle<typename Pipeline::vertex_in> vertices;
+    std::uint32_t vertex_count;
+    std::uint32_t first_vertex = 0;
+};
+
+class RenderPassEncoderPrev {
 public:
     template<typename VertexIn, typename VertexOut, typename FragOut, typename... RequiredResources>
-    void draw(
+    void draw_prev(
         BufferHandle<VertexIn> vertex_buf_handle,
         BufferHandle<FragOut> output_buffer_handle,
+        std::uint32_t vertex_count,
+        std::uint32_t first_vertex = 0
+    );
+
+    template<typename Pipeline, typename... Attachments>
+        requires FragOutMatchesAttachments<typename Pipeline::frag_out, Attachments...>
+    void draw(
+        Framebuffer<Attachments...> target,
+        BufferHandle<typename Pipeline::vertex_in> vertices,
         std::uint32_t vertex_count,
         std::uint32_t first_vertex = 0
     );
@@ -29,9 +47,9 @@ public:
     );
 
 private:
-    friend class Renderer;
+    friend class RendererPrev;
 
-    RenderPassEncoder(
+    RenderPassEncoderPrev(
         PipelineRegistry& pipeline_registry,
         BufferRegistry& buffer_registry,
         ShaderResourceRegistry& resource_registry
@@ -54,23 +72,23 @@ edge_function(const Eigen::Vector2f& a, const Eigen::Vector2f& b, const Eigen::V
 }
 
 template<typename VertexIn, typename VertexOut, typename FragOut, typename... RequiredResources>
-void RenderPassEncoder::draw(
+void RenderPassEncoderPrev::draw_prev(
     BufferHandle<VertexIn> vertex_buffer_handle,
     BufferHandle<FragOut> output_buffer_handle,
     std::uint32_t vertex_count,
     std::uint32_t first_vertex
 ) {
     // TODO: Better error handling
-    Pipeline<VertexIn, VertexOut, FragOut, RequiredResources...>* pipeline =
+    PipelinePrev<VertexIn, VertexOut, FragOut, RequiredResources...>* pipeline =
         pipeline_registry_
-            .get_pipeline<Pipeline<VertexIn, VertexOut, FragOut, RequiredResources...>>();
+            .get_pipeline<PipelinePrev<VertexIn, VertexOut, FragOut, RequiredResources...>>();
 
     if (!pipeline) {
         return;
     }
 
-    FrameBuffer<VertexIn>* vb = buffer_registry_.get_buffer(vertex_buffer_handle);
-    FrameBuffer<FragOut>* out_buffer = buffer_registry_.get_buffer(output_buffer_handle);
+    FrameBufferPrev<VertexIn>* vb = buffer_registry_.get_buffer(vertex_buffer_handle);
+    FrameBufferPrev<FragOut>* out_buffer = buffer_registry_.get_buffer(output_buffer_handle);
     auto resources = resource_registry_.extract<RequiredResources...>();
 
     std::vector<VertexIn> vertex_data = vb->data();
@@ -86,12 +104,14 @@ void RenderPassEncoder::draw(
     v_out.reserve(actual_vertex_count);
 
     for (std::size_t i = 0; i < actual_vertex_count; ++i) {
-        v_out.push_back(std::apply(
-            [&](auto&&... args) {
-                return pipeline->shader->vertex(vertex_data[first_vertex + i], args...);
-            },
-            resources
-        ));
+        v_out.push_back(
+            std::apply(
+                [&](auto&&... args) {
+                    return pipeline->shader->vertex(vertex_data[first_vertex + i], args...);
+                },
+                resources
+            )
+        );
     }
 
     const std::uint32_t imageWidth = out_buffer->width();
@@ -224,8 +244,6 @@ void RenderPassEncoder::draw(
             }
         }
     }
-
-
 }
 
 } // namespace renderer

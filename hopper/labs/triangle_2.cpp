@@ -53,7 +53,7 @@ struct VOut {
 };
 
 // First pass shader - renders to float color buffer
-class ColorShader: public renderer::Shader<ColorVertex, VOut, core::ColorRGBA32F> {
+class ColorShader: public renderer::ShaderPrev<ColorVertex, VOut, core::ColorRGBA32F> {
 public:
     VOut vertex(const ColorVertex& v) override {
         Eigen::Vector4f clip_pos(v.x, v.y, 0.0f, 1.0f);
@@ -79,7 +79,7 @@ struct CharacterBufferResource {
 };
 
 // Pipeline definition for first pass only
-using ColorPipeline = renderer::Pipeline<ColorVertex, VOut, core::ColorRGBA32F>;
+using ColorPipeline = renderer::PipelinePrev<ColorVertex, VOut, core::ColorRGBA32F>;
 
 // Render commands
 class ColorPassCommand: public renderer::RenderCommand {
@@ -97,8 +97,8 @@ public:
         return "color_pass";
     }
 
-    void execute(renderer::RenderPassEncoder& encoder) override {
-        encoder.draw<ColorVertex, VOut, core::ColorRGBA32F>(vb_, ob_, count_, 0);
+    void execute(renderer::RenderPassEncoderPrev& encoder) override {
+        encoder.draw_prev<ColorVertex, VOut, core::ColorRGBA32F>(vb_, ob_, count_, 0);
     }
 
 private:
@@ -118,7 +118,7 @@ public:
         return "pixel_pass";
     }
 
-    void execute(renderer::RenderPassEncoder&) override {
+    void execute(renderer::RenderPassEncoderPrev&) override {
         // Get buffer handles from ECS resources
         auto* color_buffer_res = world_->get_resource<ColorBufferResource>();
         auto* char_buffer_res = world_->get_resource<CharacterBufferResource>();
@@ -199,7 +199,7 @@ public:
         if (!term_layer_ptr || !*term_layer_ptr)
             return;
 
-        auto renderer = std::make_unique<renderer::Renderer>(
+        auto renderer = std::make_unique<renderer::RendererPrev>(
             char_width,
             char_height,
             (*term_layer_ptr)->terminal->presenter()
@@ -207,10 +207,12 @@ public:
 
         // Register shader for first pass only
         auto color_shader = std::make_unique<ColorShader>();
-        renderer->register_pipeline(std::make_unique<ColorPipeline>(
-            renderer::PipelineDescriptor {},
-            std::move(color_shader)
-        ));
+        renderer->register_pipeline(
+            std::make_unique<ColorPipeline>(
+                renderer::PipelineDescriptor {},
+                std::move(color_shader)
+            )
+        );
 
         // Create buffers
         auto color_buffer =
@@ -280,7 +282,7 @@ void input_system(ecs::World& world) {
 }
 
 void render_system(ecs::World& world) {
-    auto* renderer = world.get_resource<std::unique_ptr<renderer::Renderer>>();
+    auto* renderer = world.get_resource<std::unique_ptr<renderer::RendererPrev>>();
     if (!renderer || !*renderer)
         return;
 
@@ -325,11 +327,13 @@ void render_system(ecs::World& world) {
 
         // Submit render commands
         // First pass: render triangle to color buffer
-        (*renderer)->submit(std::make_unique<ColorPassCommand>(
-            vertex_buffer_res->handle,
-            color_buffer_res->handle,
-            vertices.size()
-        ));
+        (*renderer)->submit(
+            std::make_unique<ColorPassCommand>(
+                vertex_buffer_res->handle,
+                color_buffer_res->handle,
+                vertices.size()
+            )
+        );
 
         // Second pass: convert color buffer to character pixels
         (*renderer)->submit(

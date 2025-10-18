@@ -61,7 +61,7 @@ struct DiffuseTextureTag {};
 using DiffuseTextureBinding = renderer::Binding<core::ColorRGBA8, DiffuseTextureTag>;
 
 class TextureShader:
-    public renderer::Shader<TexturedVertex, VOut, core::ColorRGBA32F, DiffuseTextureBinding> {
+    public renderer::ShaderPrev<TexturedVertex, VOut, core::ColorRGBA32F, DiffuseTextureBinding> {
 public:
     VOut vertex(const TexturedVertex& v, const DiffuseTextureBinding&) override {
         Eigen::Vector4f clip_pos(v.x, v.y, 0.0f, 1.0f);
@@ -101,7 +101,7 @@ struct CharacterBufferResource {
 
 // ------------------------------------- Pipeline definitions ----------------------------------------------
 using TexturePipeline =
-    renderer::Pipeline<TexturedVertex, VOut, core::ColorRGBA32F, DiffuseTextureBinding>;
+    renderer::PipelinePrev<TexturedVertex, VOut, core::ColorRGBA32F, DiffuseTextureBinding>;
 
 // ------------------------------------- Render Commands  ----------------------------------------------
 class ColorPassCommand: public renderer::RenderCommand {
@@ -127,13 +127,13 @@ public:
         return pass_name_;
     }
 
-    void execute(renderer::RenderPassEncoder& encoder) override {
+    void execute(renderer::RenderPassEncoderPrev& encoder) override {
         if (auto* vb = buffer_registry_->get_buffer(vb_)) {
             vb->update_buffer(vertices_);
         }
 
         resource_registry_->bind<DiffuseTextureBinding>(DiffuseTextureBinding {*texture_});
-        encoder.draw<TexturedVertex, VOut, core::ColorRGBA32F, DiffuseTextureBinding>(
+        encoder.draw_prev<TexturedVertex, VOut, core::ColorRGBA32F, DiffuseTextureBinding>(
             vb_,
             ob_,
             vertices_.size(),
@@ -166,7 +166,7 @@ public:
         return "clear_pass";
     }
 
-    void execute(renderer::RenderPassEncoder&) override {
+    void execute(renderer::RenderPassEncoderPrev&) override {
         if (auto* buffer = buffer_registry_->get_buffer(ob_)) {
             std::fill(buffer->data().begin(), buffer->data().end(), clear_color_);
         }
@@ -189,7 +189,7 @@ public:
         return "pixel_pass";
     }
 
-    void execute(renderer::RenderPassEncoder&) override {
+    void execute(renderer::RenderPassEncoderPrev&) override {
         // Get buffer handles from ECS resources
         auto* color_buffer_res = world_->get_resource<ColorBufferResource>();
         auto* char_buffer_res = world_->get_resource<CharacterBufferResource>();
@@ -263,16 +263,18 @@ public:
         if (!term_layer_ptr || !*term_layer_ptr)
             return;
 
-        auto renderer = std::make_unique<renderer::Renderer>(
+        auto renderer = std::make_unique<renderer::RendererPrev>(
             char_width,
             char_height,
             (*term_layer_ptr)->terminal->presenter()
         );
 
-        renderer->register_pipeline(std::make_unique<TexturePipeline>(
-            renderer::PipelineDescriptor {},
-            std::make_unique<TextureShader>()
-        ));
+        renderer->register_pipeline(
+            std::make_unique<TexturePipeline>(
+                renderer::PipelineDescriptor {},
+                std::make_unique<TextureShader>()
+            )
+        );
 
         auto color_buffer =
             renderer->buffer_registry.create_buffer<core::ColorRGBA32F>(pixel_width, pixel_height);
@@ -355,7 +357,7 @@ void input_system(ecs::World& world) {
 }
 
 void render_system(ecs::World& world) {
-    auto* renderer_ptr = world.get_resource<std::unique_ptr<renderer::Renderer>>();
+    auto* renderer_ptr = world.get_resource<std::unique_ptr<renderer::RendererPrev>>();
     if (!renderer_ptr || !*renderer_ptr)
         return;
     auto& renderer = **renderer_ptr;
@@ -384,15 +386,17 @@ void render_system(ecs::World& world) {
             {-1.0f, 1.0f, 0.0f, 0.0f}, // top-left
         };
 
-        renderer.submit(std::make_unique<ColorPassCommand>(
-            vertex_buffer_res->handle,
-            color_buffer_res->handle,
-            std::move(vertices),
-            "color_pass_bg",
-            &renderer.resource_registry,
-            &renderer.buffer_registry,
-            sprite.texture
-        ));
+        renderer.submit(
+            std::make_unique<ColorPassCommand>(
+                vertex_buffer_res->handle,
+                color_buffer_res->handle,
+                std::move(vertices),
+                "color_pass_bg",
+                &renderer.resource_registry,
+                &renderer.buffer_registry,
+                sprite.texture
+            )
+        );
     }
 
     // Update quad vertices based on transform
@@ -412,15 +416,17 @@ void render_system(ecs::World& world) {
             {transform.x - half_width, transform.y + half_height, 0.0f, 0.0f}, // top-left
         };
 
-        renderer.submit(std::make_unique<ColorPassCommand>(
-            vertex_buffer_res->handle,
-            color_buffer_res->handle,
-            std::move(vertices),
-            "color_pass_fg",
-            &renderer.resource_registry,
-            &renderer.buffer_registry,
-            sprite.texture
-        ));
+        renderer.submit(
+            std::make_unique<ColorPassCommand>(
+                vertex_buffer_res->handle,
+                color_buffer_res->handle,
+                std::move(vertices),
+                "color_pass_fg",
+                &renderer.resource_registry,
+                &renderer.buffer_registry,
+                sprite.texture
+            )
+        );
     }
 
     renderer.submit(std::make_unique<HalfBlockCommand>(&renderer.buffer_registry, &world));

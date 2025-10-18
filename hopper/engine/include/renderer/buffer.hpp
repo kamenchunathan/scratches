@@ -5,14 +5,36 @@
 #include <unordered_map>
 #include <vector>
 
+#include "renderer/resource.hpp"
+
 namespace renderer {
 
-// TODO: Find a way to separate buffer semantics and dimensionality from the buffer handle
+enum class LoadOp { Load, Clear, Ignore };
+
+enum class StoreOp { Store, Ignore };
+
+template<typename Format>
+struct TextureView {
+    ResourceId<Format, TextureTag> texture;
+    std::uint32_t x, y, width, height;
+};
+
+template<typename Format>
+struct Attachment {
+    TextureView<Format> view;
+    LoadOp load;
+    StoreOp store;
+};
+
+template<typename... Attachments>
+struct Framebuffer {
+    std::tuple<Attachments...> attachments;
+};
 
 template<typename PixelType>
-class FrameBuffer {
+class FrameBufferPrev {
 public:
-    FrameBuffer(std::uint32_t w, std::uint32_t h): width_(w), height_(h) {
+    FrameBufferPrev(std::uint32_t w, std::uint32_t h): width_(w), height_(h) {
         buf_.resize(width_ * height_);
     };
 
@@ -68,7 +90,7 @@ public:
     BufferHandle<PixelType> create_buffer(std::uint32_t width, std::uint32_t height);
 
     template<typename PixelType>
-    FrameBuffer<PixelType>* get_buffer(BufferHandle<PixelType> handle);
+    FrameBufferPrev<PixelType>* get_buffer(BufferHandle<PixelType> handle);
 
 private:
     std::unordered_map<std::uint32_t, std::any> buffers_;
@@ -78,17 +100,17 @@ private:
 template<typename PixelType>
 BufferHandle<PixelType> BufferRegistry::create_buffer(std::uint32_t width, std::uint32_t height) {
     std::uint32_t id = next_handle_++;
-    buffers_.emplace(id, FrameBuffer<PixelType>(width, height));
+    buffers_.emplace(id, FrameBufferPrev<PixelType>(width, height));
     return BufferHandle<PixelType>(id);
 }
 
 template<typename PixelType>
-FrameBuffer<PixelType>* BufferRegistry::get_buffer(BufferHandle<PixelType> handle) {
+FrameBufferPrev<PixelType>* BufferRegistry::get_buffer(BufferHandle<PixelType> handle) {
     auto it = buffers_.find(handle.id_);
     if (it == buffers_.end()) {
         return nullptr;
     }
-    return std::any_cast<FrameBuffer<PixelType>>(&it->second);
+    return std::any_cast<FrameBufferPrev<PixelType>>(&it->second);
 }
 
 } // namespace renderer

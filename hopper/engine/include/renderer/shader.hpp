@@ -173,15 +173,20 @@ namespace detail {
     }
 } // namespace detail
 
+template<typename FragOut, typename... Attachments>
+concept FragOutMatchesAttachments = std::is_aggregate_v<FragOut> && requires {
+    requires std::is_same_v<
+        decltype([]<typename... Fields>(std::tuple<Fields...>*) -> std::tuple<std::remove_cvref_t<Fields>...> {
+            return {};
+        }(static_cast<decltype(detail::tuple_from_aggregate(std::declval<FragOut>()))*>(nullptr))),
+        std::tuple<Attachments...>>;
+};
+
 template<typename T>
 concept Interpolatable = requires(T a, T b, float t) {
-    {
-        a + b
-    } -> std::convertible_to<T>;
+    { a + b } -> std::convertible_to<T>;
 
-    {
-        a* t
-    } -> std::convertible_to<T>;
+    { a * t } -> std::convertible_to<T>;
 };
 
 template<typename T>
@@ -193,18 +198,16 @@ concept AggregateInterpolatable = std::is_aggregate_v<T> && requires {
 
 template<typename T>
 concept HasPosition = requires(T t) {
-    {
-        t.position
-    } -> std::convertible_to<Eigen::Vector4f>;
+    { t.position } -> std::convertible_to<Eigen::Vector4f>;
 };
 
-template<typename VertexIn, typename VertexOut, typename FragOut, typename... RequiredResources>
+template<typename VertexIn, typename VertexOut, typename FragOut, typename... Uniforms>
     requires HasPosition<VertexOut> && AggregateInterpolatable<VertexOut>
-class Shader {
+class ShaderPrev {
 public:
-    virtual ~Shader() = default;
-    virtual VertexOut vertex(const VertexIn&, const RequiredResources&...) = 0;
-    virtual FragOut fragment(const VertexOut&, const RequiredResources&...) = 0;
+    virtual ~ShaderPrev() = default;
+    virtual VertexOut vertex(const VertexIn&, const Uniforms&...) = 0;
+    virtual FragOut fragment(const VertexOut&, const Uniforms&...) = 0;
 };
 
 class IPipeline {
@@ -212,15 +215,39 @@ public:
     virtual ~IPipeline() = default;
 };
 
-template<typename VertexIn, typename VertexOut, typename FragOut, typename... RequiredResources>
+template<typename VertexIn, typename VertexOut, typename FragOut, typename... Uniforms>
 class Pipeline: public IPipeline {
+public:
+    using vertex_in = VertexIn;
+    using vertex_out = VertexOut;
+    using frag_out = FragOut;
+
 public:
     Pipeline(
         PipelineDescriptor,
-        std::unique_ptr<Shader<VertexIn, VertexOut, FragOut, RequiredResources...>> shader
+        std::unique_ptr<ShaderPrev<VertexIn, VertexOut, FragOut, Uniforms...>> shader
     ):
         shader(std::move(shader)) {}
-    std::unique_ptr<Shader<VertexIn, VertexOut, FragOut, RequiredResources...>> shader;
+    std::unique_ptr<ShaderPrev<VertexIn, VertexOut, FragOut, Uniforms...>> shader;
+
+private:
+    PipelineDescriptor descriptor_;
+};
+
+template<typename VertexIn, typename VertexOut, typename FragOut, typename... Uniforms>
+class PipelinePrev: public IPipeline {
+public:
+    using vertex_in = VertexIn;
+    using vertex_out = VertexOut;
+    using frag_out = FragOut;
+
+public:
+    PipelinePrev(
+        PipelineDescriptor,
+        std::unique_ptr<ShaderPrev<VertexIn, VertexOut, FragOut, Uniforms...>> shader
+    ):
+        shader(std::move(shader)) {}
+    std::unique_ptr<ShaderPrev<VertexIn, VertexOut, FragOut, Uniforms...>> shader;
 
 private:
     PipelineDescriptor descriptor_;

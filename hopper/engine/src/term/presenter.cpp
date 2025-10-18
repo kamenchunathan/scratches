@@ -65,7 +65,7 @@ void TerminalPresenter::flush() {
 }
 
 void TerminalPresenter::render_full_frame(
-    const renderer::FrameBuffer<renderer::CharacterPixel>& buffer
+    const renderer::FrameBufferPrev<renderer::CharacterPixel>& buffer
 ) {
     auto term_size_opt = size();
     const auto term_width = term_size_opt->first;
@@ -212,8 +212,8 @@ void TerminalPresenter::render_diff(
 }
 
 void TerminalPresenter::present(
-    const renderer::FrameBuffer<renderer::CharacterPixel>& front_buffer,
-    const renderer::FrameBuffer<renderer::CharacterPixel>& back_buffer
+    const renderer::FrameBufferPrev<renderer::CharacterPixel>& front_buffer,
+    const renderer::FrameBufferPrev<renderer::CharacterPixel>& back_buffer
 ) {
     // const auto& front_buffer_data = front_buffer.data();
     // const auto& back_buffer_data = back_buffer.data();

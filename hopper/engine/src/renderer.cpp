@@ -7,7 +7,7 @@
 
 namespace renderer {
 
-Renderer::Renderer(std::uint32_t w, std::uint32_t h, std::unique_ptr<Presenter> presenter):
+RendererPrev::RendererPrev(std::uint32_t w, std::uint32_t h, std::unique_ptr<Presenter> presenter):
     viewport_width_(w),
     viewport_height_(h),
     presenter_(std::move(presenter)),
@@ -17,37 +17,37 @@ Renderer::Renderer(std::uint32_t w, std::uint32_t h, std::unique_ptr<Presenter> 
     presenter_->init();
 }
 
-Renderer::~Renderer() {
+RendererPrev::~RendererPrev() {
     presenter_->deinit();
 }
 
-BufferHandle<CharacterPixel> Renderer::render_target_handle() const {
+BufferHandle<CharacterPixel> RendererPrev::render_target_handle() const {
     return front_buffer_handle_;
 }
 
-BufferHandle<bool> Renderer::mask_buffer_handle() const {
+BufferHandle<bool> RendererPrev::mask_buffer_handle() const {
     return mask_buffer_;
 }
 
-void Renderer::submit(std::unique_ptr<RenderCommand> command) {
+void RendererPrev::submit(std::unique_ptr<RenderCommand> command) {
     command_queues_[command->target_pass()].push_back(std::move(command));
 }
 
-void Renderer::present() {
+void RendererPrev::present() {
     auto* front = buffer_registry.get_buffer(front_buffer_handle_);
     auto* back = buffer_registry.get_buffer(back_buffer_handle_);
     presenter_->present(*front, *back);
 }
 
-void Renderer::swap_buffers() {
+void RendererPrev::swap_buffers() {
     auto* front = buffer_registry.get_buffer(front_buffer_handle_);
     auto* back = buffer_registry.get_buffer(back_buffer_handle_);
 
     std::swap(front->data(), back->data());
 }
 
-void Renderer::render_frame() {
-    RenderPassEncoder encoder(pipeline_registry, buffer_registry, resource_registry);
+void RendererPrev::render_frame() {
+    RenderPassEncoderPrev encoder(pipeline_registry, buffer_registry, resource_registry);
     const std::vector<RenderPass*>& passes = render_graph.compile();
     for (auto pass: passes) {
         auto it = command_queues_.find(pass->name());

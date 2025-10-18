@@ -24,15 +24,14 @@ struct VOut {
     core::ColorRGB8 color;
 };
 
-class SimpleShader: public renderer::Shader<ColorVertex, VOut, renderer::CharacterPixel> {
+class SimpleShader: public renderer::ShaderPrev<ColorVertex, VOut, renderer::CharacterPixel> {
 public:
     VOut vertex(const ColorVertex& v) override {
         Eigen::Vector4f clip_pos(v.x, v.y, 0.0f, 1.0f);
         return {clip_pos, v.character_color};
     }
 
-    renderer::CharacterPixel
-    fragment(const VOut& v) override {
+    renderer::CharacterPixel fragment(const VOut& v) override {
         return renderer::CharacterPixel {
             .codepoint = U'█',
             .fg_color = v.color,
@@ -43,7 +42,7 @@ public:
     ~SimpleShader() override = default;
 };
 
-using UnlitPipeline = renderer::Pipeline<ColorVertex, VOut, renderer::CharacterPixel>;
+using UnlitPipeline = renderer::PipelinePrev<ColorVertex, VOut, renderer::CharacterPixel>;
 
 class SimpleDrawCommand: public renderer::RenderCommand {
 public:
@@ -60,8 +59,8 @@ public:
         return "main";
     }
 
-    void execute(renderer::RenderPassEncoder& encoder) override {
-        encoder.draw<ColorVertex, VOut, renderer::CharacterPixel>(vb_, ob_, count_, 0);
+    void execute(renderer::RenderPassEncoderPrev& encoder) override {
+        encoder.draw_prev<ColorVertex, VOut, renderer::CharacterPixel>(vb_, ob_, count_, 0);
     }
 
 private:
@@ -75,7 +74,7 @@ int main() {
     const std::uint32_t height = 45;
 
     auto term = Terminal();
-    renderer::Renderer app_renderer(width, height, term.presenter());
+    renderer::RendererPrev app_renderer(width, height, term.presenter());
     auto shader = std::make_unique<SimpleShader>();
     app_renderer.register_pipeline(
         std::make_unique<UnlitPipeline>(renderer::PipelineDescriptor {}, std::move(shader))
@@ -97,11 +96,13 @@ int main() {
     }
 
     app_renderer.render_graph.add_pass(std::make_unique<renderer::RenderPass>("main"));
-    app_renderer.submit(std::make_unique<SimpleDrawCommand>(
-        vertex_buffer_handle,
-        output_buffer_handle,
-        vertices.size()
-    ));
+    app_renderer.submit(
+        std::make_unique<SimpleDrawCommand>(
+            vertex_buffer_handle,
+            output_buffer_handle,
+            vertices.size()
+        )
+    );
     app_renderer.render_frame();
     std::this_thread::sleep_for(5s);
 }
