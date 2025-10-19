@@ -9,8 +9,6 @@
 
 #include <Eigen/Dense>
 
-#include "renderer/resource.hpp"
-
 namespace renderer {
 
 enum class Primitive { Lines, Triangles, Square };
@@ -222,12 +220,12 @@ public:
     using vertex_out = VertexOut;
     using frag_out = FragOut;
 
-public:
     Pipeline(
         PipelineDescriptor,
         std::unique_ptr<ShaderPrev<VertexIn, VertexOut, FragOut, Uniforms...>> shader
     ):
         shader(std::move(shader)) {}
+
     std::unique_ptr<ShaderPrev<VertexIn, VertexOut, FragOut, Uniforms...>> shader;
 
 private:
@@ -236,11 +234,6 @@ private:
 
 template<typename VertexIn, typename VertexOut, typename FragOut, typename... Uniforms>
 class PipelinePrev: public IPipeline {
-public:
-    using vertex_in = VertexIn;
-    using vertex_out = VertexOut;
-    using frag_out = FragOut;
-
 public:
     PipelinePrev(
         PipelineDescriptor,

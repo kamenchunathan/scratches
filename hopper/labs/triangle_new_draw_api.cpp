@@ -1,4 +1,5 @@
 #include <cmath>
+#include <cstdlib>
 #include <format>
 #include <iterator>
 #include <memory>
@@ -79,7 +80,7 @@ struct CharacterBufferResource {
 };
 
 // Pipeline definition for first pass only
-using ColorPipeline = renderer::Pipeline<ColorVertex, VOut, core::ColorRGBA32F>;
+using ColorPipeline = renderer::PipelinePrev<ColorVertex, VOut, core::ColorRGBA32F>;
 
 // Render commands
 class ColorPassCommand: public renderer::RenderCommandPrev {
@@ -199,41 +200,53 @@ public:
         if (!term_layer_ptr || !*term_layer_ptr)
             return;
 
-        auto renderer = std::make_unique<renderer::RendererPrev>(
+        auto renderer = std::make_unique<renderer::Renderer>(
             char_width,
             char_height,
             (*term_layer_ptr)->terminal->presenter()
         );
 
         // Register shader for first pass only
-        auto color_shader = std::make_unique<ColorShader>();
-        renderer->register_pipeline(
-            std::make_unique<ColorPipeline>(
-                renderer::PipelineDescriptor {},
-                std::move(color_shader)
-            )
-        );
-
-        // Create buffers
-        auto color_buffer =
-            renderer->buffer_registry.create_buffer<core::ColorRGBA32F>(pixel_width, pixel_height);
-        auto vertex_buffer =
-            renderer->buffer_registry.create_buffer<ColorVertex>(pixel_width, pixel_height);
-        auto char_buffer = renderer->render_target_handle();
-
-        // Setup render graph
-        renderer->render_graph.add_pass(std::make_unique<renderer::RenderPass>("color_pass"));
-        auto pixel_pass = std::make_unique<renderer::RenderPass>("pixel_pass");
-        pixel_pass->add_dependency("color_pass");
-        renderer->render_graph.add_pass(std::move(pixel_pass));
-
-        // Store buffer handles as ECS resources
-        app.world.insert_resource(ColorBufferResource {color_buffer});
-        app.world.insert_resource(VertexBufferResource {vertex_buffer});
-        app.world.insert_resource(CharacterBufferResource {char_buffer});
-
-        // Store renderer
-        app.world.insert_resource(std::move(renderer));
+        // auto color_shader = std::make_unique<ColorShader>();
+        // std::expected<
+        //     renderer::PipelineHandle<renderer::Pipeline<ColorVertex, VOut, core::ColorRGBA32F>>,
+        //     renderer::ResourceError>
+        //     color_pipeline_handle_res = renderer->resource_registry.add_pipeline(
+        //         std::make_unique<ColorPipeline>(
+        //             renderer::PipelineDescriptor {},
+        //             std::move(color_shader)
+        //         )
+        //     );
+        //
+        // if (!color_pipeline_handle_res) {
+        //     // TODO: Better error handling
+        //     std::exit(1);
+        // }
+        //
+        // renderer::PipelineHandle<renderer::PipelinePrev<ColorVertex, VOut, core::ColorRGBA32F>>
+        //     color_pipeline_handle = color_pipeline_handle_res.value();
+        //
+        // // Create buffers
+        // renderer::TextureHandle<core::ColorRGBA32F> color_texture =
+        //     renderer->resource_registry.add_texture<core::ColorRGBA32F>(pixel_width, pixel_height)
+        //         .value();
+        // renderer::BufferHandle<ColorVertex> vertex_buffer =
+        //     renderer->resource_registry.add_buffer<ColorVertex>(pixel_width * pixel_height).value();
+        // auto char_buffer = renderer->render_target_handle();
+        //
+        // // Setup render graph
+        // renderer->render_graph.add_pass(std::make_unique<renderer::RenderPass>("color_pass"));
+        // auto pixel_pass = std::make_unique<renderer::RenderPass>("pixel_pass");
+        // pixel_pass->add_dependency("color_pass");
+        // renderer->render_graph.add_pass(std::move(pixel_pass));
+        //
+        // // Store buffer handles as ECS resources
+        // app.world.insert_resource(ColorBufferResource {color_buffer});
+        // app.world.insert_resource(VertexBufferResource {vertex_buffer});
+        // app.world.insert_resource(CharacterBufferResource {char_buffer});
+        //
+        // // Store renderer
+        // app.world.insert_resource(std::move(renderer));
     }
 };
 

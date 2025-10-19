@@ -44,7 +44,7 @@ public:
 
 using UnlitPipeline = renderer::PipelinePrev<ColorVertex, VOut, renderer::CharacterPixel>;
 
-class SimpleDrawCommand: public renderer::RenderCommand {
+class SimpleDrawCommand: public renderer::RenderCommandPrev {
 public:
     SimpleDrawCommand(
         renderer::BufferHandlePrev<ColorVertex> vb,
@@ -96,11 +96,13 @@ int main() {
     }
 
     app_renderer.render_graph.add_pass(std::make_unique<renderer::RenderPass>("main"));
-    app_renderer.submit(std::make_unique<SimpleDrawCommand>(
-        vertex_buffer_handle,
-        output_buffer_handle,
-        vertices.size()
-    ));
+    app_renderer.submit(
+        std::make_unique<SimpleDrawCommand>(
+            vertex_buffer_handle,
+            output_buffer_handle,
+            vertices.size()
+        )
+    );
     app_renderer.render_frame();
     std::this_thread::sleep_for(5s);
 }

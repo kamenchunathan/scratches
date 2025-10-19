@@ -55,3 +55,10 @@ executable(
   install: false,
   dependencies: [engine_dep],
 )
+
+executable(
+  'triangle_new_draw_api',
+  'triangle_new_draw_api.cpp',
+  install: false,
+  dependencies: [engine_dep],
+)

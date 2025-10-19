@@ -16,25 +16,23 @@ namespace renderer {
 
 class Renderer {
 public:
-    // TODO: for testing
-    PipelineRegistry pipeline_registry;
-    BufferRegistry buffer_registry;
-    ShaderResourceRegistry resource_registry;
+    ResourceRegistry resource_registry;
     RenderGraph render_graph;
 
     Renderer(std::uint32_t w, std::uint32_t h, std::unique_ptr<Presenter>);
     ~Renderer();
 
-    void render_frame();
-
     FrameBuffer<Attachment<CharacterPixel>> render_target() const;
+
+    void submit(std::unique_ptr<RenderCommand>);
+    void render_frame();
 
 private:
     std::uint32_t viewport_width_, viewport_height_;
     std::unique_ptr<Presenter> presenter_;
 
-    FrameBuffer<Attachment<CharacterPixel>> front_buffer_;
-    FrameBuffer<Attachment<CharacterPixel>> back_buffer_;
+    std::optional<FrameBuffer<Attachment<CharacterPixel>>> front_buffer_;
+    std::optional<FrameBuffer<Attachment<CharacterPixel>>> back_buffer_;
 
     std::unordered_map<std::string, std::vector<std::unique_ptr<RenderCommand>>> command_queues_;
 
@@ -49,7 +47,6 @@ public:
     BufferRegistry buffer_registry;
     ShaderResourceRegistry shader_resource_registry;
     RenderGraph render_graph;
-    ResourceRegistry resource_registry;
 
     RendererPrev(std::uint32_t w, std::uint32_t h, std::unique_ptr<Presenter>);
     ~RendererPrev();
@@ -57,7 +54,7 @@ public:
     template<typename Pipeline>
     void register_pipeline(std::unique_ptr<Pipeline> pipeline);
 
-    void submit(std::unique_ptr<RenderCommand>);
+    void submit(std::unique_ptr<RenderCommandPrev>);
 
     void render_frame();
 
@@ -72,7 +69,8 @@ private:
     BufferHandlePrev<CharacterPixel> back_buffer_handle_;
     BufferHandlePrev<bool> mask_buffer_;
 
-    std::unordered_map<std::string, std::vector<std::unique_ptr<RenderCommand>>> command_queues_;
+    std::unordered_map<std::string, std::vector<std::unique_ptr<RenderCommandPrev>>>
+        command_queues_;
 
     void present();
     void swap_buffers();

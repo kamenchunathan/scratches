@@ -131,7 +131,8 @@ public:
     template<typename Format>
     void destroy_texture(TextureHandle<Format> handle);
 
-    /******************************** Buffer Operations ****************************************/
+    ///////////////////////////////// Buffer Operations /////////////////////////////////////////
+
     template<typename Element>
     [[nodiscard]] std::expected<BufferHandle<Element>, ResourceError>
     add_buffer(std::uint32_t element_count) {
