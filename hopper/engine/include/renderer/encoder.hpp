@@ -34,6 +34,7 @@ public:
     template<typename Pipeline, typename... Attachments>
         requires FragOutMatchesAttachments<typename Pipeline::frag_out, Attachments...>
     void draw(
+        PipelineHandle<Pipeline> pipeline,
         FrameBuffer<Attachments...> target,
         BufferHandlePrev<typename Pipeline::vertex_in> vertices,
         std::uint32_t vertex_count,
@@ -52,15 +53,18 @@ private:
     RenderPassEncoderPrev(
         PipelineRegistry& pipeline_registry,
         BufferRegistry& buffer_registry,
-        ShaderResourceRegistry& resource_registry
+        ShaderResourceRegistry& shader_resource_registry,
+        ResourceRegistry& resource_registry
     ):
         pipeline_registry_(pipeline_registry),
         buffer_registry_(buffer_registry),
+        shader_resource_registry_(shader_resource_registry),
         resource_registry_(resource_registry) {}
 
     PipelineRegistry& pipeline_registry_;
     BufferRegistry& buffer_registry_;
-    ShaderResourceRegistry& resource_registry_;
+    ShaderResourceRegistry& shader_resource_registry_;
+    ResourceRegistry& resource_registry_;
 };
 
 // A rasterizer based on scratchapixel lesson
@@ -89,7 +93,7 @@ void RenderPassEncoderPrev::draw_prev(
 
     FrameBufferPrev<VertexIn>* vb = buffer_registry_.get_buffer(vertex_buffer_handle);
     FrameBufferPrev<FragOut>* out_buffer = buffer_registry_.get_buffer(output_buffer_handle);
-    auto resources = resource_registry_.extract<RequiredResources...>();
+    auto resources = shader_resource_registry_.extract<RequiredResources...>();
 
     std::vector<VertexIn> vertex_data = vb->data();
     if (first_vertex >= vertex_data.size()) {
@@ -242,6 +246,23 @@ void RenderPassEncoderPrev::draw_prev(
             }
         }
     }
+}
+
+template<typename PipelineType, typename... Attachments>
+    requires FragOutMatchesAttachments<typename PipelineType::frag_out, Attachments...>
+void RenderPassEncoderPrev::draw(
+    PipelineHandle<PipelineType> pipeline_handle,
+    FrameBuffer<Attachments...> target,
+    BufferHandlePrev<typename PipelineType::vertex_in> vertices,
+    std::uint32_t vertex_count,
+    std::uint32_t first_vertex
+) {
+    std::expected<const PipelineType*, ResourceError> p =
+        resource_registry_.get_pipeline(pipeline_handle);
+    if (!p) {
+        return;
+    }
+    PipelineType* pipeline = p.value();
 }
 
 } // namespace renderer

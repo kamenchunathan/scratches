@@ -389,7 +389,7 @@ void render_system(ecs::World& world) {
             color_buffer_res->handle,
             std::move(vertices),
             "color_pass_bg",
-            &renderer.resource_registry,
+            &renderer.shader_resource_registry,
             &renderer.buffer_registry,
             sprite.texture
         ));
@@ -417,7 +417,7 @@ void render_system(ecs::World& world) {
             color_buffer_res->handle,
             std::move(vertices),
             "color_pass_fg",
-            &renderer.resource_registry,
+            &renderer.shader_resource_registry,
             &renderer.buffer_registry,
             sprite.texture
         ));

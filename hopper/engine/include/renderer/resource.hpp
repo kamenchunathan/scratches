@@ -80,9 +80,8 @@ using FrameBufferHandle = ResourceHandle<FrameBuffer<Attachments...>, FrameBuffe
 
 template<typename Pipeline>
 using PipelineHandle = ResourceHandle<Pipeline, PipelineTag>;
-#pragma once
 
-enum class ResourceError { InvalidDimensions, InvalidHandle };
+enum class ResourceError { InvalidDimensions, InvalidHandle, InvalidPipelineInstance };
 
 class ResourceRegistry {
 public:
@@ -180,7 +179,7 @@ public:
     [[nodiscard]] std::expected<PipelineHandle<PipelineType>, ResourceError>
     add_pipeline(std::unique_ptr<PipelineType> pipeline) {
         if (!pipeline) {
-            return std::unexpected(ResourceError::InvalidHandle);
+            return std::unexpected(ResourceError::InvalidPipelineInstance);
         }
         return insert_pipeline(std::move(pipeline));
     }

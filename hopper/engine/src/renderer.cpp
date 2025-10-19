@@ -47,7 +47,8 @@ void RendererPrev::swap_buffers() {
 }
 
 void RendererPrev::render_frame() {
-    RenderPassEncoderPrev encoder(pipeline_registry, buffer_registry, resource_registry);
+    RenderPassEncoderPrev
+        encoder(pipeline_registry, buffer_registry, shader_resource_registry, resource_registry);
     const std::vector<RenderPass*>& passes = render_graph.compile();
     for (auto pass: passes) {
         auto it = command_queues_.find(pass->name());
