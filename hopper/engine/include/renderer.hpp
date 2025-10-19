@@ -27,14 +27,14 @@ public:
 
     void render_frame();
 
-    Framebuffer<Attachment<CharacterPixel>> render_target() const;
+    FrameBuffer<Attachment<CharacterPixel>> render_target() const;
 
 private:
     std::uint32_t viewport_width_, viewport_height_;
     std::unique_ptr<Presenter> presenter_;
 
-    Framebuffer<Attachment<CharacterPixel>> front_buffer_;
-    Framebuffer<Attachment<CharacterPixel>> back_buffer_;
+    FrameBuffer<Attachment<CharacterPixel>> front_buffer_;
+    FrameBuffer<Attachment<CharacterPixel>> back_buffer_;
 
     std::unordered_map<std::string, std::vector<std::unique_ptr<RenderCommand>>> command_queues_;
 
@@ -60,16 +60,16 @@ public:
 
     void render_frame();
 
-    BufferHandle<CharacterPixel> render_target_handle() const;
-    BufferHandle<bool> mask_buffer_handle() const;
+    BufferHandlePrev<CharacterPixel> render_target_handle() const;
+    BufferHandlePrev<bool> mask_buffer_handle() const;
 
 private:
     std::uint32_t viewport_width_, viewport_height_;
     std::unique_ptr<Presenter> presenter_;
 
-    BufferHandle<CharacterPixel> front_buffer_handle_;
-    BufferHandle<CharacterPixel> back_buffer_handle_;
-    BufferHandle<bool> mask_buffer_;
+    BufferHandlePrev<CharacterPixel> front_buffer_handle_;
+    BufferHandlePrev<CharacterPixel> back_buffer_handle_;
+    BufferHandlePrev<bool> mask_buffer_;
 
     std::unordered_map<std::string, std::vector<std::unique_ptr<RenderCommand>>> command_queues_;
 

@@ -67,15 +67,15 @@ public:
 
 // ECS Resources for buffer handles
 struct ColorBufferResource {
-    renderer::BufferHandle<core::ColorRGBA32F> handle;
+    renderer::BufferHandlePrev<core::ColorRGBA32F> handle;
 };
 
 struct VertexBufferResource {
-    renderer::BufferHandle<ColorVertex> handle;
+    renderer::BufferHandlePrev<ColorVertex> handle;
 };
 
 struct CharacterBufferResource {
-    renderer::BufferHandle<renderer::CharacterPixel> handle;
+    renderer::BufferHandlePrev<renderer::CharacterPixel> handle;
 };
 
 // Pipeline definition for first pass only
@@ -85,8 +85,8 @@ using ColorPipeline = renderer::PipelinePrev<ColorVertex, VOut, core::ColorRGBA3
 class ColorPassCommand: public renderer::RenderCommand {
 public:
     ColorPassCommand(
-        renderer::BufferHandle<ColorVertex> vb,
-        renderer::BufferHandle<core::ColorRGBA32F> ob,
+        renderer::BufferHandlePrev<ColorVertex> vb,
+        renderer::BufferHandlePrev<core::ColorRGBA32F> ob,
         std::size_t count
     ):
         vb_(vb),
@@ -102,8 +102,8 @@ public:
     }
 
 private:
-    renderer::BufferHandle<ColorVertex> vb_;
-    renderer::BufferHandle<core::ColorRGBA32F> ob_;
+    renderer::BufferHandlePrev<ColorVertex> vb_;
+    renderer::BufferHandlePrev<core::ColorRGBA32F> ob_;
     std::size_t count_;
 };
 

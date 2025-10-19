@@ -21,11 +21,11 @@ RendererPrev::~RendererPrev() {
     presenter_->deinit();
 }
 
-BufferHandle<CharacterPixel> RendererPrev::render_target_handle() const {
+BufferHandlePrev<CharacterPixel> RendererPrev::render_target_handle() const {
     return front_buffer_handle_;
 }
 
-BufferHandle<bool> RendererPrev::mask_buffer_handle() const {
+BufferHandlePrev<bool> RendererPrev::mask_buffer_handle() const {
     return mask_buffer_;
 }
 

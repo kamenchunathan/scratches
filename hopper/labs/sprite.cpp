@@ -88,15 +88,15 @@ public:
 
 // ------------------------------ ECS Resources for buffer handles ----------------------------------------
 struct ColorBufferResource {
-    renderer::BufferHandle<core::ColorRGBA32F> handle;
+    renderer::BufferHandlePrev<core::ColorRGBA32F> handle;
 };
 
 struct VertexBufferResource {
-    renderer::BufferHandle<TexturedVertex> handle;
+    renderer::BufferHandlePrev<TexturedVertex> handle;
 };
 
 struct CharacterBufferResource {
-    renderer::BufferHandle<renderer::CharacterPixel> handle;
+    renderer::BufferHandlePrev<renderer::CharacterPixel> handle;
 };
 
 // ------------------------------------- Pipeline definitions ----------------------------------------------
@@ -107,8 +107,8 @@ using TexturePipeline =
 class ColorPassCommand: public renderer::RenderCommand {
 public:
     ColorPassCommand(
-        renderer::BufferHandle<TexturedVertex> vb,
-        renderer::BufferHandle<core::ColorRGBA32F> ob,
+        renderer::BufferHandlePrev<TexturedVertex> vb,
+        renderer::BufferHandlePrev<core::ColorRGBA32F> ob,
         std::vector<TexturedVertex> vertices,
         std::string pass_name,
         renderer::ShaderResourceRegistry* resource_registry,
@@ -142,8 +142,8 @@ public:
     }
 
 private:
-    renderer::BufferHandle<TexturedVertex> vb_;
-    renderer::BufferHandle<core::ColorRGBA32F> ob_;
+    renderer::BufferHandlePrev<TexturedVertex> vb_;
+    renderer::BufferHandlePrev<core::ColorRGBA32F> ob_;
     std::vector<TexturedVertex> vertices_;
     std::string pass_name_;
     renderer::ShaderResourceRegistry* resource_registry_;
@@ -154,7 +154,7 @@ private:
 class ClearCommand: public renderer::RenderCommand {
 public:
     ClearCommand(
-        renderer::BufferHandle<core::ColorRGBA32F> ob,
+        renderer::BufferHandlePrev<core::ColorRGBA32F> ob,
         renderer::BufferRegistry* buffer_registry,
         core::ColorRGBA32F clear_color = {0.0f, 0.0f, 0.0f, 1.0f}
     ):
@@ -173,7 +173,7 @@ public:
     }
 
 private:
-    renderer::BufferHandle<core::ColorRGBA32F> ob_;
+    renderer::BufferHandlePrev<core::ColorRGBA32F> ob_;
     renderer::BufferRegistry* buffer_registry_;
     core::ColorRGBA32F clear_color_;
 };
@@ -269,12 +269,10 @@ public:
             (*term_layer_ptr)->terminal->presenter()
         );
 
-        renderer->register_pipeline(
-            std::make_unique<TexturePipeline>(
-                renderer::PipelineDescriptor {},
-                std::make_unique<TextureShader>()
-            )
-        );
+        renderer->register_pipeline(std::make_unique<TexturePipeline>(
+            renderer::PipelineDescriptor {},
+            std::make_unique<TextureShader>()
+        ));
 
         auto color_buffer =
             renderer->buffer_registry.create_buffer<core::ColorRGBA32F>(pixel_width, pixel_height);
@@ -386,17 +384,15 @@ void render_system(ecs::World& world) {
             {-1.0f, 1.0f, 0.0f, 0.0f}, // top-left
         };
 
-        renderer.submit(
-            std::make_unique<ColorPassCommand>(
-                vertex_buffer_res->handle,
-                color_buffer_res->handle,
-                std::move(vertices),
-                "color_pass_bg",
-                &renderer.resource_registry,
-                &renderer.buffer_registry,
-                sprite.texture
-            )
-        );
+        renderer.submit(std::make_unique<ColorPassCommand>(
+            vertex_buffer_res->handle,
+            color_buffer_res->handle,
+            std::move(vertices),
+            "color_pass_bg",
+            &renderer.resource_registry,
+            &renderer.buffer_registry,
+            sprite.texture
+        ));
     }
 
     // Update quad vertices based on transform
@@ -416,17 +412,15 @@ void render_system(ecs::World& world) {
             {transform.x - half_width, transform.y + half_height, 0.0f, 0.0f}, // top-left
         };
 
-        renderer.submit(
-            std::make_unique<ColorPassCommand>(
-                vertex_buffer_res->handle,
-                color_buffer_res->handle,
-                std::move(vertices),
-                "color_pass_fg",
-                &renderer.resource_registry,
-                &renderer.buffer_registry,
-                sprite.texture
-            )
-        );
+        renderer.submit(std::make_unique<ColorPassCommand>(
+            vertex_buffer_res->handle,
+            color_buffer_res->handle,
+            std::move(vertices),
+            "color_pass_fg",
+            &renderer.resource_registry,
+            &renderer.buffer_registry,
+            sprite.texture
+        ));
     }
 
     renderer.submit(std::make_unique<HalfBlockCommand>(&renderer.buffer_registry, &world));

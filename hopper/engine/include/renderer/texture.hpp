@@ -13,9 +13,11 @@ template<typename PixelType>
 class Texture2D {
 public:
     Texture2D(): width_(0), height_(0) {}
+
     Texture2D(std::uint32_t width, std::uint32_t height): width_(width), height_(height) {
         texture_data_.resize(width * height);
     }
+
     Texture2D(std::uint32_t width, std::uint32_t height, std::vector<PixelType> data):
         width_(width),
         height_(height),

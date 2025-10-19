@@ -15,8 +15,8 @@ namespace renderer {
 template<typename Pipeline, typename... Attachments>
     requires FragOutMatchesAttachments<typename Pipeline::frag_out, Attachments...>
 struct DrawDescriptor {
-    Framebuffer<Attachments...> target;
-    BufferHandle<typename Pipeline::vertex_in> vertices;
+    FrameBuffer<Attachments...> target;
+    BufferHandlePrev<typename Pipeline::vertex_in> vertices;
     std::uint32_t vertex_count;
     std::uint32_t first_vertex = 0;
 };
@@ -25,8 +25,8 @@ class RenderPassEncoderPrev {
 public:
     template<typename VertexIn, typename VertexOut, typename FragOut, typename... RequiredResources>
     void draw_prev(
-        BufferHandle<VertexIn> vertex_buf_handle,
-        BufferHandle<FragOut> output_buffer_handle,
+        BufferHandlePrev<VertexIn> vertex_buf_handle,
+        BufferHandlePrev<FragOut> output_buffer_handle,
         std::uint32_t vertex_count,
         std::uint32_t first_vertex = 0
     );
@@ -34,8 +34,8 @@ public:
     template<typename Pipeline, typename... Attachments>
         requires FragOutMatchesAttachments<typename Pipeline::frag_out, Attachments...>
     void draw(
-        Framebuffer<Attachments...> target,
-        BufferHandle<typename Pipeline::vertex_in> vertices,
+        FrameBuffer<Attachments...> target,
+        BufferHandlePrev<typename Pipeline::vertex_in> vertices,
         std::uint32_t vertex_count,
         std::uint32_t first_vertex = 0
     );
@@ -73,8 +73,8 @@ edge_function(const Eigen::Vector2f& a, const Eigen::Vector2f& b, const Eigen::V
 
 template<typename VertexIn, typename VertexOut, typename FragOut, typename... RequiredResources>
 void RenderPassEncoderPrev::draw_prev(
-    BufferHandle<VertexIn> vertex_buffer_handle,
-    BufferHandle<FragOut> output_buffer_handle,
+    BufferHandlePrev<VertexIn> vertex_buffer_handle,
+    BufferHandlePrev<FragOut> output_buffer_handle,
     std::uint32_t vertex_count,
     std::uint32_t first_vertex
 ) {
@@ -104,14 +104,12 @@ void RenderPassEncoderPrev::draw_prev(
     v_out.reserve(actual_vertex_count);
 
     for (std::size_t i = 0; i < actual_vertex_count; ++i) {
-        v_out.push_back(
-            std::apply(
-                [&](auto&&... args) {
-                    return pipeline->shader->vertex(vertex_data[first_vertex + i], args...);
-                },
-                resources
-            )
-        );
+        v_out.push_back(std::apply(
+            [&](auto&&... args) {
+                return pipeline->shader->vertex(vertex_data[first_vertex + i], args...);
+            },
+            resources
+        ));
     }
 
     const std::uint32_t imageWidth = out_buffer->width();

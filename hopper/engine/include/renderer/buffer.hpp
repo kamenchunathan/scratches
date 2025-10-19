@@ -8,29 +8,6 @@
 #include "renderer/resource.hpp"
 
 namespace renderer {
-
-enum class LoadOp { Load, Clear, Ignore };
-
-enum class StoreOp { Store, Ignore };
-
-template<typename Format>
-struct TextureView {
-    ResourceId<Format, TextureTag> texture;
-    std::uint32_t x, y, width, height;
-};
-
-template<typename Format>
-struct Attachment {
-    TextureView<Format> view;
-    LoadOp load;
-    StoreOp store;
-};
-
-template<typename... Attachments>
-struct Framebuffer {
-    std::tuple<Attachments...> attachments;
-};
-
 template<typename PixelType>
 class FrameBufferPrev {
 public:
@@ -67,30 +44,30 @@ private:
 class BufferRegistry;
 
 template<typename PixelType>
-class BufferHandle {
+class BufferHandlePrev {
 public:
-    BufferHandle(const BufferHandle&) = default;
-    BufferHandle& operator=(const BufferHandle&) = default;
-    BufferHandle(BufferHandle&&) = default;
-    BufferHandle& operator=(BufferHandle&&) = default;
+    BufferHandlePrev(const BufferHandlePrev&) = default;
+    BufferHandlePrev& operator=(const BufferHandlePrev&) = default;
+    BufferHandlePrev(BufferHandlePrev&&) = default;
+    BufferHandlePrev& operator=(BufferHandlePrev&&) = default;
 
-    bool operator==(const BufferHandle& other) const {
+    bool operator==(const BufferHandlePrev& other) const {
         return id_ == other.id_;
     }
 
 private:
     friend class BufferRegistry;
-    BufferHandle(int id): id_(id) {}
+    BufferHandlePrev(int id): id_(id) {}
     int id_;
 };
 
 class BufferRegistry {
 public:
     template<typename PixelType>
-    BufferHandle<PixelType> create_buffer(std::uint32_t width, std::uint32_t height);
+    BufferHandlePrev<PixelType> create_buffer(std::uint32_t width, std::uint32_t height);
 
     template<typename PixelType>
-    FrameBufferPrev<PixelType>* get_buffer(BufferHandle<PixelType> handle);
+    FrameBufferPrev<PixelType>* get_buffer(BufferHandlePrev<PixelType> handle);
 
 private:
     std::unordered_map<std::uint32_t, std::any> buffers_;
@@ -98,14 +75,15 @@ private:
 };
 
 template<typename PixelType>
-BufferHandle<PixelType> BufferRegistry::create_buffer(std::uint32_t width, std::uint32_t height) {
+BufferHandlePrev<PixelType>
+BufferRegistry::create_buffer(std::uint32_t width, std::uint32_t height) {
     std::uint32_t id = next_handle_++;
     buffers_.emplace(id, FrameBufferPrev<PixelType>(width, height));
-    return BufferHandle<PixelType>(id);
+    return BufferHandlePrev<PixelType>(id);
 }
 
 template<typename PixelType>
-FrameBufferPrev<PixelType>* BufferRegistry::get_buffer(BufferHandle<PixelType> handle) {
+FrameBufferPrev<PixelType>* BufferRegistry::get_buffer(BufferHandlePrev<PixelType> handle) {
     auto it = buffers_.find(handle.id_);
     if (it == buffers_.end()) {
         return nullptr;
