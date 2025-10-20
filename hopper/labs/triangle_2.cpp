@@ -111,7 +111,7 @@ private:
 class HalfBlockCommand: public renderer::RenderCommandPrev {
 public:
     HalfBlockCommand(renderer::BufferRegistry* buffer_registry, ecs::World* world):
-        buffer_registry_(buffer_registry),
+        resource_registry_(buffer_registry),
         world_(world) {}
 
     const std::string target_pass() const override {
@@ -126,8 +126,8 @@ public:
         if (!color_buffer_res || !char_buffer_res)
             return;
 
-        auto* color_buffer = buffer_registry_->get_buffer(color_buffer_res->handle);
-        auto* char_buffer = buffer_registry_->get_buffer(char_buffer_res->handle);
+        auto* color_buffer = resource_registry_->get_buffer(color_buffer_res->handle);
+        auto* char_buffer = resource_registry_->get_buffer(char_buffer_res->handle);
 
         if (!color_buffer || !char_buffer)
             return;
@@ -180,7 +180,7 @@ public:
     }
 
 private:
-    renderer::BufferRegistry* buffer_registry_;
+    renderer::BufferRegistry* resource_registry_;
     ecs::World* world_;
 };
 
@@ -207,12 +207,10 @@ public:
 
         // Register shader for first pass only
         auto color_shader = std::make_unique<ColorShader>();
-        renderer->register_pipeline(
-            std::make_unique<ColorPipeline>(
-                renderer::PipelineDescriptor {},
-                std::move(color_shader)
-            )
-        );
+        renderer->register_pipeline(std::make_unique<ColorPipeline>(
+            renderer::PipelineDescriptor {},
+            std::move(color_shader)
+        ));
 
         // Create buffers
         auto color_buffer =
@@ -327,13 +325,11 @@ void render_system(ecs::World& world) {
 
         // Submit render commands
         // First pass: render triangle to color buffer
-        (*renderer)->submit(
-            std::make_unique<ColorPassCommand>(
-                vertex_buffer_res->handle,
-                color_buffer_res->handle,
-                vertices.size()
-            )
-        );
+        (*renderer)->submit(std::make_unique<ColorPassCommand>(
+            vertex_buffer_res->handle,
+            color_buffer_res->handle,
+            vertices.size()
+        ));
 
         // Second pass: convert color buffer to character pixels
         (*renderer)->submit(

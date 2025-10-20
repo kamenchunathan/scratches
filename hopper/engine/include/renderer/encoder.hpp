@@ -2,6 +2,7 @@
 
 #include <cmath>
 #include <cstdint>
+#include <type_traits>
 #include <vector>
 
 #include <Eigen/Dense>
@@ -11,6 +12,32 @@
 #include "renderer/shader.hpp"
 
 namespace renderer {
+
+// TODO: Check if the type of frag_out is the type of the attachment and only one attachment buffer is provided before
+// attempting to convert the aggregate type into a tuple and checking matches this way
+template<typename T>
+struct attachment_format;
+
+template<typename Format>
+struct attachment_format<Attachment<Format>> {
+    using type = Format;
+};
+
+template<typename... Attachments>
+using attachment_formats_t = std::tuple<typename attachment_format<Attachments>::type...>;
+
+template<typename FragOut, typename... Attachments>
+concept FragOutMatchesAttachments = requires {
+    requires(
+        std::is_same_v<std::tuple<FragOut>, attachment_formats_t<Attachments...>>
+        || (std::is_aggregate_v<FragOut>
+            && std::is_same_v<
+                decltype([]<typename... Fields>(std::tuple<Fields...>*) -> std::tuple<std::remove_cvref_t<Fields>...> {
+                    return {};
+                }(static_cast<decltype(detail::tuple_from_aggregate(std::declval<FragOut>()))*>(nullptr))),
+                attachment_formats_t<Attachments...>>)
+    );
+};
 
 template<typename Pipeline, typename... Attachments>
     requires FragOutMatchesAttachments<typename Pipeline::frag_out, Attachments...>
@@ -115,14 +142,12 @@ void RenderPassEncoderPrev::draw_prev(
     v_out.reserve(actual_vertex_count);
 
     for (std::size_t i = 0; i < actual_vertex_count; ++i) {
-        v_out.push_back(
-            std::apply(
-                [&](auto&&... args) {
-                    return pipeline->shader->vertex(vertex_data[first_vertex + i], args...);
-                },
-                resources
-            )
-        );
+        v_out.push_back(std::apply(
+            [&](auto&&... args) {
+                return pipeline->shader->vertex(vertex_data[first_vertex + i], args...);
+            },
+            resources
+        ));
     }
 
     const std::uint32_t imageWidth = out_buffer->width();
@@ -270,28 +295,35 @@ void RenderPassEncoder::draw(
         resource_registry_.get_pipeline(pipeline_handle);
     if (!p)
         return;
-    PipelineType* pipeline = p.value();
+    const PipelineType* pipeline = p.value();
 
-    std::expected<std::span<typename PipelineType::vertex_in>, ResourceError> vertex_buffer_res =
-        resource_registry_.get_buffer(vertex_buffer_handle);
+    std::expected<std::span<const typename PipelineType::vertex_in>, ResourceError>
+        vertex_buffer_res = resource_registry_.get_buffer(vertex_buffer_handle);
     if (!vertex_buffer_res)
         return;
-    std::span<typename PipelineType::vertex_in> vertex_buffer = vertex_buffer_res.value();
+    std::span<const typename PipelineType::vertex_in> vertex_buffer = vertex_buffer_res.value();
 
-    // NOTE: For now I'm only going to handle the first attachment since I'm unsure of how
-    // to add all of them
-    using ColorPixelType = decltype(std::get<0>(
-        detail::tuple_from_aggregate(std::declval<PipelineType::vertex_out>())
-    ));
-    Attachment<ColorPixelType> color_attachment = std::get<0>(target.attachments);
-    // TODO: Ignoring texture view area for now
-    TextureHandle<ColorPixelType> color_attachment_texture_handle = color_attachment.view.texture;
-    std::expected<Texture2D<ColorPixelType>*, ResourceError> color_texture_res =
-        resource_registry_.get_texture_mut(color_attachment_texture_handle);
-    if (!color_texture_res)
+    auto get_texture_from_attachment = [&](const auto& attachment) {
+        using AttachmentType = std::remove_cvref_t<decltype(attachment)>;
+        using PixelType = typename attachment_format<AttachmentType>::type;
+        auto texture_res = resource_registry_.get_texture_mut(attachment.view.texture);
+        if (!texture_res)
+            return (Texture2D<PixelType>*)nullptr;
+        return texture_res.value();
+    };
+
+    auto attachment_textures = std::apply(
+        [&](const auto&... attachments) {
+            return std::make_tuple(get_texture_from_attachment(attachments)...);
+        },
+        target.attachments
+    );
+
+    const auto* first_texture = std::get<0>(attachment_textures);
+    if (!first_texture)
         return;
-    Texture2D<ColorPixelType>* color_texture = color_texture_res.value();
-    const std::vector<ColorPixelType>& color_data = color_texture->data();
+    const std::uint32_t imageWidth = first_texture->width();
+    const std::uint32_t imageHeight = first_texture->height();
 
     if (first_vertex >= vertex_buffer.size()) {
         return;
@@ -300,13 +332,7 @@ void RenderPassEncoder::draw(
         std::min(first_vertex + vertex_count, static_cast<std::uint32_t>(vertex_buffer.size()));
     std::uint32_t actual_vertex_count = end_vertex - first_vertex;
 
-    // NOTE: For now I'm going to assume no uniforms
-    // TODO: Correct this later
-    std::unique_ptr<ShaderPrev<
-        typename PipelineType::vertex_in,
-        typename PipelineType::vertex_out,
-        typename PipelineType::frag_out>>
-        shader = pipeline->shader;
+    auto* shader = pipeline->shader.get();
 
     assert(actual_vertex_count % 3 == 0 && "Vertices must be a multiple of 3");
     std::vector<typename PipelineType::vertex_out> v_out;
@@ -316,24 +342,17 @@ void RenderPassEncoder::draw(
         v_out.push_back(shader->vertex(vertex_buffer[first_vertex + i]));
     }
 
-    const std::uint32_t imageWidth = color_texture->width();
-    const std::uint32_t imageHeight = color_texture->height();
     std::vector<float> z_buffer(imageWidth * imageHeight, std::numeric_limits<float>::infinity());
-
-    if (!(first_vertex < color_data.size() && end_vertex < color_data.size()))
-        return;
 
     for (std::size_t i = 0; i < v_out.size(); i += 3) {
         const typename PipelineType::vertex_out& v0_clip = v_out[i];
         const typename PipelineType::vertex_out& v1_clip = v_out[i + 1];
         const typename PipelineType::vertex_out& v2_clip = v_out[i + 2];
 
-        // Perspective division
         Eigen::Vector3f v0_ndc = v0_clip.position.template head<3>() / v0_clip.position.w();
         Eigen::Vector3f v1_ndc = v1_clip.position.template head<3>() / v1_clip.position.w();
         Eigen::Vector3f v2_ndc = v2_clip.position.template head<3>() / v2_clip.position.w();
 
-        // Viewport transform
         Eigen::Vector2f v0_screen = {
             (v0_ndc.x() + 1.0f) * 0.5f * imageWidth,
             (1.0f - (v0_ndc.y() + 1.0f) * 0.5f) * imageHeight
@@ -347,7 +366,6 @@ void RenderPassEncoder::draw(
             (1.0f - (v2_ndc.y() + 1.0f) * 0.5f) * imageHeight
         };
 
-        // Bounding box of the triangle
         int xmin = std::max(
             0,
             static_cast<int>(std::floor(std::min({v0_screen.x(), v1_screen.x(), v2_screen.x()})))
@@ -410,8 +428,6 @@ void RenderPassEncoder::draw(
                         auto t1 = detail::tuple_from_aggregate(v1_clip);
                         auto t2 = detail::tuple_from_aggregate(v2_clip);
 
-                        constexpr auto size = std::tuple_size_v<decltype(t0)>;
-
                         auto interpolated_tuple = std::apply(
                             [&](auto&&... args0) {
                                 return std::apply(
@@ -437,9 +453,32 @@ void RenderPassEncoder::draw(
                                 std::move(interpolated_tuple)
                             );
 
+                        auto frag_result = shader->fragment(interpolated_v);
+
+                        auto frag_output_tuple = [&] {
+                            // TODO: Fully support returning either one or an aggregate of types
+                            if constexpr (std::is_same_v<
+                                              std::tuple<typename PipelineType::frag_out>,
+                                              attachment_formats_t<Attachments...>>)
+                            {
+                                return std::make_tuple(frag_result);
+                            } else {
+                                return detail::tuple_from_aggregate(frag_result);
+                            }
+                        }();
+
                         z_buffer[y * imageWidth + x] = z_interpolated;
-                        // BUG: We're assuming no uniforms
-                        color_data[y * imageWidth + x] = shader->fragment(interpolated_v);
+
+                        [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+                            (([&] {
+                                 auto* tex = std::get<Is>(attachment_textures);
+                                 if (tex) {
+                                     tex->data_mut()[y * imageWidth + x] =
+                                         std::get<Is>(frag_output_tuple);
+                                 }
+                             }()),
+                             ...);
+                        }(std::make_index_sequence<sizeof...(Attachments)> {});
                     }
                 }
             }

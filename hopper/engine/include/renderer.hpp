@@ -19,6 +19,8 @@ public:
     ResourceRegistry resource_registry;
     RenderGraph render_graph;
 
+    std::uint32_t viewport_width, viewport_height;
+
     Renderer(std::uint32_t w, std::uint32_t h, std::unique_ptr<Presenter>);
     ~Renderer();
 
@@ -28,7 +30,6 @@ public:
     void render_frame();
 
 private:
-    std::uint32_t viewport_width_, viewport_height_;
     std::unique_ptr<Presenter> presenter_;
 
     std::optional<FrameBuffer<Attachment<CharacterPixel>>> front_buffer_;

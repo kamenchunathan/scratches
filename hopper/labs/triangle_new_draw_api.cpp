@@ -13,14 +13,16 @@
 #include "ecs/world.hpp"
 #include "input.hpp"
 #include "renderer.hpp"
-#include "renderer/buffer.hpp"
 #include "renderer/command.hpp"
 #include "renderer/graph.hpp"
+#include "renderer/resource.hpp"
 #include "renderer/shader.hpp"
+#include "renderer/texture.hpp"
 #include "renderer/types.hpp"
 #include "term/layer.hpp"
 
-// Components
+//////////////////////////////////////////////////// Components //////////////////////////////////////////////////////
+
 struct Transform {
     float x = 0.0f;
     float y = 0.0f;
@@ -42,7 +44,8 @@ struct Triangle {
     core::ColorRGB8 color3;
 };
 
-// Vertex structures
+//////////////////////////////////////////////////// Shaders //////////////////////////////////////////////////////
+
 struct ColorVertex {
     float x, y;
     core::ColorRGBA32F color;
@@ -53,93 +56,100 @@ struct VOut {
     core::ColorRGBA32F color;
 };
 
-// First pass shader - renders to float color buffer
-class ColorShader: public renderer::ShaderPrev<ColorVertex, VOut, core::ColorRGBA32F> {
+struct FragOut {
+    core::ColorRGBA32F color;
+};
+
+class ColorShader: public renderer::ShaderPrev<ColorVertex, VOut, FragOut> {
 public:
     VOut vertex(const ColorVertex& v) override {
         Eigen::Vector4f clip_pos(v.x, v.y, 0.0f, 1.0f);
         return {clip_pos, v.color};
     }
 
-    core::ColorRGBA32F fragment(const VOut& v) override {
-        return v.color;
+    FragOut fragment(const VOut& v) override {
+        return {v.color};
     }
 };
 
-// ECS Resources for buffer handles
-struct ColorBufferResource {
-    renderer::BufferHandlePrev<core::ColorRGBA32F> handle;
-};
+using ColorPipeline = renderer::Pipeline<ColorVertex, VOut, FragOut>;
+
+///////////////////////////////////////// ECS Resources for buffer handles //////////////////////////////////////////
 
 struct VertexBufferResource {
-    renderer::BufferHandlePrev<ColorVertex> handle;
+    renderer::BufferHandle<ColorVertex> handle;
 };
 
-struct CharacterBufferResource {
-    renderer::BufferHandlePrev<renderer::CharacterPixel> handle;
+struct ColorTextureResource {
+    renderer::TextureHandle<core::ColorRGBA32F> handle;
 };
 
-// Pipeline definition for first pass only
-using ColorPipeline = renderer::PipelinePrev<ColorVertex, VOut, core::ColorRGBA32F>;
+struct ColorPipelineResource {
+    renderer::PipelineHandle<ColorPipeline> handle;
+};
 
-// Render commands
-class ColorPassCommand: public renderer::RenderCommandPrev {
+///////////////////////////////////////////////// Render commands /////////////////////////////////////////////////
+
+class ColorPassCommand: public renderer::RenderCommand {
 public:
     ColorPassCommand(
-        renderer::BufferHandlePrev<ColorVertex> vb,
-        renderer::BufferHandlePrev<core::ColorRGBA32F> ob,
-        std::size_t count
+        renderer::PipelineHandle<ColorPipeline> pipeline_handle,
+        renderer::FrameBuffer<renderer::Attachment<core::ColorRGBA32F>> target,
+        renderer::BufferHandle<ColorVertex> vertex_buffer_handle,
+        std::uint32_t vertex_count
     ):
-        vb_(vb),
-        ob_(ob),
-        count_(count) {}
+        pipeline_handle_(pipeline_handle),
+        target_(target),
+        vertex_buffer_handle_(vertex_buffer_handle),
+        vertex_count_(vertex_count) {}
 
     const std::string target_pass() const override {
         return "color_pass";
     }
 
-    void execute(renderer::RenderPassEncoderPrev& encoder) override {
-        encoder.draw_prev<ColorVertex, VOut, core::ColorRGBA32F>(vb_, ob_, count_, 0);
+    void execute(renderer::RenderPassEncoder& encoder) override {
+        encoder.draw(pipeline_handle_, target_, vertex_buffer_handle_, vertex_count_);
     }
 
 private:
-    renderer::BufferHandlePrev<ColorVertex> vb_;
-    renderer::BufferHandlePrev<core::ColorRGBA32F> ob_;
-    std::size_t count_;
+    renderer::PipelineHandle<ColorPipeline> pipeline_handle_;
+    renderer::FrameBuffer<renderer::Attachment<core::ColorRGBA32F>> target_;
+    renderer::BufferHandle<ColorVertex> vertex_buffer_handle_;
+    std::uint32_t vertex_count_;
 };
 
-// Second pass command - directly converts float buffer to character pixels
-class HalfBlockCommand: public renderer::RenderCommandPrev {
+class HalfBlockCommand: public renderer::RenderCommand {
 public:
-    HalfBlockCommand(renderer::BufferRegistry* buffer_registry, ecs::World* world):
-        buffer_registry_(buffer_registry),
-        world_(world) {}
+    HalfBlockCommand(
+        renderer::ResourceRegistry* resource_registry,
+        renderer::TextureHandle<core::ColorRGBA32F> color_texture,
+        renderer::TextureHandle<renderer::CharacterPixel> char_texture
+    ):
+        resource_registry_(resource_registry),
+        color_texture_handle_(color_texture),
+        char_texture_handle_(char_texture) {}
 
     const std::string target_pass() const override {
         return "pixel_pass";
     }
 
-    void execute(renderer::RenderPassEncoderPrev&) override {
-        // Get buffer handles from ECS resources
-        auto* color_buffer_res = world_->get_resource<ColorBufferResource>();
-        auto* char_buffer_res = world_->get_resource<CharacterBufferResource>();
+    void execute(renderer::RenderPassEncoder&) override {
+        auto color_texture_exp = resource_registry_->get_texture(color_texture_handle_);
+        auto char_texture_exp = resource_registry_->get_texture_mut(char_texture_handle_);
 
-        if (!color_buffer_res || !char_buffer_res)
+        if (!color_texture_exp || !char_texture_exp)
             return;
 
-        auto* color_buffer = buffer_registry_->get_buffer(color_buffer_res->handle);
-        auto* char_buffer = buffer_registry_->get_buffer(char_buffer_res->handle);
+        const auto* color_texture = color_texture_exp.value();
+        auto* char_texture = char_texture_exp.value();
 
-        if (!color_buffer || !char_buffer)
-            return;
+        const std::uint32_t color_width = color_texture->width();
+        const std::uint32_t color_height = color_texture->height();
+        const std::uint32_t char_width = char_texture->width();
+        const std::uint32_t char_height = char_texture->height();
 
-        const std::uint32_t color_width = color_buffer->width();
-        const std::uint32_t color_height = color_buffer->height();
-        const std::uint32_t char_width = char_buffer->width();
-        const std::uint32_t char_height = char_buffer->height();
-
-        const auto& color_data = color_buffer->data();
-        std::vector<renderer::CharacterPixel> char_data(char_width * char_height);
+        const auto& color_data = color_texture->data();
+        auto& char_data = char_texture->data_mut();
 
         // Convert float colors to 8-bit
         auto to_rgb8 = [](const core::ColorRGBA32F& c) {
@@ -170,22 +180,22 @@ public:
 
                 // Create half-block character with appropriate colors
                 char_data[char_y * char_width + char_x] = renderer::CharacterPixel {
-                    .codepoint = U'▀', // Upper half block
+                    .codepoint = U'▀',
                     .fg_color = to_rgb8(top_color),
                     .bg_color = to_rgb8(bottom_color)
                 };
             }
         }
-
-        char_buffer->update_buffer(char_data);
     }
 
 private:
-    renderer::BufferRegistry* buffer_registry_;
-    ecs::World* world_;
+    renderer::ResourceRegistry* resource_registry_;
+    renderer::TextureHandle<core::ColorRGBA32F> color_texture_handle_;
+    renderer::TextureHandle<renderer::CharacterPixel> char_texture_handle_;
 };
 
-// Renderer Layer
+///////////////////////////////////////////////// Layers  /////////////////////////////////////////////////
+
 class RendererLayer {
 public:
     void build(core::Application& app) {
@@ -206,51 +216,47 @@ public:
             (*term_layer_ptr)->terminal->presenter()
         );
 
-        // Register shader for first pass only
-        // auto color_shader = std::make_unique<ColorShader>();
-        // std::expected<
-        //     renderer::PipelineHandle<renderer::Pipeline<ColorVertex, VOut, core::ColorRGBA32F>>,
-        //     renderer::ResourceError>
-        //     color_pipeline_handle_res = renderer->resource_registry.add_pipeline(
-        //         std::make_unique<ColorPipeline>(
-        //             renderer::PipelineDescriptor {},
-        //             std::move(color_shader)
-        //         )
-        //     );
-        //
-        // if (!color_pipeline_handle_res) {
-        //     // TODO: Better error handling
-        //     std::exit(1);
-        // }
-        //
-        // renderer::PipelineHandle<renderer::PipelinePrev<ColorVertex, VOut, core::ColorRGBA32F>>
-        //     color_pipeline_handle = color_pipeline_handle_res.value();
-        //
-        // // Create buffers
-        // renderer::TextureHandle<core::ColorRGBA32F> color_texture =
-        //     renderer->resource_registry.add_texture<core::ColorRGBA32F>(pixel_width, pixel_height)
-        //         .value();
-        // renderer::BufferHandle<ColorVertex> vertex_buffer =
-        //     renderer->resource_registry.add_buffer<ColorVertex>(pixel_width * pixel_height).value();
-        // auto char_buffer = renderer->render_target_handle();
-        //
-        // // Setup render graph
-        // renderer->render_graph.add_pass(std::make_unique<renderer::RenderPass>("color_pass"));
-        // auto pixel_pass = std::make_unique<renderer::RenderPass>("pixel_pass");
-        // pixel_pass->add_dependency("color_pass");
-        // renderer->render_graph.add_pass(std::move(pixel_pass));
-        //
-        // // Store buffer handles as ECS resources
-        // app.world.insert_resource(ColorBufferResource {color_buffer});
-        // app.world.insert_resource(VertexBufferResource {vertex_buffer});
-        // app.world.insert_resource(CharacterBufferResource {char_buffer});
-        //
-        // // Store renderer
-        // app.world.insert_resource(std::move(renderer));
+        // Add color pipeline
+        auto color_shader = std::make_unique<ColorShader>();
+        std::expected<renderer::PipelineHandle<ColorPipeline>, renderer::ResourceError>
+            color_pipeline_handle_res =
+                renderer->resource_registry.add_pipeline(std::make_unique<ColorPipeline>(
+                    renderer::PipelineDescriptor {},
+                    std::move(color_shader)
+                ));
+
+        if (!color_pipeline_handle_res) {
+            // TODO: Better error handling
+            std::exit(1);
+        }
+
+        renderer::PipelineHandle<ColorPipeline> color_pipeline_handle =
+            color_pipeline_handle_res.value();
+
+        // Create buffers and textures
+        auto vertex_buffer_handle = renderer->resource_registry.add_buffer<ColorVertex>(3).value();
+        auto color_texture_handle =
+            renderer->resource_registry.add_texture<core::ColorRGBA32F>(pixel_width, pixel_height)
+                .value();
+
+        // Setup render graph
+        renderer->render_graph.add_pass(std::make_unique<renderer::RenderPass>("color_pass"));
+        auto pixel_pass = std::make_unique<renderer::RenderPass>("pixel_pass");
+        pixel_pass->add_dependency("color_pass");
+        renderer->render_graph.add_pass(std::move(pixel_pass));
+
+        // Store buffer handles as ECS resources
+        app.world.insert_resource(VertexBufferResource {vertex_buffer_handle});
+        app.world.insert_resource(ColorTextureResource {color_texture_handle});
+        app.world.insert_resource(ColorPipelineResource {color_pipeline_handle});
+
+        // Store renderer
+        app.world.insert_resource(std::move(renderer));
     }
 };
 
-// Systems
+///////////////////////////////////////////////// Systems  /////////////////////////////////////////////////
+
 void input_system(ecs::World& world) {
     auto* input_state = world.get_resource<core::input::InputState>();
     if (!input_state)
@@ -295,37 +301,38 @@ void input_system(ecs::World& world) {
 }
 
 void render_system(ecs::World& world) {
-    auto* renderer = world.get_resource<std::unique_ptr<renderer::RendererPrev>>();
-    if (!renderer || !*renderer)
+    auto* renderer_ptr = world.get_resource<std::unique_ptr<renderer::Renderer>>();
+    if (!renderer_ptr || !*renderer_ptr)
         return;
+    auto* renderer = (*renderer_ptr).get();
 
-    auto* color_buffer_res = world.get_resource<ColorBufferResource>();
+    auto* color_pipeline_res = world.get_resource<ColorPipelineResource>();
     auto* vertex_buffer_res = world.get_resource<VertexBufferResource>();
-
-    if (!color_buffer_res || !vertex_buffer_res)
+    auto* color_texture_res = world.get_resource<ColorTextureResource>();
+    if (!color_pipeline_res || !vertex_buffer_res || !color_texture_res)
         return;
 
-    // Update triangle vertices based on transform
+    // TODO: Pass transform data to shader
     for (auto [entity, transform, triangle]: ecs::Query<Transform, Triangle>(&world)) {
         std::vector<ColorVertex> vertices = {
-            {transform.x + 0.0f,
-             transform.y + 0.4f,
+            {0.0f,
+             0.4f,
              core::ColorRGBA32F::rgba(
                  triangle.color1.r / 255.0f,
                  triangle.color1.g / 255.0f,
                  triangle.color1.b / 255.0f,
                  1.0f
              )},
-            {transform.x - 0.4f,
-             transform.y - 0.4f,
+            {-0.4f,
+             -0.4f,
              core::ColorRGBA32F::rgba(
                  triangle.color2.r / 255.0f,
                  triangle.color2.g / 255.0f,
                  triangle.color2.b / 255.0f,
                  1.0f
              )},
-            {transform.x + 0.4f,
-             transform.y - 0.4f,
+            {0.4f,
+             -0.4f,
              core::ColorRGBA32F::rgba(
                  triangle.color3.r / 255.0f,
                  triangle.color3.g / 255.0f,
@@ -334,27 +341,48 @@ void render_system(ecs::World& world) {
              )}
         };
 
-        if (auto* vb = (*renderer)->buffer_registry.get_buffer(vertex_buffer_res->handle)) {
-            vb->update_buffer(vertices);
+        if (std::expected<std::span<ColorVertex>, renderer::ResourceError> vb =
+                renderer->resource_registry.get_buffer_mut(vertex_buffer_res->handle);
+            vb.has_value())
+        {
+            assert(vb.value().size() == vertices.size() && "Mismatched sizes");
+            std::copy(vertices.begin(), vertices.end(), vb.value().begin());
         }
 
-        // Submit render commands
-        // First pass: render triangle to color buffer
-        (*renderer)->submit(
-            std::make_unique<ColorPassCommand>(
-                vertex_buffer_res->handle,
-                color_buffer_res->handle,
-                vertices.size()
-            )
-        );
+        // Create the target for the color pass
+        // TODO: Perhaps don't create this every time and maybe add frame buffer resource management
+        renderer::FrameBuffer<renderer::Attachment<core::ColorRGBA32F>> color_pass_target {
+            .attachments = {renderer::Attachment<core::ColorRGBA32F> {
+                .view =
+                    {.texture = color_texture_res->handle,
+                     .x = 0,
+                     .y = 0,
+                     .widht = renderer->viewport_width,
+                     .height = renderer->viewport_height * 2},
+                .load = renderer::LoadOp::Clear,
+                .store = renderer::StoreOp::Store,
+            }}
+        };
+
+        // Submit render commands First pass: render triangle to color buffer
+        renderer->submit(std::make_unique<ColorPassCommand>(
+            color_pipeline_res->handle,
+            color_pass_target,
+            vertex_buffer_res->handle,
+            vertices.size()
+        ));
 
         // Second pass: convert color buffer to character pixels
-        (*renderer)->submit(
-            std::make_unique<HalfBlockCommand>(&(*renderer)->buffer_registry, &world)
-        );
+        auto final_target = renderer->render_target();
+        auto final_target_handle = std::get<0>(final_target.attachments).view.texture;
+        renderer->submit(std::make_unique<HalfBlockCommand>(
+            &renderer->resource_registry,
+            color_texture_res->handle,
+            final_target_handle
+        ));
     }
 
-    (*renderer)->render_frame();
+    renderer->render_frame();
 }
 
 int main() {

@@ -5,8 +5,6 @@
 #include <unordered_map>
 #include <vector>
 
-#include "renderer/resource.hpp"
-
 namespace renderer {
 template<typename PixelType>
 class FrameBufferPrev {

@@ -11,8 +11,8 @@
 namespace renderer {
 
 Renderer::Renderer(std::uint32_t w, std::uint32_t h, std::unique_ptr<Presenter> presenter):
-    viewport_width_(w),
-    viewport_height_(h),
+    viewport_width(w),
+    viewport_height(h),
     presenter_(std::move(presenter)) {
     TextureHandle<CharacterPixel> char_texture_handle =
         resource_registry.add_texture<CharacterPixel>(w, h).value();
@@ -21,37 +21,35 @@ Renderer::Renderer(std::uint32_t w, std::uint32_t h, std::unique_ptr<Presenter> 
         resource_registry.add_texture<CharacterPixel>(w, h).value();
 
     front_buffer_ = FrameBuffer {
-        .attachments = std::make_tuple(
-            Attachment {
-                .view =
-                    TextureView {
-                        .texture = char_texture_handle,
-                        .x = 0,
-                        .y = 0,
-                        .widht = w,
-                        .height = h
-                    },
-                .load = LoadOp::Load,
-                .store = StoreOp::Store,
-            }
+        .attachments = std::make_tuple(Attachment {
+            .view =
+                TextureView {
+                    .texture = char_texture_handle,
+                    .x = 0,
+                    .y = 0,
+                    .widht = w,
+                    .height = h
+                },
+            .load = LoadOp::Load,
+            .store = StoreOp::Store,
+        }
 
         )
     };
 
     back_buffer_ = FrameBuffer {
-        .attachments = std::make_tuple(
-            Attachment {
-                .view =
-                    TextureView {
-                        .texture = back_char_texture_handle,
-                        .x = 0,
-                        .y = 0,
-                        .widht = w,
-                        .height = h
-                    },
-                .load = LoadOp::Load,
-                .store = StoreOp::Store,
-            }
+        .attachments = std::make_tuple(Attachment {
+            .view =
+                TextureView {
+                    .texture = back_char_texture_handle,
+                    .x = 0,
+                    .y = 0,
+                    .widht = w,
+                    .height = h
+                },
+            .load = LoadOp::Load,
+            .store = StoreOp::Store,
+        }
 
         )
     };

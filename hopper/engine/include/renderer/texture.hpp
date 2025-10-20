@@ -35,6 +35,10 @@ public:
         return texture_data_;
     }
 
+    [[nodiscard]] std::vector<PixelType>& data_mut() {
+        return texture_data_;
+    }
+
     // TODO: Move to asset manager
     static std::optional<Texture2D> load_png(const std::string& path);
 

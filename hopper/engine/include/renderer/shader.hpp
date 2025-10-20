@@ -171,20 +171,15 @@ namespace detail {
     }
 } // namespace detail
 
-template<typename FragOut, typename... Attachments>
-concept FragOutMatchesAttachments = std::is_aggregate_v<FragOut> && requires {
-    requires std::is_same_v<
-        decltype([]<typename... Fields>(std::tuple<Fields...>*) -> std::tuple<std::remove_cvref_t<Fields>...> {
-            return {};
-        }(static_cast<decltype(detail::tuple_from_aggregate(std::declval<FragOut>()))*>(nullptr))),
-        std::tuple<Attachments...>>;
-};
-
 template<typename T>
 concept Interpolatable = requires(T a, T b, float t) {
-    { a + b } -> std::convertible_to<T>;
+    {
+        a + b
+    } -> std::convertible_to<T>;
 
-    { a * t } -> std::convertible_to<T>;
+    {
+        a* t
+    } -> std::convertible_to<T>;
 };
 
 template<typename T>
@@ -196,7 +191,9 @@ concept AggregateInterpolatable = std::is_aggregate_v<T> && requires {
 
 template<typename T>
 concept HasPosition = requires(T t) {
-    { t.position } -> std::convertible_to<Eigen::Vector4f>;
+    {
+        t.position
+    } -> std::convertible_to<Eigen::Vector4f>;
 };
 
 template<typename VertexIn, typename VertexOut, typename FragOut, typename... Uniforms>

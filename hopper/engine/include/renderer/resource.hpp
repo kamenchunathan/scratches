@@ -263,9 +263,6 @@ private:
     template<typename Format>
     Store<Texture2D<Format>>* get_texture_store();
 
-    template<typename Format>
-    const Store<Texture2D<Format>>* get_texture_store() const;
-
     template<typename Element>
     Store<std::vector<Element>>* get_buffer_store();
 
@@ -357,9 +354,9 @@ ResourceRegistry::Store<Texture2D<Format>>* ResourceRegistry::get_texture_store(
     auto key = std::type_index(typeid(Format));
     auto it = texture_store_.find(key);
     if (it == texture_store_.end()) {
-        it = texture_store_.emplace(key, std::make_unique<Store<Texture2D<Format>>>()).first;
+        it = texture_store_.emplace(key, Store<Texture2D<Format>> {}).first;
     }
-    return std::any_cast<std::unique_ptr<Store<Texture2D<Format>>>>(&it->second)->get();
+    return std::any_cast<Store<Texture2D<Format>>>(&it->second);
 }
 
 template<typename Elem>
@@ -367,9 +364,9 @@ ResourceRegistry::Store<std::vector<Elem>>* ResourceRegistry::get_buffer_store()
     auto key = std::type_index(typeid(Elem));
     auto it = buffer_store_.find(key);
     if (it == buffer_store_.end()) {
-        it = buffer_store_.emplace(key, std::make_unique<Store<std::vector<Elem>>>()).first;
+        it = buffer_store_.emplace(key, Store<std::vector<Elem>> {}).first;
     }
-    return std::any_cast<std::unique_ptr<Store<std::vector<Elem>>>>(&it->second)->get();
+    return std::any_cast<Store<std::vector<Elem>>>(&it->second);
 }
 
 template<typename Format>
