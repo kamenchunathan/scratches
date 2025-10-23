@@ -256,15 +256,24 @@ private:
         }
     };
 
-    std::unordered_map<std::type_index, std::any> texture_store_;
-    std::unordered_map<std::type_index, std::any> buffer_store_;
+    // TODO: I do not quite like this
+    // This is because the const get_*_store functions insert to this if a new type is passed
+    // Making these mutable is conceptually Ok but look for other options
+    mutable std::unordered_map<std::type_index, std::any> texture_store_;
+    mutable std::unordered_map<std::type_index, std::any> buffer_store_;
     Store<std::unique_ptr<IPipeline>> pipeline_store_;
+
+    template<typename Format>
+    const Store<Texture2D<Format>>* get_texture_store() const;
 
     template<typename Format>
     Store<Texture2D<Format>>* get_texture_store();
 
     template<typename Element>
     Store<std::vector<Element>>* get_buffer_store();
+
+    template<typename Element>
+    const Store<std::vector<Element>>* get_buffer_store() const;
 
     template<typename Format>
     std::expected<TextureHandle<Format>, ResourceError> insert_texture(Texture2D<Format>&& texture);
@@ -350,7 +359,7 @@ private:
 };
 
 template<typename Format>
-ResourceRegistry::Store<Texture2D<Format>>* ResourceRegistry::get_texture_store() {
+const ResourceRegistry::Store<Texture2D<Format>>* ResourceRegistry::get_texture_store() const {
     auto key = std::type_index(typeid(Format));
     auto it = texture_store_.find(key);
     if (it == texture_store_.end()) {
@@ -359,14 +368,28 @@ ResourceRegistry::Store<Texture2D<Format>>* ResourceRegistry::get_texture_store(
     return std::any_cast<Store<Texture2D<Format>>>(&it->second);
 }
 
+template<typename Format>
+ResourceRegistry::Store<Texture2D<Format>>* ResourceRegistry::get_texture_store() {
+    return const_cast<ResourceRegistry::Store<Texture2D<Format>>*>(
+        static_cast<const ResourceRegistry&>(*this).get_texture_store<Format>()
+    );
+}
+
 template<typename Elem>
-ResourceRegistry::Store<std::vector<Elem>>* ResourceRegistry::get_buffer_store() {
+const ResourceRegistry::Store<std::vector<Elem>>* ResourceRegistry::get_buffer_store() const {
     auto key = std::type_index(typeid(Elem));
     auto it = buffer_store_.find(key);
     if (it == buffer_store_.end()) {
         it = buffer_store_.emplace(key, Store<std::vector<Elem>> {}).first;
     }
     return std::any_cast<Store<std::vector<Elem>>>(&it->second);
+}
+
+template<typename Elem>
+ResourceRegistry::Store<std::vector<Elem>>* ResourceRegistry::get_buffer_store() {
+    return const_cast<ResourceRegistry::Store<std::vector<Elem>>*>(
+        static_cast<const ResourceRegistry&>(*this).get_buffer_store<Elem>()
+    );
 }
 
 template<typename Format>
