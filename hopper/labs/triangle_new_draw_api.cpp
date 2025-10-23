@@ -60,19 +60,20 @@ struct FragOut {
     core::ColorRGBA32F color;
 };
 
-class ColorShader: public renderer::ShaderPrev<ColorVertex, VOut, FragOut> {
+class ColorShader: public renderer::ShaderPrev<ColorVertex, VOut, FragOut, Eigen::Vector2f> {
 public:
-    VOut vertex(const ColorVertex& v) override {
-        Eigen::Vector4f clip_pos(v.x, v.y, 0.0f, 1.0f);
+    VOut vertex(const ColorVertex& v, const Eigen::Vector2f& position) override {
+        Eigen::Vector4f clip_pos(v.x + position.x(), v.y + position.y(), 0.0f, 1.0f);
         return {clip_pos, v.color};
     }
 
-    FragOut fragment(const VOut& v) override {
+    FragOut fragment(const VOut& v, const Eigen::Vector2f& position) override {
+        (void)position;
         return {v.color};
     }
 };
 
-using ColorPipeline = renderer::Pipeline<ColorVertex, VOut, FragOut>;
+using ColorPipeline = renderer::Pipeline<ColorVertex, VOut, FragOut, Eigen::Vector2f>;
 
 ///////////////////////////////////////// ECS Resources for buffer handles //////////////////////////////////////////
 
@@ -96,11 +97,13 @@ public:
         renderer::PipelineHandle<ColorPipeline> pipeline_handle,
         renderer::FrameBuffer<renderer::Attachment<core::ColorRGBA32F>> target,
         renderer::BufferHandle<ColorVertex> vertex_buffer_handle,
+        Eigen::Vector2f pos,
         std::uint32_t vertex_count
     ):
         pipeline_handle_(pipeline_handle),
         target_(target),
         vertex_buffer_handle_(vertex_buffer_handle),
+        pos(pos),
         vertex_count_(vertex_count) {}
 
     const std::string target_pass() const override {
@@ -108,13 +111,14 @@ public:
     }
 
     void execute(renderer::RenderPassEncoder& encoder) override {
-        encoder.draw(pipeline_handle_, target_, vertex_buffer_handle_, vertex_count_);
+        encoder.draw(pipeline_handle_, target_, vertex_buffer_handle_, pos, vertex_count_);
     }
 
 private:
     renderer::PipelineHandle<ColorPipeline> pipeline_handle_;
     renderer::FrameBuffer<renderer::Attachment<core::ColorRGBA32F>> target_;
     renderer::BufferHandle<ColorVertex> vertex_buffer_handle_;
+    Eigen::Vector2f pos;
     std::uint32_t vertex_count_;
 };
 
@@ -369,6 +373,7 @@ void render_system(ecs::World& world) {
             color_pipeline_res->handle,
             color_pass_target,
             vertex_buffer_res->handle,
+            Eigen::Vector2f(transform.x, transform.y),
             vertices.size()
         ));
 

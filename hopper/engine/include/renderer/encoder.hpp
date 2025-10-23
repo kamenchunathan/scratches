@@ -56,6 +56,7 @@ public:
         PipelineHandle<Pipeline> pipeline,
         FrameBuffer<Attachments...> target,
         BufferHandle<typename Pipeline::vertex_in> vertices,
+        typename Pipeline::uniforms uniforms,
         std::uint32_t vertex_count,
         std::uint32_t first_vertex = 0
     );
@@ -282,26 +283,27 @@ void RenderPassEncoderPrev::draw_prev(
     }
 }
 
-template<typename PipelineType, typename... Attachments>
-    requires FragOutMatchesAttachments<typename PipelineType::frag_out, Attachments...>
+template<typename Pipeline, typename... Attachments>
+    requires FragOutMatchesAttachments<typename Pipeline::frag_out, Attachments...>
 void RenderPassEncoder::draw(
-    PipelineHandle<PipelineType> pipeline_handle,
+    PipelineHandle<Pipeline> pipeline_handle,
     FrameBuffer<Attachments...> target,
-    BufferHandle<typename PipelineType::vertex_in> vertex_buffer_handle,
+    BufferHandle<typename Pipeline::vertex_in> vertex_buffer_handle,
+    typename Pipeline::uniforms uniforms,
     std::uint32_t vertex_count,
     std::uint32_t first_vertex
 ) {
-    std::expected<const PipelineType*, ResourceError> p =
+    std::expected<const Pipeline*, ResourceError> p =
         resource_registry_.get_pipeline(pipeline_handle);
     if (!p)
         return;
-    const PipelineType* pipeline = p.value();
+    const Pipeline* pipeline = p.value();
 
-    std::expected<std::span<const typename PipelineType::vertex_in>, ResourceError>
-        vertex_buffer_res = resource_registry_.get_buffer(vertex_buffer_handle);
+    std::expected<std::span<const typename Pipeline::vertex_in>, ResourceError> vertex_buffer_res =
+        resource_registry_.get_buffer(vertex_buffer_handle);
     if (!vertex_buffer_res)
         return;
-    std::span<const typename PipelineType::vertex_in> vertex_buffer = vertex_buffer_res.value();
+    std::span<const typename Pipeline::vertex_in> vertex_buffer = vertex_buffer_res.value();
 
     auto get_texture_from_attachment = [&](const auto& attachment) {
         using AttachmentType = std::remove_cvref_t<decltype(attachment)>;
@@ -335,19 +337,24 @@ void RenderPassEncoder::draw(
     auto* shader = pipeline->shader.get();
 
     assert(actual_vertex_count % 3 == 0 && "Vertices must be a multiple of 3");
-    std::vector<typename PipelineType::vertex_out> v_out;
+    std::vector<typename Pipeline::vertex_out> v_out;
     v_out.reserve(actual_vertex_count);
 
     for (std::size_t i = 0; i < actual_vertex_count; ++i) {
-        v_out.push_back(shader->vertex(vertex_buffer[first_vertex + i]));
+        v_out.push_back(std::apply(
+            [&](auto&&... args) {
+                return shader->vertex(vertex_buffer[first_vertex + i], args...);
+            },
+            uniforms
+        ));
     }
 
     std::vector<float> z_buffer(imageWidth * imageHeight, std::numeric_limits<float>::infinity());
 
     for (std::size_t i = 0; i < v_out.size(); i += 3) {
-        const typename PipelineType::vertex_out& v0_clip = v_out[i];
-        const typename PipelineType::vertex_out& v1_clip = v_out[i + 1];
-        const typename PipelineType::vertex_out& v2_clip = v_out[i + 2];
+        const typename Pipeline::vertex_out& v0_clip = v_out[i];
+        const typename Pipeline::vertex_out& v1_clip = v_out[i + 1];
+        const typename Pipeline::vertex_out& v2_clip = v_out[i + 2];
 
         Eigen::Vector3f v0_ndc = v0_clip.position.template head<3>() / v0_clip.position.w();
         Eigen::Vector3f v1_ndc = v1_clip.position.template head<3>() / v1_clip.position.w();
@@ -448,17 +455,22 @@ void RenderPassEncoder::draw(
                             t0
                         );
 
-                        typename PipelineType::vertex_out interpolated_v =
-                            detail::construct_from_tuple<typename PipelineType::vertex_out>(
+                        typename Pipeline::vertex_out interpolated_v =
+                            detail::construct_from_tuple<typename Pipeline::vertex_out>(
                                 std::move(interpolated_tuple)
                             );
 
-                        auto frag_result = shader->fragment(interpolated_v);
+                        auto frag_result = std::apply(
+                            [&](auto&&... args) {
+                                return shader->fragment(interpolated_v, args...);
+                            },
+                            uniforms
+                        );
 
                         auto frag_output_tuple = [&] {
                             // TODO: Fully support returning either one or an aggregate of types
                             if constexpr (std::is_same_v<
-                                              std::tuple<typename PipelineType::frag_out>,
+                                              std::tuple<typename Pipeline::frag_out>,
                                               attachment_formats_t<Attachments...>>)
                             {
                                 return std::make_tuple(frag_result);

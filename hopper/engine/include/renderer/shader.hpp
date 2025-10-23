@@ -216,6 +216,7 @@ public:
     using vertex_in = VertexIn;
     using vertex_out = VertexOut;
     using frag_out = FragOut;
+    using uniforms = std::tuple<Uniforms...>;
 
     Pipeline(
         PipelineDescriptor,
