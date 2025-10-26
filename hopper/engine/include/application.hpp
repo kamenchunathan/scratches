@@ -37,6 +37,7 @@ public:
 
     void run();
 
+    /* delta_time: Milliseconds */
     void tick(double delta_time);
 
     bool should_exit() {

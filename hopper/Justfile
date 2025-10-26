@@ -1,11 +1,20 @@
 setup:
     #!/usr/bin/env bash
-    # set -euxo pipefail; 
-    
-    mkdir build
+    set -euxo pipefail
+
+    echo "Cleaning old build directory..."
+    # rm -rf build
+
+    echo "Setting up build directories..."
     meson setup build/debug
+    
     meson setup --buildtype=release build/release
-    meson setup --cross-file=./wasm32.ini -Dcpp_args=['-O0', '-g4'] build/wasm32/debug
+    meson setup --cross-file=./wasm32.ini \
+        "-Dc_args=['-O0','-g']" \
+        "-Dcpp_args=['-O0','-g']" \
+        "-Dc_link_args=['-gsource-map','-sASSERTIONS=1','-sSAFE_HEAP=1','-sSTACK_OVERFLOW_CHECK=2','-sDISABLE_EXCEPTION_CATCHING=0']" \
+        "-Dcpp_link_args=['-gsource-map','-sASSERTIONS=1','-sSAFE_HEAP=1','-sSTACK_OVERFLOW_CHECK=2','-sDISABLE_EXCEPTION_CATCHING=0']" \
+        --wipe build/wasm32/debug
     meson setup --cross-file=./wasm32.ini --buildtype=release build/wasm32/release
 
 serve binary_name:
@@ -19,6 +28,7 @@ serve binary_name:
     mkdir -p public
     cp build/wasm32/debug/labs/{{binary_name}}.js public/
     cp build/wasm32/debug/labs/{{binary_name}}.wasm public/
+    cp build/wasm32/debug/labs/{{binary_name}}.wasm.map public/
 
     echo "Generating index.html..."
     cat > public/index.html <<EOF

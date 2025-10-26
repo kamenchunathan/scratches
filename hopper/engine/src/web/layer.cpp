@@ -1,11 +1,34 @@
 #include "web/layer.hpp"
 
 #include <emscripten.h>
+#include <emscripten/html5.h>
 
 #include "application.hpp"
 
 EM_JS(void, my_log, (const char* msg), { console.log('BrowserLayer: ' + UTF8ToString(msg)); });
 
+extern "C" {
+EMSCRIPTEN_KEEPALIVE
+bool main_loop_callback(double time, void* user_data) {
+    try {
+        BrowserLayer::State* state = static_cast<BrowserLayer::State*>(user_data);
+        double delta_ms = time - state->last_time;
+        state->last_time = time;
+
+        state->app->tick(delta_ms);
+        return !state->app->should_exit();
+    } catch (const std::exception& e) {
+        my_log(e.what());
+        return false;
+    }
+}
+}
+
+void BrowserLayer::run(core::Application& app) {
+    m_state = {&app, 0};
+    emscripten_request_animation_frame_loop(main_loop_callback, &m_state);
+}
+
 void BrowserLayer::build(core::Application& app) {
-    my_log("build method called.");
+    app.set_runner([this](core::Application& a) { run(a); });
 }

@@ -8,7 +8,7 @@
 
 namespace ecs {
 
-enum class SystemStage {
+enum class SystemStage : std::uint8_t {
     Startup,
     PreUpdate,
     Update,
@@ -24,8 +24,10 @@ public:
     }
 
     void run_stage(SystemStage stage, World& world) {
-        for (auto system: stages_[stage]) {
-            system(world);
+        if (stages_.contains(stage)) {
+            for (auto system: stages_[stage]) {
+                system(world);
+            }
         }
     }
 
