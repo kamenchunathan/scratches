@@ -468,7 +468,6 @@ void RenderPassEncoder::draw(
                         );
 
                         auto frag_output_tuple = [&] {
-                            // TODO: Fully support returning either one or an aggregate of types
                             if constexpr (std::is_same_v<
                                               std::tuple<typename Pipeline::frag_out>,
                                               attachment_formats_t<Attachments...>>)

@@ -7,33 +7,39 @@ engine_sources = [
   'src/ecs/archetype.cpp',
   'src/ecs/world.cpp',
   'src/renderer/graph.cpp',
-  'src/renderer/texture.cpp',
-  'src/renderer/texture.cpp',
   'src/term/layer.cpp',
   'src/term/presenter.cpp',
   'src/term/input_parser.cpp',
   'src/util/text.cpp',
+  'src/web/layer.cpp',
 ]
+
+engine_lib_deps = [
+  dependency('asio', version: '>=1.30'),
+  dependency('eigen3', version: '>=-3.4'),
+]
+
+engine_dep_deps = [
+  dependency('eigen3', version: '>=3.4'),
+]
+
+if host_machine.system() != 'emscripten'
+  engine_lib_deps += dependency('libpng', static: true)
+  engine_dep_deps += dependency('libpng', static: true)
+endif
 
 engine_lib = static_library(
   'engine',
   engine_sources,
   include_directories: engine_inc,
   install: true,
-  dependencies: [
-    dependency('asio', version: '>=1.30'),
-    dependency('eigen3', version: '>=-3.4'),
-    dependency('libpng', static: true),
-  ],
+  dependencies: engine_lib_deps,
 )
 
 engine_dep = declare_dependency(
   include_directories: engine_inc,
   link_with: engine_lib,
-  dependencies: [
-    dependency('eigen3', version: '>=3.4'),
-    dependency('libpng', static: true),
-  ],
+  dependencies: engine_dep_deps,
 )
 
 diff_test_exe = executable(

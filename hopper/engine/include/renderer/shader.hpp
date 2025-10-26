@@ -198,6 +198,23 @@ concept HasPosition = requires(T t) {
 
 template<typename VertexIn, typename VertexOut, typename FragOut, typename... Uniforms>
     requires HasPosition<VertexOut> && AggregateInterpolatable<VertexOut>
+class Shader {
+public:
+    virtual ~Shader() = default;
+    virtual VertexOut vertex(const VertexIn&) = 0;
+    virtual FragOut fragment(const VertexOut&) = 0;
+
+    template<std::uint32_t id, typename T>
+    void bind_uniform(T t) {
+        std::get<id>(uniforms_) = t;
+    }
+
+private:
+    std::tuple<std::optional<Uniforms>...> uniforms_;
+};
+
+template<typename VertexIn, typename VertexOut, typename FragOut, typename... Uniforms>
+    requires HasPosition<VertexOut> && AggregateInterpolatable<VertexOut>
 class ShaderPrev {
 public:
     virtual ~ShaderPrev() = default;

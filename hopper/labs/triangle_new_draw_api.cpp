@@ -56,24 +56,21 @@ struct VOut {
     core::ColorRGBA32F color;
 };
 
-struct FragOut {
-    core::ColorRGBA32F color;
-};
-
-class ColorShader: public renderer::ShaderPrev<ColorVertex, VOut, FragOut, Eigen::Vector2f> {
+class ColorShader:
+    public renderer::ShaderPrev<ColorVertex, VOut, core::ColorRGBA32F, Eigen::Vector2f> {
 public:
     VOut vertex(const ColorVertex& v, const Eigen::Vector2f& position) override {
         Eigen::Vector4f clip_pos(v.x + position.x(), v.y + position.y(), 0.0f, 1.0f);
         return {clip_pos, v.color};
     }
 
-    FragOut fragment(const VOut& v, const Eigen::Vector2f& position) override {
+    core::ColorRGBA32F fragment(const VOut& v, const Eigen::Vector2f& position) override {
         (void)position;
-        return {v.color};
+        return v.color;
     }
 };
 
-using ColorPipeline = renderer::Pipeline<ColorVertex, VOut, FragOut, Eigen::Vector2f>;
+using ColorPipeline = renderer::Pipeline<ColorVertex, VOut, core::ColorRGBA32F, Eigen::Vector2f>;
 
 ///////////////////////////////////////// ECS Resources for buffer handles //////////////////////////////////////////
 
