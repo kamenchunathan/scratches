@@ -1,6 +1,8 @@
 #pragma once
 
-#include "png.h"
+#ifndef __EMSCRIPTEN__
+
+    #include "png.h"
 
 namespace asset {
 
@@ -31,5 +33,7 @@ public:
         return png_ptr && info_ptr;
     }
 };
+
+#endif // !__EMSCRIPTEN__
 
 } // namespace asset

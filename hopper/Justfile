@@ -1,8 +1,44 @@
-build:
-    meson compile -C build
-
 setup:
-    meson setup build
+    #!/usr/bin/env bash
+    # set -euxo pipefail; 
+    
+    mkdir build
+    meson setup build/debug
+    meson setup --buildtype=release build/release
+    meson setup --cross-file=./wasm32.ini -Dcpp_args=['-O0', '-g4'] build/wasm32/debug
+    meson setup --cross-file=./wasm32.ini --buildtype=release build/wasm32/release
+
+serve binary_name:
+    #!/usr/bin/env bash
+    set -euxo pipefail
+
+    echo "Compiling {{binary_name}} for wasm..."
+    meson compile -C build/wasm32/debug {{binary_name}}
+
+    echo "Preparing public directory..."
+    mkdir -p public
+    cp build/wasm32/debug/labs/{{binary_name}}.js public/
+    cp build/wasm32/debug/labs/{{binary_name}}.wasm public/
+
+    echo "Generating index.html..."
+    cat > public/index.html <<EOF
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <title>{{binary_name}}</title>
+    </head>
+    <body>
+        <script src="{{binary_name}}.js"></script>
+    </body>
+    </html>
+    EOF
+
+    echo "Starting server at http://localhost:8080"
+    
+    # Assumes static-web-server is installed 
+    static-web-server --port 8080 -d public
+    
 
 watch_lab binary_name:
     #!/bin/bash

@@ -62,3 +62,10 @@ executable(
   install: false,
   dependencies: [engine_dep],
 )
+
+executable(
+  'browsertest',
+  'browsertest.cpp',
+  install: false,
+  dependencies: [engine_dep],
+)

@@ -36,6 +36,7 @@
                   [
                     clang-tools
                     llvmPackages_21.libcxxClang
+                    emscripten
                     cmake
                     cppcheck
                     doxygen
@@ -47,6 +48,7 @@
 
                     openssl
                     protobuf
+
                   ]
                   ++ (if system == "aarch64-darwin" then [ ] else [ gdb ]);
               };
