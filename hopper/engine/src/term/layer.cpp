@@ -104,24 +104,24 @@ std::vector<core::input::Event> Terminal::poll_input() {
     return {};
 }
 
-void TerminalLayer::build(core::Application& app) {
-    app.set_runner([this](core::Application& app_ref) { run(app_ref); });
+void TerminalLayer::build(std::shared_ptr<core::Application> app) {
+    app->set_runner([this](std::shared_ptr<core::Application> app_ref) { run(app_ref); });
 }
 
-void TerminalLayer::run(core::Application& app) {
+void TerminalLayer::run(std::shared_ptr<core::Application> app) {
     auto last_time = std::chrono::high_resolution_clock::now();
 
-    while (!app.should_exit()) {
+    while (!app->should_exit()) {
         auto current_time = std::chrono::high_resolution_clock::now();
         auto delta_time = current_time - last_time;
         last_time = current_time;
 
         auto events = terminal->poll_input();
-        if (auto* input_state = app.world.get_resource<core::input::InputState>()) {
+        if (auto* input_state = app->world.get_resource<core::input::InputState>()) {
             input_state->process_events(events);
         }
 
-        app.tick(std::chrono::duration<double>(delta_time).count());
+        app->tick(std::chrono::duration<double>(delta_time).count());
 
         std::this_thread::sleep_for(std::chrono::milliseconds(1000 / frame_rate));
     }

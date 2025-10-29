@@ -1,5 +1,3 @@
-#include <print>
-
 #include "application.hpp"
 #include "ecs/system.hpp"
 
@@ -12,12 +10,11 @@ void Application::set_runner(Runner runner) {
 void Application::run() {
     scheduler.run_stage(ecs::SystemStage::Startup, world);
     if (runner_) {
-        runner_(*this);
+        runner_(shared_from_this());
     }
 }
 
 void Application::tick(double) {
-    // std::println("{}", should_exit());
     scheduler.run_stage(ecs::SystemStage::Update, world);
 }
 

@@ -36,6 +36,6 @@ public:
     std::uint32_t frame_rate = 30; // Set to lower value to avoid flickering
     std::unique_ptr<Terminal> terminal;
 
-    void build(core::Application& app);
-    void run(core::Application& app);
+    void build(std::shared_ptr<core::Application> app);
+    void run(std::shared_ptr<core::Application> app);
 };

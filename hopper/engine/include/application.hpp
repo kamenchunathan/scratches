@@ -1,6 +1,7 @@
 #pragma once
 
 #include <functional>
+#include <memory>
 
 #include "ecs/system.hpp"
 #include "ecs/world.hpp"
@@ -10,13 +11,13 @@ namespace core {
 class Application;
 
 template<typename T>
-concept Layer = requires(T t, core::Application& app) {
+concept Layer = requires(T t, std::shared_ptr<Application> app) {
     {
         t.build(app)
     } -> std::same_as<void>;
 };
 
-class Application {
+class Application : public std::enable_shared_from_this<Application> {
 public:
     ecs::World world;
     ecs::SystemScheduler scheduler;
@@ -24,12 +25,8 @@ public:
     Application() = default;
     ~Application() = default;
 
-    using Runner = std::function<void(Application&)>;
+    using Runner = std::function<void(std::shared_ptr<Application>)>;
 
-    // BUG: If a layer is passed as an lvalue it happens to be layer that sets the runner,
-    // the value is dropped but any references to the layer captured by the runner remain
-    // which may lead to segfaults.
-    // Brainstorm approaches to this problem
     template<Layer L>
     void add_layer(L&& layer);
 
@@ -56,7 +53,7 @@ private:
 
 template<Layer L>
 void Application::add_layer(L&& layer) {
-    layer.build(*this);
+    layer.build(shared_from_this());
 }
 
 } // namespace core

@@ -1,10 +1,14 @@
-#include "application.hpp"
 #include <cstdint>
+#include <memory>
+
+namespace core {
+class Application;
+}
 
 class BrowserLayer {
 public:
     struct State {
-        core::Application* app;
+        std::shared_ptr<core::Application> app;
         double last_time;
     };
 
@@ -14,6 +18,6 @@ private:
 public:
     std::uint32_t fps = 0;
 
-    void build(core::Application&);
-    void run(core::Application&);
+    void build(std::shared_ptr<core::Application>);
+    void run(std::shared_ptr<core::Application>);
 };
