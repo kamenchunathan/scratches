@@ -11,12 +11,12 @@ EM_JS(void, console_log, (const char* msg), { console.log('BrowserLayer: ' + UTF
 int main() {
     // Application has to be static because it's methods and variables are accessed
     // in a callback from javascript
-    static core::Application app;
+    static auto app = std::make_shared<core::Application>();
 
     BrowserLayer layer;
-    app.add_layer(layer);
+    app->add_layer(layer);
 
-    app.scheduler.add_system(ecs::SystemStage::Update, [](ecs::World&) { console_log("wow"); });
+    app->scheduler.add_system(ecs::SystemStage::Update, [](ecs::World&) { console_log("wow"); });
 
-    app.run();
+    app->run();
 }

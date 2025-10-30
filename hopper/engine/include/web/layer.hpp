@@ -13,7 +13,7 @@ public:
     };
 
 private:
-    State m_state;
+    State state_;
 
 public:
     std::uint32_t fps = 0;

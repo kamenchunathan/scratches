@@ -23,9 +23,14 @@ engine_dep_deps = [
   dependency('eigen3', version: '>=3.4'),
 ]
 
+emscripten_link_args = []
+
 if host_machine.system() != 'emscripten'
   engine_lib_deps += dependency('libpng', static: true)
   engine_dep_deps += dependency('libpng', static: true)
+  link_args += [
+    '--js-library', meson.current_source_dir() / 'library.js'
+  ]
 endif
 
 engine_lib = static_library(
@@ -40,6 +45,7 @@ engine_dep = declare_dependency(
   include_directories: engine_inc,
   link_with: engine_lib,
   dependencies: engine_dep_deps,
+  link_args: emscripten_link_args,
 )
 
 diff_test_exe = executable(

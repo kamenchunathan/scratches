@@ -1,12 +1,12 @@
 #include "common.hpp"
 
-#if PLATFORM_WASM
+// #if PLATFORM_WASM
 
-    #include <emscripten.h>
-    #include <emscripten/html5.h>
+#include <emscripten.h>
+#include <emscripten/html5.h>
 
-    #include "application.hpp"
-    #include "web/layer.hpp"
+#include "application.hpp"
+#include "web/layer.hpp"
 
 EM_JS(void, my_log, (const char* msg), { console.log('BrowserLayer: ' + UTF8ToString(msg)); });
 
@@ -29,12 +29,12 @@ bool main_loop_callback(double time, void* user_data) {
 }
 
 void BrowserLayer::run(std::shared_ptr<core::Application> app) {
-    m_state = {app, 0};
-    emscripten_request_animation_frame_loop(main_loop_callback, &m_state);
+    state_ = State {app, 0};
+    emscripten_request_animation_frame_loop(main_loop_callback, &state_);
 }
 
 void BrowserLayer::build(std::shared_ptr<core::Application> app) {
     app->set_runner([this](std::shared_ptr<core::Application> a) { run(a); });
 }
 
-#endif
+// #endif
