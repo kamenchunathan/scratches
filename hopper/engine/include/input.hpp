@@ -1,11 +1,11 @@
 #pragma once
 
-#include "application.hpp"
-#include "ecs/system.hpp"
 #include <array>
 #include <format>
 #include <optional>
 #include <variant>
+
+#include "application.hpp"
 
 namespace core::input {
 
@@ -136,7 +136,7 @@ public:
 // TODO: Make generic later
 class InputLayer {
 public:
-    void build(core::Application&);
+    void build(std::shared_ptr<core::Application>);
 };
 
 } // namespace core::input

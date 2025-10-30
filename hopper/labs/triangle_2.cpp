@@ -187,7 +187,7 @@ private:
 // Renderer Layer
 class RendererLayer {
 public:
-    void build(core::Application& app) {
+    void build(std::shared_ptr<core::Application> app) {
         // Get terminal dimensions
         const std::uint32_t char_width = 160;
         const std::uint32_t char_height = 45;
@@ -195,7 +195,7 @@ public:
         const std::uint32_t pixel_height = 90;
 
         // Create renderer
-        auto* term_layer_ptr = app.world.get_resource<TerminalLayer*>();
+        auto* term_layer_ptr = app->world.get_resource<TerminalLayer*>();
         if (!term_layer_ptr || !*term_layer_ptr)
             return;
 
@@ -207,10 +207,12 @@ public:
 
         // Register shader for first pass only
         auto color_shader = std::make_unique<ColorShader>();
-        renderer->register_pipeline(std::make_unique<ColorPipeline>(
-            renderer::PipelineDescriptor {},
-            std::move(color_shader)
-        ));
+        renderer->register_pipeline(
+            std::make_unique<ColorPipeline>(
+                renderer::PipelineDescriptor {},
+                std::move(color_shader)
+            )
+        );
 
         // Create buffers
         auto color_buffer =
@@ -226,12 +228,12 @@ public:
         renderer->render_graph.add_pass(std::move(pixel_pass));
 
         // Store buffer handles as ECS resources
-        app.world.insert_resource(ColorBufferResource {color_buffer});
-        app.world.insert_resource(VertexBufferResource {vertex_buffer});
-        app.world.insert_resource(CharacterBufferResource {char_buffer});
+        app->world.insert_resource(ColorBufferResource {color_buffer});
+        app->world.insert_resource(VertexBufferResource {vertex_buffer});
+        app->world.insert_resource(CharacterBufferResource {char_buffer});
 
         // Store renderer
-        app.world.insert_resource(std::move(renderer));
+        app->world.insert_resource(std::move(renderer));
     }
 };
 
@@ -325,11 +327,13 @@ void render_system(ecs::World& world) {
 
         // Submit render commands
         // First pass: render triangle to color buffer
-        (*renderer)->submit(std::make_unique<ColorPassCommand>(
-            vertex_buffer_res->handle,
-            color_buffer_res->handle,
-            vertices.size()
-        ));
+        (*renderer)->submit(
+            std::make_unique<ColorPassCommand>(
+                vertex_buffer_res->handle,
+                color_buffer_res->handle,
+                vertices.size()
+            )
+        );
 
         // Second pass: convert color buffer to character pixels
         (*renderer)->submit(

@@ -55,7 +55,7 @@ void sigint_handler(int /*sig*/) {
 
 class TerminalInputLayer {
 public:
-    void build(core::Application& app) {
+    void build(std::shared_ptr<core::Application> app) {
         if (!isatty(STDIN_FILENO)) {
             std::println(stderr, "This program must be run in a terminal.");
             return;
@@ -74,10 +74,10 @@ public:
 
         std::print("Reading mouse input. Press 'q' to quit.\r\n");
 
-        app.set_runner(run);
+        app->set_runner(run);
     }
 
-    static void run(core::Application&) {
+    static void run(std::shared_ptr<core::Application>) {
         char buf[1024];
 
         while (true) {
@@ -117,4 +117,4 @@ int main() {
     TerminalInputLayer term_input_layer {};
     app.add_layer(term_input_layer);
     app.run();
-}
+    nputhandlinge

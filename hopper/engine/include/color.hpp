@@ -3,7 +3,6 @@
 #include <algorithm>
 #include <cstdint>
 #include <format>
-#include <iostream>
 
 namespace core {
 
@@ -19,8 +18,10 @@ struct ColorRGB8 {
     static const ColorRGB8 MAGENTA;
     static const ColorRGB8 CYAN;
 
-    static ColorRGB8
-    rgb(std::uint8_t r, std::uint8_t g, std::uint8_t b
+    static ColorRGB8 rgb(
+        std::uint8_t r,
+        std::uint8_t g,
+        std::uint8_t b
 
     ) {
         return ColorRGB8 {r, g, b};

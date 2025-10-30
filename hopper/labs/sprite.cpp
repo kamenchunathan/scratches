@@ -3,7 +3,6 @@
 #include <format>
 #include <iterator>
 #include <memory>
-#include <print>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -253,13 +252,13 @@ private:
 // Renderer Layer
 class RendererLayer {
 public:
-    void build(core::Application& app) {
+    void build(std::shared_ptr<core::Application> app) {
         const std::uint32_t char_width = 160;
         const std::uint32_t char_height = 45;
         const std::uint32_t pixel_width = 160;
         const std::uint32_t pixel_height = 90;
 
-        auto* term_layer_ptr = app.world.get_resource<TerminalLayer*>();
+        auto* term_layer_ptr = app->world.get_resource<TerminalLayer*>();
         if (!term_layer_ptr || !*term_layer_ptr)
             return;
 
@@ -269,10 +268,12 @@ public:
             (*term_layer_ptr)->terminal->presenter()
         );
 
-        renderer->register_pipeline(std::make_unique<TexturePipeline>(
-            renderer::PipelineDescriptor {},
-            std::make_unique<TextureShader>()
-        ));
+        renderer->register_pipeline(
+            std::make_unique<TexturePipeline>(
+                renderer::PipelineDescriptor {},
+                std::make_unique<TextureShader>()
+            )
+        );
 
         auto color_buffer =
             renderer->buffer_registry.create_buffer<core::ColorRGBA32F>(pixel_width, pixel_height);
@@ -292,12 +293,12 @@ public:
         renderer->render_graph.add_pass(std::move(pixel_pass));
 
         // Store buffer handles as ECS resources
-        app.world.insert_resource(ColorBufferResource {color_buffer});
-        app.world.insert_resource(VertexBufferResource {vertex_buffer});
-        app.world.insert_resource(CharacterBufferResource {char_buffer});
+        app->world.insert_resource(ColorBufferResource {color_buffer});
+        app->world.insert_resource(VertexBufferResource {vertex_buffer});
+        app->world.insert_resource(CharacterBufferResource {char_buffer});
 
         // Store renderer
-        app.world.insert_resource(std::move(renderer));
+        app->world.insert_resource(std::move(renderer));
     }
 };
 
@@ -384,15 +385,17 @@ void render_system(ecs::World& world) {
             {-1.0f, 1.0f, 0.0f, 0.0f}, // top-left
         };
 
-        renderer.submit(std::make_unique<ColorPassCommand>(
-            vertex_buffer_res->handle,
-            color_buffer_res->handle,
-            std::move(vertices),
-            "color_pass_bg",
-            &renderer.shader_resource_registry,
-            &renderer.buffer_registry,
-            sprite.texture
-        ));
+        renderer.submit(
+            std::make_unique<ColorPassCommand>(
+                vertex_buffer_res->handle,
+                color_buffer_res->handle,
+                std::move(vertices),
+                "color_pass_bg",
+                &renderer.shader_resource_registry,
+                &renderer.buffer_registry,
+                sprite.texture
+            )
+        );
     }
 
     // Update quad vertices based on transform
@@ -412,15 +415,17 @@ void render_system(ecs::World& world) {
             {transform.x - half_width, transform.y + half_height, 0.0f, 0.0f}, // top-left
         };
 
-        renderer.submit(std::make_unique<ColorPassCommand>(
-            vertex_buffer_res->handle,
-            color_buffer_res->handle,
-            std::move(vertices),
-            "color_pass_fg",
-            &renderer.shader_resource_registry,
-            &renderer.buffer_registry,
-            sprite.texture
-        ));
+        renderer.submit(
+            std::make_unique<ColorPassCommand>(
+                vertex_buffer_res->handle,
+                color_buffer_res->handle,
+                std::move(vertices),
+                "color_pass_fg",
+                &renderer.shader_resource_registry,
+                &renderer.buffer_registry,
+                sprite.texture
+            )
+        );
     }
 
     renderer.submit(std::make_unique<HalfBlockCommand>(&renderer.buffer_registry, &world));

@@ -7,8 +7,8 @@
 
 namespace core::input {
 
-void InputLayer::build(core::Application& app) {
-    app.world.insert_resource(InputState {});
+void InputLayer::build(std::shared_ptr<core::Application> app) {
+    app->world.insert_resource(InputState {});
 }
 
 template<class... Ts>
