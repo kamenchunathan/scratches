@@ -1,5 +1,12 @@
-#include "web/presenter.hpp"
-#include <cstdint>
+#include "common.hpp"
+
+#ifdef PLATFORM_WASM
+
+    #include <cstdint>
+    #include <emscripten.h>
+    #include <emscripten/html5.h>
+
+    #include "web/presenter.hpp"
 
 namespace web {
 
@@ -8,16 +15,21 @@ void render_to_dom(const void* buffer_ptr, std::uint32_t width, std::uint32_t he
 }
 
 void BrowserPresenter::init() {
+    // Initialize the web rendering context
     EM_ASM({
-        if (!Module.frameTarget) {
-            frameTarget = document.getElementById("pre");
-            frameTarget.id = "frame-target";
-            frameTarget.style.fontFamily = "monospace";
-            frameTarget.style.backgroundColor = '#000';
-            frameTarget.style.color = "#fff";
-            frameTarget.style.padding = "10px";
-            Module.frameTarget = frameTarget;
-            document.body.appendChild(Module.frameTarget);
+        if (!Module.frameContainer) {
+            Module.frameContainer = document.getElementById('frame-container');
+        }
+
+        if (!Module.frameContainer) {
+            Module.frameContainer = document.createElement('pre');
+            Module.frameContainer.id = 'frame-container';
+            Module.frameContainer.style.fontFamily = 'monospace';
+            Module.frameContainer.style.whiteSpace = 'pre';
+            Module.frameContainer.style.backgroundColor = '#000';
+            Module.frameContainer.style.color = '#fff';
+            Module.frameContainer.style.padding = '10px';
+            document.body.appendChild(Module.frameContainer);
         }
     });
 }
@@ -28,7 +40,9 @@ void BrowserPresenter::present(
     const renderer::FrameBufferPrev<renderer::CharacterPixel>& front_buffer,
     const renderer::FrameBufferPrev<renderer::CharacterPixel>&
 ) {
-    render_to_dom(&front_buffer.data(), front_buffer.width(), front_buffer.height());
+    render_to_dom(front_buffer.data().data(), front_buffer.width(), front_buffer.height());
 }
 
 } // namespace web
+
+#endif

@@ -1,9 +1,11 @@
-#include <cstdint>
-#include <memory>
+#include "common.hpp"
 
-namespace core {
-class Application;
-}
+#ifdef PLATFORM_WASM
+
+    #include <cstdint>
+    #include <memory>
+
+    #include "application.hpp"
 
 class BrowserLayer {
 public:
@@ -21,3 +23,5 @@ public:
     void build(std::shared_ptr<core::Application>);
     void run(std::shared_ptr<core::Application>);
 };
+
+#endif

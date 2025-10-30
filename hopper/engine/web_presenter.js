@@ -8,9 +8,9 @@ mergeInto(LibraryManager.library, {
     /// Takes a u32 (Number) representation of ColorRGB8 and converts it into a string
     // css-style hexcode assuming little endian 
     function colorRGB8ToHex(repr){
-      const r = (repr & 0x0000FF).toString(16).padStart(2, '0');
-      const g = ((repr & 0x00FF00) >> 8).toString(16).padStart(2, '0');
-      const b = ((repr & 0xFF0000) >> 16).toString(16).padStart(2, '0');
+      const r = (repr & 0xFF).toString(16).padStart(2, '0');
+      const g = ((repr >> 8) & 0xFF) .toString(16).padStart(2, '0');
+      const b = ((repr >> 16) &0xFF).toString(16).padStart(2, '0');
       return `#${r}${g}${b}`;
     }
 
@@ -52,8 +52,8 @@ mergeInto(LibraryManager.library, {
       html += '</div>'
     }
 
-    if (Module.frameTarget) {
-      Module.frameTarget.innerHTML = html;
+    if (Module.frameContainer) {
+      Module.frameContainer.innerHTML = html;
     }
   }
 });

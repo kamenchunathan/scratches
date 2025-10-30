@@ -1,21 +1,23 @@
-setup:
+default:
+    @echo "Available recipes: setup, setup-debug, setup-release, serve <binary_name>, watch_lab <binary_name>"
+
+setup: setup-debug setup-release
+
+setup-debug:
     #!/usr/bin/env bash
     set -euxo pipefail
 
-    echo "Cleaning old build directory..."
-    # rm -rf build
-
-    echo "Setting up build directories..."
+    echo "Setting up debug build directories..."
     meson setup build/debug
-    
+    meson setup --cross-file=./wasm32-debug.ini --wipe build/wasm32/debug
+
+setup-release:
+    #!/usr/bin/env bash
+    set -euxo pipefail
+
+    echo "Setting up release build directories..."
     meson setup --buildtype=release build/release
-    meson setup --cross-file=./wasm32.ini \
-        "-Dc_args=['-O0','-g']" \
-        "-Dcpp_args=['-O0','-g']" \
-        "-Dc_link_args=['-gsource-map','-sASSERTIONS=1','-sSAFE_HEAP=1','-sSTACK_OVERFLOW_CHECK=2','-sDISABLE_EXCEPTION_CATCHING=0']" \
-        "-Dcpp_link_args=['-gsource-map','-sASSERTIONS=1','-sSAFE_HEAP=1','-sSTACK_OVERFLOW_CHECK=2','-sDISABLE_EXCEPTION_CATCHING=0']" \
-        --wipe build/wasm32/debug
-    meson setup --cross-file=./wasm32.ini --buildtype=release build/wasm32/release
+    meson setup --cross-file=./wasm32-release.ini --buildtype=release --wipe build/wasm32/release
 
 serve binary_name:
     #!/usr/bin/env bash
@@ -65,7 +67,7 @@ watch_lab binary_name:
         meson compile -C build {{binary_name}}
         if [ $? -eq 0 ]; then
             clear
-            ./build/labs/{{binary_name}} &
+            ./build/labs/{{binary_name}} & 
             child_pid=$!
         fi
     }

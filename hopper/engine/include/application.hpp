@@ -12,12 +12,10 @@ class Application;
 
 template<typename T>
 concept Layer = requires(T t, std::shared_ptr<Application> app) {
-    {
-        t.build(app)
-    } -> std::same_as<void>;
+    { t.build(app) } -> std::same_as<void>;
 };
 
-class Application : public std::enable_shared_from_this<Application> {
+class Application: public std::enable_shared_from_this<Application> {
 public:
     ecs::World world;
     ecs::SystemScheduler scheduler;
