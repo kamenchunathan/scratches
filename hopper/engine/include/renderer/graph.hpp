@@ -10,7 +10,6 @@ namespace renderer {
 class RenderPass {
 public:
     explicit RenderPass(std::string name);
-    virtual ~RenderPass() = default;
 
     void add_dependency(const std::string& pass_name);
 
