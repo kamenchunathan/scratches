@@ -1,13 +1,15 @@
 #pragma once
 
+#include <functional>
 #include <memory>
+#include <optional>
 #include <unordered_map>
 #include <vector>
 
 #include "archetype.hpp"
 #include "component.hpp"
-#include "ecs/resource.hpp"
 #include "entity.hpp"
+#include "resource.hpp"
 
 namespace ecs {
 
@@ -62,16 +64,16 @@ public:
     void insert_resource(ResourceType&& res);
 
     template<typename ResourceType>
-    ResourceType* get_resource();
+    auto get_resource() -> std::optional<std::reference_wrapper<ResourceType>>;
 
     template<typename ResourceType>
-    const ResourceType* get_resource() const;
+    auto get_resource() const -> std::optional<std::reference_wrapper<const ResourceType>>;
 
     template<typename ResourceType>
     bool has_resource() const;
 
     template<typename ResourceType>
-    void remove_resource();
+    auto remove_resource() -> std::optional<std::remove_cvref_t<ResourceType>>;
 
     std::vector<Archetype*>
     get_matching_archetypes(ComponentMask required, ComponentMask disallowed);
@@ -143,31 +145,37 @@ void World::insert_resource(ResourceType&& res) {
 }
 
 template<typename ResourceType>
-ResourceType* World::get_resource() {
+auto World::get_resource() -> std::optional<std::reference_wrapper<ResourceType>> {
     using StoredType = std::remove_cvref_t<ResourceType>;
     ResourceId id = ResourceIds::get_id<StoredType>();
 
     if (id >= resources_.size() || !resources_[id]) {
-        return nullptr;
+        return std::nullopt;
     }
 
     // Dynamic cast to the correct holder type and extract the resource
-    auto* holder = dynamic_cast<detail::ResourceStore<StoredType>*>(resources_[id].get());
-    return holder ? &holder->get() : nullptr;
+    auto* store = dynamic_cast<detail::ResourceStore<StoredType>*>(resources_[id].get());
+    if (store) {
+        return store->get();
+    }
+    return std::nullopt;
 }
 
 template<typename ResourceType>
-const ResourceType* World::get_resource() const {
+auto World::get_resource() const -> std::optional<std::reference_wrapper<const ResourceType>> {
     using StoredType = std::remove_cvref_t<ResourceType>;
     ResourceId id = ResourceIds::get_id<StoredType>();
 
     if (id >= resources_.size() || !resources_[id]) {
-        return nullptr;
+        return std::nullopt;
     }
 
-    const auto* holder =
+    const auto* store =
         dynamic_cast<const detail::ResourceStore<StoredType>*>(resources_[id].get());
-    return holder ? &holder->get() : nullptr;
+    if (store) {
+        return store->get();
+    }
+    return std::nullopt;
 }
 
 template<typename ResourceType>
@@ -183,13 +191,28 @@ bool World::has_resource() const {
 }
 
 template<typename ResourceType>
-void World::remove_resource() {
+auto World::remove_resource() -> std::optional<std::remove_cvref_t<ResourceType>> {
     using StoredType = std::remove_cvref_t<ResourceType>;
     ResourceId id = ResourceIds::get_id<StoredType>();
 
-    if (id < resources_.size()) {
-        resources_[id].reset();
+    if (id >= resources_.size() || !resources_[id]) {
+        return std::nullopt;
     }
+
+    // Take ownership of the holder unique_ptr to move the resource out safely
+    // The store pointer will go out of scope, destroying the store.
+    auto store_ptr = std::move(resources_[id]);
+
+    auto* store = dynamic_cast<detail::ResourceStore<StoredType>*>(store_ptr.get());
+    if (!store) {
+        // The type was wrong, but the resource has been removed from the world.
+        // Return nullopt and the incorrect holder will be destroyed.
+        return std::nullopt;
+    }
+
+    // Move the resource out of the holder.
+    StoredType resource = std::move(store->get());
+    return resource;
 }
 
 } // namespace ecs
