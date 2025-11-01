@@ -105,24 +105,30 @@ std::vector<core::input::Event> Terminal::poll_input() {
 }
 
 void TerminalLayer::build(std::shared_ptr<core::Application> app) {
+    app->world.insert_resource(terminal->presenter());
     app->set_runner([this](std::shared_ptr<core::Application> app_ref) { run(app_ref); });
 }
 
 void TerminalLayer::run(std::shared_ptr<core::Application> app) {
     auto last_time = std::chrono::high_resolution_clock::now();
+    const auto target_frame_duration = std::chrono::milliseconds(1000 / frame_rate);
 
     while (!app->should_exit()) {
-        auto current_time = std::chrono::high_resolution_clock::now();
-        auto delta_time = current_time - last_time;
-        last_time = current_time;
+        auto frame_start_time = std::chrono::high_resolution_clock::now();
+        auto delta_time = frame_start_time - last_time;
+        last_time = frame_start_time;
 
+        // Update the InputState resource
         auto events = terminal->poll_input();
-        if (auto* input_state = app->world.get_resource<core::input::InputState>()) {
-            input_state->process_events(events);
+        if (auto opt_input_state = app->world.get_resource<core::input::InputState>()) {
+            opt_input_state->get().process_events(events);
         }
 
         app->tick(std::chrono::duration<double>(delta_time).count());
 
-        std::this_thread::sleep_for(std::chrono::milliseconds(1000 / frame_rate));
+        auto work_duration = std::chrono::high_resolution_clock::now() - frame_start_time;
+        if (work_duration < target_frame_duration) {
+            std::this_thread::sleep_for(target_frame_duration - work_duration);
+        }
     }
 }
