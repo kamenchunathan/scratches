@@ -33,8 +33,13 @@ private:
 
 class TerminalLayer {
 public:
-    std::uint32_t frame_rate = 30; // Set to lower value to avoid flickering
+    std::uint32_t frame_rate = 30;
     std::unique_ptr<Terminal> terminal;
+
+    TerminalLayer() {
+        TerminalLayer(std::make_unique<Terminal>());
+    }
+    explicit TerminalLayer(std::unique_ptr<Terminal> terminal): terminal(std::move(terminal)) {}
 
     void build(std::shared_ptr<core::Application> app);
     void run(std::shared_ptr<core::Application> app);

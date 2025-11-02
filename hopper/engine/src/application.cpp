@@ -16,18 +16,19 @@ void Application::run() {
 }
 
 void Application::tick(double delta_time) {
-    auto* time = world.get_resource<core::Time>();
-    if (time) {
-        time->delta_seconds = delta_time / 1000.0;
-        time->total_seconds += delta_time / 1000.0;
+    if (auto opt_time = world.get_resource<core::Time>()) {
+        auto& time = opt_time->get();
+        time.delta_seconds = delta_time;
+        time.total_seconds += delta_time;
     } else {
         world.insert_resource(
             core::Time {
-                .delta_seconds = delta_time / 1000.0,
-                .total_seconds = delta_time / 1000.0,
+                .delta_seconds = delta_time,
+                .total_seconds = delta_time,
             }
         );
     }
+
     scheduler.run_stage(ecs::SystemStage::Update, world);
 }
 

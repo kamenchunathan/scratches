@@ -120,14 +120,17 @@ public:
 
     void execute(renderer::RenderPassEncoderPrev&) override {
         // Get buffer handles from ECS resources
-        auto* color_buffer_res = world_->get_resource<ColorBufferResource>();
-        auto* char_buffer_res = world_->get_resource<CharacterBufferResource>();
+        auto opt_color_buffer_res = world_->get_resource<ColorBufferResource>();
+        auto opt_char_buffer_res = world_->get_resource<CharacterBufferResource>();
 
-        if (!color_buffer_res || !char_buffer_res)
+        if (!opt_color_buffer_res || !opt_char_buffer_res)
             return;
 
-        auto* color_buffer = resource_registry_->get_buffer(color_buffer_res->handle);
-        auto* char_buffer = resource_registry_->get_buffer(char_buffer_res->handle);
+        auto& color_buffer_res = opt_color_buffer_res->get();
+        auto& char_buffer_res = opt_char_buffer_res->get();
+
+        auto* color_buffer = resource_registry_->get_buffer(color_buffer_res.handle);
+        auto* char_buffer = resource_registry_->get_buffer(char_buffer_res.handle);
 
         if (!color_buffer || !char_buffer)
             return;
@@ -195,14 +198,14 @@ public:
         const std::uint32_t pixel_height = 90;
 
         // Create renderer
-        auto* term_layer_ptr = app->world.get_resource<TerminalLayer*>();
-        if (!term_layer_ptr || !*term_layer_ptr)
+        auto opt_presenter = app->world.remove_resource<std::unique_ptr<TerminalPresenter>>();
+        if (!opt_presenter.has_value())
             return;
 
         auto renderer = std::make_unique<renderer::RendererPrev>(
             char_width,
             char_height,
-            (*term_layer_ptr)->terminal->presenter()
+            std::move(opt_presenter.value())
         );
 
         // Register shader for first pass only
@@ -239,58 +242,63 @@ public:
 
 // Systems
 void input_system(ecs::World& world) {
-    auto* input_state = world.get_resource<core::input::InputState>();
-    if (!input_state)
-        return;
+    if (auto opt_input_state = world.get_resource<core::input::InputState>()) {
+        auto& input_state = opt_input_state->get();
 
-    const float move_speed = 0.02f;
+        const float move_speed = 0.02f;
 
-    for (auto [entity, transform]: ecs::Query<Transform>(&world)) {
-        if (input_state->is_button_down(core::input::KeyCode::W)
-            || input_state->is_button_down(core::input::KeyCode::Up))
-        {
-            transform.y += move_speed;
-        }
-        if (input_state->is_button_down(core::input::KeyCode::S)
-            || input_state->is_button_down(core::input::KeyCode::Down))
-        {
-            transform.y -= move_speed;
-        }
-        if (input_state->is_button_down(core::input::KeyCode::A)
-            || input_state->is_button_down(core::input::KeyCode::Left))
-        {
-            transform.x -= move_speed;
-        }
-        if (input_state->is_button_down(core::input::KeyCode::D)
-            || input_state->is_button_down(core::input::KeyCode::Right))
-        {
-            transform.x += move_speed;
+        for (auto [entity, transform]: ecs::Query<Transform>(&world)) {
+            if (input_state.is_button_down(core::input::KeyCode::W)
+                || input_state.is_button_down(core::input::KeyCode::Up))
+            {
+                transform.y += move_speed;
+            }
+            if (input_state.is_button_down(core::input::KeyCode::S)
+                || input_state.is_button_down(core::input::KeyCode::Down))
+            {
+                transform.y -= move_speed;
+            }
+            if (input_state.is_button_down(core::input::KeyCode::A)
+                || input_state.is_button_down(core::input::KeyCode::Left))
+            {
+                transform.x -= move_speed;
+            }
+            if (input_state.is_button_down(core::input::KeyCode::D)
+                || input_state.is_button_down(core::input::KeyCode::Right))
+            {
+                transform.x += move_speed;
+            }
+
+            // Clamp position
+            transform.x = std::clamp(transform.x, -1.5f, 1.5f);
+            transform.y = std::clamp(transform.y, -1.5f, 1.5f);
         }
 
-        // Clamp position
-        transform.x = std::clamp(transform.x, -1.5f, 1.5f);
-        transform.y = std::clamp(transform.y, -1.5f, 1.5f);
-    }
-
-    if (input_state->just_pressed(core::input::KeyCode::Q)
-        || input_state->just_pressed(core::input::KeyCode::Escape))
-    {
-        if (auto* app_ptr = world.get_resource<core::Application*>()) {
-            (*app_ptr)->set_should_exit(true);
+        if (input_state.just_pressed(core::input::KeyCode::Q)
+            || input_state.just_pressed(core::input::KeyCode::Escape))
+        {
+            if (auto opt_app_ptr = world.get_resource<std::shared_ptr<core::Application>>()) {
+                auto app_ptr = opt_app_ptr->get();
+                app_ptr->set_should_exit(true);
+            }
         }
     }
 }
 
 void render_system(ecs::World& world) {
-    auto* renderer = world.get_resource<std::unique_ptr<renderer::RendererPrev>>();
-    if (!renderer || !*renderer)
+    auto opt_renderer = world.get_resource<std::unique_ptr<renderer::RendererPrev>>();
+    auto opt_color_buffer_res = world.get_resource<ColorBufferResource>();
+    auto opt_vertex_buffer_res = world.get_resource<VertexBufferResource>();
+
+    if (!opt_renderer || !opt_color_buffer_res || !opt_vertex_buffer_res)
         return;
 
-    auto* color_buffer_res = world.get_resource<ColorBufferResource>();
-    auto* vertex_buffer_res = world.get_resource<VertexBufferResource>();
-
-    if (!color_buffer_res || !vertex_buffer_res)
+    auto& renderer = opt_renderer->get();
+    if (!renderer)
         return;
+
+    auto& color_buffer_res = opt_color_buffer_res->get();
+    auto& vertex_buffer_res = opt_vertex_buffer_res->get();
 
     // Update triangle vertices based on transform
     for (auto [entity, transform, triangle]: ecs::Query<Transform, Triangle>(&world)) {
@@ -321,44 +329,41 @@ void render_system(ecs::World& world) {
              )}
         };
 
-        if (auto* vb = (*renderer)->buffer_registry.get_buffer(vertex_buffer_res->handle)) {
+        if (auto* vb = renderer->buffer_registry.get_buffer(vertex_buffer_res.handle)) {
             vb->update_buffer(vertices);
         }
 
         // Submit render commands
         // First pass: render triangle to color buffer
-        (*renderer)->submit(
+        renderer->submit(
             std::make_unique<ColorPassCommand>(
-                vertex_buffer_res->handle,
-                color_buffer_res->handle,
+                vertex_buffer_res.handle,
+                color_buffer_res.handle,
                 vertices.size()
             )
         );
 
         // Second pass: convert color buffer to character pixels
-        (*renderer)->submit(
-            std::make_unique<HalfBlockCommand>(&(*renderer)->buffer_registry, &world)
-        );
+        renderer->submit(std::make_unique<HalfBlockCommand>(&renderer->buffer_registry, &world));
     }
 
-    (*renderer)->render_frame();
+    renderer->render_frame();
 }
 
 int main() {
-    core::Application app;
+    auto app = std::make_shared<core::Application>();
 
-    app.add_layer(core::input::InputLayer {});
+    app->add_layer(core::input::InputLayer {});
     TerminalLayer term_layer {.frame_rate = 60, .terminal = std::make_unique<Terminal>()};
-    app.world.insert_resource<TerminalLayer*>(&term_layer);
     // NOTE: Workaround to allow the input system to send, the should_exist flag on the
     // application. Other fixes include writing an event system and using a resource,
     // will remove if I decide to do an event bus
-    app.world.insert_resource<core::Application*>(&app);
-    app.add_layer(term_layer);
-    app.add_layer(RendererLayer {});
+    app->world.insert_resource(app);
+    app->add_layer(term_layer);
+    app->add_layer(RendererLayer {});
 
     // Create triangle entity
-    app.world.spawn(
+    app->world.spawn(
         Transform {0.0f, 0.0f, 0.0f},
         Triangle {
             core::ColorRGB8::rgb(255, 100, 200),
@@ -367,9 +372,9 @@ int main() {
         }
     );
 
-    app.scheduler.add_system(ecs::SystemStage::Update, input_system);
-    app.scheduler.add_system(ecs::SystemStage::Update, render_system);
+    app->scheduler.add_system(ecs::SystemStage::Update, input_system);
+    app->scheduler.add_system(ecs::SystemStage::Update, render_system);
 
-    app.run();
+    app->run();
     return 0;
 }
