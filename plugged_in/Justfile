@@ -1,0 +1,39 @@
+setup:
+  meson setup build
+
+build:
+  meson compile -C build
+
+run:
+  ./build/plugged
+
+watch:
+  #!/bin/bash
+  # set -euxo pipefail; 
+    
+  child_pid=""
+  trap 'kill $child_pid 2>/dev/null; exit' SIGINT
+  
+  run() {
+      if [ -n "$child_pid" ]; then
+          kill $child_pid 2>/dev/null
+      fi
+
+      meson compile -C build/
+      if [ $? -eq 0 ]; then
+          clear
+          ./build/plugged & 
+          child_pid=$!
+      fi
+  }
+  
+  clear
+  echo "Building..."
+  run
+  echo -e "\n"
+  
+  while inotifywait -q -e modify src; do
+      clear
+      echo "Rebuilding..."
+      run
+  done
