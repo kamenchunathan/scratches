@@ -32,19 +32,26 @@
                 stdenv = pkgs.clangStdenv;
               }
               {
+                buildInputs = with pkgs; [
+                  llvm
+                  clang-tools
+                  gtest
+                  llvmPackages.libclang
+                ];
+
                 packages =
                   with pkgs;
                   [
-                    clang-tools
-
                     meson
                     ninja
                     just
                     cmake
-
-                    gtest
+                    pkg-config
                   ]
                   ++ (if system == "aarch64-darwin" then [ ] else [ gdb ]);
+
+                CLANG_INCLUDE_PATH = "${pkgs.llvmPackages.libclang.dev}/include";
+                LLVM_LIB_PATH = "${pkgs.llvm}/lib";
               };
         }
       );

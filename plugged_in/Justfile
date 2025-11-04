@@ -1,39 +1,55 @@
+# Set up both projects.
+# The main project needs to find the generator, so we add its output directory to the PATH
+# for the duration of the meson setup command.
 setup:
-  meson setup build
+    meson setup generator build/generator
+    @echo "--- Configuring main project ---"
+    @PATH="{{invocation_directory()}}/build/generator:{{env_var('PATH')}}" meson setup build
 
+# Build the generator and then the main project.
 build:
-  meson compile -C build
+    @echo "--- Building generator ---"
+    @meson compile -C build/generator
+    @echo "--- Building main project ---"
+    @meson compile -C build
 
-run:
-  ./build/plugged
+# Run the final executable
+run: build
+    ./build/plugged
 
+# Watch for changes in source and generator files and rebuild
 watch:
-  #!/bin/bash
-  # set -euxo pipefail; 
-    
-  child_pid=""
-  trap 'kill $child_pid 2>/dev/null; exit' SIGINT
-  
-  run() {
-      if [ -n "$child_pid" ]; then
-          kill $child_pid 2>/dev/null
-      fi
+    #!/bin/bash
+    # set -euxo pipefail;
 
-      meson compile -C build/
-      if [ $? -eq 0 ]; then
-          clear
-          ./build/plugged & 
-          child_pid=$!
-      fi
-  }
-  
-  clear
-  echo "Building..."
-  run
-  echo -e "\n"
-  
-  while inotifywait -q -e modify src; do
-      clear
-      echo "Rebuilding..."
-      run
-  done
+    child_pid=""
+    trap 'kill "$child_pid" 2>/dev/null; exit' SIGINT
+
+    run_app() {
+        # Kill previous process if it's running
+        if [ -n "$child_pid" ]; then
+            kill "$child_pid" 2>/dev/null
+        fi
+
+        # Use `just build` which now builds both projects
+        if just build; then
+            clear
+            ./build/plugged &
+            child_pid=$!
+        else
+            echo "Build failed, not restarting application."
+        fi
+    }
+
+    clear
+    echo "Initial build..."
+    run_app
+    echo -e "\nWatching for changes in 'src/' and 'generator/'..."
+
+    # Watch both src and generator directories for changes
+    while inotifywait -q -r -e modify,create,delete src generator; do
+        clear
+        echo "Changes detected. Rebuilding..."
+        run_app
+        echo -e "\nWatching for changes in 'src/' and 'generator/'..."
+    done
