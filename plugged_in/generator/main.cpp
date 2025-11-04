@@ -1,9 +1,11 @@
-
 #include <filesystem>
 #include <vector>
 
 #include "clang/Tooling/CompilationDatabase.h"
 #include "clang/Tooling/Tooling.h"
+#include "llvm/Support/CommandLine.h"
+
+#include "generator.hpp"
 
 namespace fs = std::filesystem;
 
@@ -71,9 +73,19 @@ int main(int argc, char const** argv) {
     // Process all headers
     clang::tooling::ClangTool tool(*compile_db, headers);
 
-    auto factory = clang::tooling::newFrontendActionFactory([&]() {
-        return std::make_unique<type_erasure::TypeErasureAction>(output_dir.getValue());
-    });
 
+    class TypeErasureActionFactory : public clang::tooling::FrontendActionFactory {
+    public:
+      TypeErasureActionFactory(llvm::StringRef output_dir) : output_dir_(output_dir) {}
+
+      std::unique_ptr<clang::FrontendAction> create() override {
+        return std::make_unique<type_erasure::TypeErasureAction>(output_dir_);
+      }
+
+    private:
+      std::string output_dir_;
+    };
+
+    auto factory = std::make_unique<TypeErasureActionFactory>(output_dir.getValue());
     return tool.run(factory.get());
 }

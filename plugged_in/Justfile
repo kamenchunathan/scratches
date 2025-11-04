@@ -1,37 +1,29 @@
-# Set up both projects.
-# The main project needs to find the generator, so we add its output directory to the PATH
-# for the duration of the meson setup command.
 setup:
     meson setup generator build/generator
+    @echo "--- Building generator ---"
+    @meson compile -C build/generator
     @echo "--- Configuring main project ---"
-    @PATH="{{invocation_directory()}}/build/generator:{{env_var('PATH')}}" meson setup build
+    @PATH="{{invocation_directory()}}/build/generator:{{env_var('PATH')}}" meson setup src build
 
-# Build the generator and then the main project.
 build:
     @echo "--- Building generator ---"
     @meson compile -C build/generator
     @echo "--- Building main project ---"
     @meson compile -C build
 
-# Run the final executable
 run: build
     ./build/plugged
 
-# Watch for changes in source and generator files and rebuild
 watch:
     #!/bin/bash
-    # set -euxo pipefail;
-
     child_pid=""
     trap 'kill "$child_pid" 2>/dev/null; exit' SIGINT
 
     run_app() {
-        # Kill previous process if it's running
         if [ -n "$child_pid" ]; then
             kill "$child_pid" 2>/dev/null
         fi
 
-        # Use `just build` which now builds both projects
         if just build; then
             clear
             ./build/plugged &
@@ -46,7 +38,6 @@ watch:
     run_app
     echo -e "\nWatching for changes in 'src/' and 'generator/'..."
 
-    # Watch both src and generator directories for changes
     while inotifywait -q -r -e modify,create,delete src generator; do
         clear
         echo "Changes detected. Rebuilding..."

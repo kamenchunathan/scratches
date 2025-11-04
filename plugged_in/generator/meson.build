@@ -9,20 +9,14 @@ clang_dep = dependency('libclang', version: '>=17.0', required: false)
 
 if not clang_dep.found()
   cpp = meson.get_compiler('cpp')
-  clang_include_path = meson.get_env('CLANG_INCLUDE_PATH')
-  llvm_lib_path = meson.get_env('LLVM_LIB_PATH')
-
-  if clang_include_path != '' and llvm_lib_path != ''
-    message('Found clang via environment variables.')
-    includes = include_directories(clang_include_path)
-    libclang_lib = cpp.find_library('clang', dirs: llvm_lib_path)
-    clang_dep = declare_dependency(
-      dependencies: libclang_lib,
-      include_directories: includes
-    )
-  else
-    error('Could not find libclang dependency')
-  endif
+  message(
+    'Could not find libclang dependency via pkg-config, trying hardcoded paths.',
+  )
+  clang_include_path = '/usr/lib/llvm-20/include'
+  llvm_lib_path = '/usr/lib/llvm-20/lib'
+  includes = include_directories(clang_include_path)
+  libclang_lib = cpp.find_library('clang', dirs: llvm_lib_path)
+  clang_dep = declare_dependency(dependencies: libclang_lib, include_directories: includes)
 endif
 
 llvm_dep = dependency('llvm', version: '>=17.0', required: true)
@@ -35,6 +29,7 @@ type_erasure_gen = executable(
   install: true,
   cpp_args: [
     '-fno-rtti', # LLVM is built without RTTI
+    '-Wno-deprecated-declarations',
   ],
 )
 
