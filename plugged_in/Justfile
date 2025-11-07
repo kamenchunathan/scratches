@@ -3,12 +3,9 @@ setup:
     @echo "--- Building generator ---"
     @meson compile -C build/generator
     @echo "--- Configuring main project ---"
-    @PATH="{{invocation_directory()}}/build/generator:{{env_var('PATH')}}" meson setup src build
+    @meson setup example build
 
 build:
-    @echo "--- Building generator ---"
-    @meson compile -C build/generator
-    @echo "--- Building main project ---"
     @meson compile -C build
 
 run: build

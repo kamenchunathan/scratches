@@ -4,6 +4,7 @@
 #include "clang/Tooling/CompilationDatabase.h"
 #include "clang/Tooling/Tooling.h"
 #include "llvm/Support/CommandLine.h"
+#include <llvm-20/llvm/Support/CommandLine.h>
 
 #include "generator.hpp"
 
@@ -73,17 +74,16 @@ int main(int argc, char const** argv) {
     // Process all headers
     clang::tooling::ClangTool tool(*compile_db, headers);
 
-
-    class TypeErasureActionFactory : public clang::tooling::FrontendActionFactory {
+    class TypeErasureActionFactory: public clang::tooling::FrontendActionFactory {
     public:
-      TypeErasureActionFactory(llvm::StringRef output_dir) : output_dir_(output_dir) {}
+        TypeErasureActionFactory(llvm::StringRef output_dir): output_dir_(output_dir) {}
 
-      std::unique_ptr<clang::FrontendAction> create() override {
-        return std::make_unique<type_erasure::TypeErasureAction>(output_dir_);
-      }
+        std::unique_ptr<clang::FrontendAction> create() override {
+            return std::make_unique<type_erasure::TypeErasureAction>(output_dir_);
+        }
 
     private:
-      std::string output_dir_;
+        std::string output_dir_;
     };
 
     auto factory = std::make_unique<TypeErasureActionFactory>(output_dir.getValue());

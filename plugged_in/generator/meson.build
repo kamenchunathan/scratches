@@ -5,23 +5,129 @@ project(
   default_options: ['cpp_std=c++23'],
 )
 
-clang_dep = dependency('libclang', version: '>=17.0', required: false)
+cpp = meson.get_compiler('cpp')
 
-if not clang_dep.found()
-  cpp = meson.get_compiler('cpp')
-  message(
-    'Could not find libclang dependency via pkg-config, trying hardcoded paths.',
-  )
-  clang_include_path = '/usr/lib/llvm-20/include'
-  llvm_lib_path = '/usr/lib/llvm-20/lib'
-  includes = include_directories(clang_include_path)
-  libclang_lib = cpp.find_library('clang', dirs: llvm_lib_path)
-  clang_dep = declare_dependency(dependencies: libclang_lib, include_directories: includes)
-endif
+# LLVM dependency is required for core data structures
+llvm_dep = dependency('llvm', version: '>=17.0', required: true, components: [
+    'RISCV',
+    'RISCVDesc',
+    'RISCVInfo',
+    'RISCVAsmParser',
+    'RISCVCodeGen',
+  ]
+)
 
-llvm_dep = dependency('llvm', version: '>=17.0', required: true)
+# Clang libraries are needed for the C++ API
+clang_include_path = '/usr/lib/llvm-20/include'
+llvm_lib_path = '/usr/lib/llvm-20/lib'
+includes = include_directories(clang_include_path)
 
-type_erasure_gen = executable(
+# List of Clang static libraries to link against.
+# The order can be important, from high-level to low-level.
+clang_lib_names = [
+  'clangAnalysis',
+  'clangAnalysisFlowSensitive',
+  'clangAnalysisFlowSensitiveModels',
+  'clangAPINotes',
+  'clangApplyReplacements',
+  'clangARCMigrate',
+  'clangAST',
+  'clangASTMatchers',
+  'clangBasic',
+  'clangChangeNamespace',
+  'clangCodeGen',
+  'clangCrossTU',
+  'clangDaemon',
+  'clangDaemonTweaks',
+  'clangDependencyScanning',
+  'clangDirectoryWatcher',
+  'clangdMain',
+  'clangdMonitoringServiceProto',
+  'clangDoc',
+  'clangdRemoteIndex',
+  'clangdRemoteIndexProto',
+  'clangdRemoteIndexServiceProto',
+  'clangdRemoteMarshalling',
+  'clangDriver',
+  'clangdSupport',
+  'clangDynamicASTMatchers',
+  'clangEdit',
+  'clangExtractAPI',
+  'clangFormat',
+  'clangFrontend',
+  'clangFrontendTool',
+  'clangHandleCXX',
+  'clangHandleLLVM',
+  'clangIncludeCleaner',
+  'clangIncludeFixer',
+  'clangIncludeFixerPlugin',
+  'clangIndex',
+  'clangIndexSerialization',
+  'clangInstallAPI',
+  'clangInterpreter',
+  'clangLex',
+  'clangMove',
+  'clangParse',
+  'clangQuery',
+  'clangReorderFields',
+  'clangRewrite',
+  'clangRewriteFrontend',
+  'clangSema',
+  'clangSerialization',
+  'clangStaticAnalyzerCheckers',
+  'clangStaticAnalyzerCore',
+  'clangStaticAnalyzerFrontend',
+  'clangSupport',
+  'clangTidy',
+  'clangTidyAbseilModule',
+  'clangTidyAlteraModule',
+  'clangTidyAndroidModule',
+  'clangTidyBoostModule',
+  'clangTidyBugproneModule',
+  'clangTidyCERTModule',
+  'clangTidyConcurrencyModule',
+  'clangTidyCppCoreGuidelinesModule',
+  'clangTidyDarwinModule',
+  'clangTidyFuchsiaModule',
+  'clangTidyGoogleModule',
+  'clangTidyHICPPModule',
+  'clangTidyLinuxKernelModule',
+  'clangTidyLLVMLibcModule',
+  'clangTidyLLVMModule',
+  'clangTidyMain',
+  'clangTidyMiscModule',
+  'clangTidyModernizeModule',
+  'clangTidyMPIModule',
+  'clangTidyObjCModule',
+  'clangTidyOpenMPModule',
+  'clangTidyPerformanceModule',
+  'clangTidyPlugin',
+  'clangTidyPortabilityModule',
+  'clangTidyReadabilityModule',
+  'clangTidyUtils',
+  'clangTidyZirconModule',
+  'clangTooling',
+  'clangToolingASTDiff',
+  'clangToolingCore',
+  'clangToolingInclusions',
+  'clangToolingInclusionsStdlib',
+  'clangToolingRefactoring',
+  'clangToolingSyntax',
+  'clangTransformer'
+]
+clang_libs = []
+foreach lib_name : clang_lib_names
+  found_lib = cpp.find_library(lib_name, dirs: llvm_lib_path)
+  if found_lib.found()
+    clang_libs += found_lib
+  else
+    error('Could not find required clang library: ' + lib_name)
+  endif
+endforeach
+
+clang_dep = declare_dependency(dependencies: clang_libs, include_directories: includes)
+
+dynamic_concept_gen = executable(
   'dynamic_concept_gen',
   'main.cpp',
   'generator.cpp',
@@ -33,5 +139,3 @@ type_erasure_gen = executable(
   ],
 )
 
-# Make the executable available for use in other projects
-meson.override_find_program('dynamic_concept_gen', type_erasure_gen)

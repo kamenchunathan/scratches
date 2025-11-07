@@ -9,8 +9,6 @@
 #include "clang/AST/Expr.h"
 #include "clang/AST/Type.h"
 #include "clang/Basic/SourceManager.h"
-#include "llvm/Support/Casting.h"
-#include "llvm/Support/raw_ostream.h"
 
 namespace fs = std::filesystem;
 
@@ -231,6 +229,8 @@ std::string CodeGenerator::generate_all(const ConceptInfo& concept_info) {
 
 #include <memory>
 #include <utility>
+
+#include "sortable.hpp"
 
 namespace type_erasure {{
 {2}
