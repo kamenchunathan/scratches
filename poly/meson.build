@@ -6,4 +6,4 @@ project(
 )
 sources = ['src/main.cpp']
 
-executable(project.name(), sources)
+executable('poly', sources)

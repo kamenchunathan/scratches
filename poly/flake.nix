@@ -27,24 +27,14 @@
         { pkgs }:
         {
           default =
-            pkgs.mkShell.override
-              {
-                # Override stdenv in order to change compiler:
-                # stdenv = pkgs.clangStdenv;
-              }
+            pkgs.mkShell
               {
                 packages =
                   with pkgs;
                   [
                     meson
-                    gcc
-                    libgcc
-                    clang
+                    ninja
                   ];
-                env = {
-                  LD_LIBRARY_PATH = "${pkgs.stdenv.cc.cc.lib}/lib";
-                  CPATH = "${pkgs.clang}/include";
-                };
               };
         }
       );
