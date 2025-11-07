@@ -1,0 +1,13 @@
+package:
+  name: guess
+  dependencies:
+    - console
+    - effect
+    - prelude
+  test:
+    main: Test.Main
+    dependencies: []
+workspace:
+  packageSet:
+    registry: 68.1.0
+  extraPackages: {}
