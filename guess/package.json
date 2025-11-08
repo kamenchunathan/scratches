@@ -4,10 +4,12 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "predev": "spago build",
+    "postinstall": "spago install",
     "dev": "vite",
-    "build": "tsc && vite build",
-    "preview": "vite preview"
+    "build": "pnpm run build:purescript && tsc && vite build",
+    "build:purescript": "spago build",
+    "preview": "vite preview",
+    "clean": "rm -rf node_modules .spago dist output"   
   },
   "devDependencies": {
     "typescript": "~5.9.3",
