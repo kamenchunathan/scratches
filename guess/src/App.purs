@@ -3,64 +3,88 @@ module App where
 import Prelude
 
 import Data.Int (decimal, toStringAs)
+import Data.Traversable (sequence)
+import Data.Maybe as Maybe
 import Effect.Class (class MonadEffect)
 import Halogen as H
 import Halogen.HTML (ClassName(..))
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
+import Data.String (Pattern(..), contains, toLower)
+import Data.Array as Array
+import Web.Event.Event (Event)
+import Web.Event.Event as WebEvent
+import Web.HTML.HTMLInputElement as HTMLInputElement
 
-type State = { count :: Int }
+completeions = [ "nationality", "current", "team", "age" ]
+
+type State = { 
+  inputText :: String
+}
 
 initialState :: forall input. input -> State
-initialState _ = { count: 0 }
+initialState _ = { inputText: "" }
 
-data Action = Increment | Decrement
+data Action 
+  = NoOp
+  | UpdateInput Event
+  | SelectCompletion String
 
 handleAction :: forall o m. MonadEffect m => Action -> H.HalogenM State Action () o m Unit
 handleAction = case _ of
-  Increment -> H.modify_ \{ count } -> { count: count + 1 }
-  Decrement -> H.modify_ \{ count } -> { count: count - 1 }
+  NoOp -> 
+    pure unit
+  
+  UpdateInput ev -> do
+    inp <- WebEvent.target ev >>= HTMLInputElement.fromEventTarget 
+      <#> HTMLInputElement.value
+      # sequence 
+      <#> Maybe.fromMaybe ""
+      # H.liftEffect 
+    H.modify_ \st -> st { inputText = inp }
+    
+  SelectCompletion selectedText -> 
+    H.modify_ \st -> st { inputText = selectedText }
+
+questionInput :: forall cs m. String -> H.ComponentHTML Action cs m
+questionInput inp =  
+  let
+    -- Filter completions based on input text
+    lowerInp = toLower inp
+    filteredCompletions = 
+      if lowerInp == "" then
+        []
+      else
+        Array.filter (contains (Pattern lowerInp) <<< toLower) completeions
+  in
+  HH.div
+    [ HP.class_ $ ClassName "w-3/4 "  ]
+    [ HH.input [ 
+        HP.autofocus true,
+        HP.class_ $ ClassName "w-full py-2 px-6 bg border border-black rounded-md",
+        HP.value inp,
+        HE.onInput UpdateInput
+      ] 
+    , HH.div [
+          -- TODO: Only add styling when completions has elements
+          HP.class_ $ ClassName "w-full py-2 px-6 bg border border-black rounded-md "
+        ] 
+        ( 
+          filteredCompletions <#>
+          (\c -> HH.div [ HE.onClick $ const (SelectCompletion c) ] [ HH.text c ])
+        )
+    ]
 
 render :: forall cs m. State -> H.ComponentHTML Action cs m
-render { count } =
+render { inputText } =
   HH.div
-    [ HP.class_ $ ClassName "w-5/6 mx-auto" ]
-    [ 
-    HH.h1
-        [ HP.class_ $ ClassName "text-center text-3xl font-semibold p-4" ]
-        [ HH.text "Home page" ]
-    -- , HH.div
-    --     []
-    --     [ HH.h2
-    --         [ HP.class_ $ ClassName "text-center text-lg p-4" ]
-    --         [ HH.text "Purescript, Typescript and Tailwind template" ]
-    --     , HH.p
-    --         [ HP.class_ $ ClassName "text-lg px-4 text-center" ]
-    --         [ HH.text "A template for a Web App Written in purescript using the halogen framework" ]
-    --     , HH.div
-    --         [ HP.class_ $ ClassName "w-4/6 mx-auto text-center py-8" ]
-    --         [ HH.span
-    --             [ HP.class_ $ ClassName "text-xl px-4" ]
-    --             [ HH.text "Counter: " ]
-    --         , HH.span
-    --             [ HP.class_ $ ClassName "text-4xl px-4" ]
-    --             [ HH.text $ toStringAs decimal count ]
-    --         ]
-    --     , HH.div
-    --         [ HP.class_ $ ClassName "flex justify-center space-x-8" ]
-    --         [ HH.button
-    --             [ HP.class_ $ ClassName "text-white text-center text-xl p-2 bg-gray-400 rounded-xl"
-    --             , HE.onClick \_ -> Decrement
-    --             ]
-    --             [ HH.text "Decrement" ]
-    --     ,HH.button
-    --             [ HP.class_ $ ClassName "text-white text-center text-xl p-2 bg-gray-400 rounded-xl"
-    --             , HE.onClick \_ -> Increment
-    --             ]
-    --             [ HH.text "Increment" ]
-    --             ]
-    --     ]
+    [ HP.class_ $ ClassName "w-5/6 min-h-screen mx-auto flex flex-col bg-slate-100 items-center" ]
+    [ HH.h1 [ HP.class_ $ ClassName "text-center text-3xl font-semibold px-4 py-8 text-blue-800" ]
+          [ HH.text "Guess the player" ]
+      , HH.h2 [ HP.class_ $ ClassName "text-center text-lg px-4 py-8" ] 
+          [ HH.text "Type your question into the search bar and guess who the football player is based on the answers" ]
+      , questionInput inputText
     ]
 
 component :: forall q o m. MonadEffect m => H.Component q Unit o m

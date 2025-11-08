@@ -1,10 +1,14 @@
 package:
   name: guess
   dependencies:
+    - arrays
     - console
     - effect
+    - foldable-traversable
     - halogen
     - prelude
+    - web-html
+    - web-uievents
   test:
     main: Test.Main
     dependencies: []

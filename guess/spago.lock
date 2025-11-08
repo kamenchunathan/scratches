@@ -5,10 +5,14 @@
         "path": "./",
         "core": {
           "dependencies": [
+            "arrays",
             "console",
             "effect",
+            "foldable-traversable",
             "halogen",
-            "prelude"
+            "prelude",
+            "web-html",
+            "web-uievents"
           ],
           "build_plan": [
             "aff",
