@@ -2,9 +2,12 @@ module Main where
 
 import Prelude
 
+import App (component)
 import Effect (Effect)
-import Effect.Console (log)
+import Halogen.Aff as HA
+import Halogen.VDom.Driver (runUI)
 
 main :: Effect Unit
-main = do
-  log "Hello world"
+main = HA.runHalogenAff do
+  body <- HA.awaitBody
+  runUI component unit body
