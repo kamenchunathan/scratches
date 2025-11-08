@@ -11,7 +11,8 @@ import Halogen.HTML (ClassName(..))
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
-import Data.String (Pattern(..), contains, toLower)
+import Data.String (Pattern(..),  toLower)
+import Data.String as String 
 import Data.Array as Array
 import Web.Event.Event (Event)
 import Web.Event.Event as WebEvent
@@ -19,12 +20,13 @@ import Web.HTML.HTMLInputElement as HTMLInputElement
 
 completeions = [ "nationality", "current", "team", "age" ]
 
-type State = { 
-  inputText :: String
-}
+type State = 
+  { inputText :: String
+  , validCompletions :: Array String
+  }
 
 initialState :: forall input. input -> State
-initialState _ = { inputText: "" }
+initialState _ = { inputText: "" , validCompletions : []}
 
 data Action 
   = NoOp
@@ -42,28 +44,27 @@ handleAction = case _ of
       # sequence 
       <#> Maybe.fromMaybe ""
       # H.liftEffect 
-    H.modify_ \st -> st { inputText = inp }
+      
+    let
+      lowerInp = toLower inp
+      filteredCompletions = 
+        if lowerInp == "" then
+          []
+        else
+          Array.filter (Maybe.isJust <<< (String.stripPrefix (Pattern lowerInp) <<< toLower) ) completeions
+    H.modify_ \st -> st { inputText = inp , validCompletions = filteredCompletions }
     
   SelectCompletion selectedText -> 
-    H.modify_ \st -> st { inputText = selectedText }
+    H.modify_ \st -> st { inputText = selectedText, validCompletions = [] }
 
-questionInput :: forall cs m. String -> H.ComponentHTML Action cs m
-questionInput inp =  
-  let
-    -- Filter completions based on input text
-    lowerInp = toLower inp
-    filteredCompletions = 
-      if lowerInp == "" then
-        []
-      else
-        Array.filter (contains (Pattern lowerInp) <<< toLower) completeions
-  in
-  HH.div
+questionInput :: forall cs m. State -> H.ComponentHTML Action cs m
+questionInput { inputText, validCompletions } =  
+    HH.div
     [ HP.class_ $ ClassName "w-3/4 "  ]
     [ HH.input [ 
         HP.autofocus true,
         HP.class_ $ ClassName "w-full py-2 px-6 bg border border-black rounded-md",
-        HP.value inp,
+        HP.value inputText,
         HE.onInput UpdateInput
       ] 
     , HH.div [
@@ -71,20 +72,20 @@ questionInput inp =
           HP.class_ $ ClassName "w-full py-2 px-6 bg border border-black rounded-md "
         ] 
         ( 
-          filteredCompletions <#>
+          validCompletions <#>
           (\c -> HH.div [ HE.onClick $ const (SelectCompletion c) ] [ HH.text c ])
         )
     ]
 
 render :: forall cs m. State -> H.ComponentHTML Action cs m
-render { inputText } =
+render state =
   HH.div
     [ HP.class_ $ ClassName "w-5/6 min-h-screen mx-auto flex flex-col bg-slate-100 items-center" ]
     [ HH.h1 [ HP.class_ $ ClassName "text-center text-3xl font-semibold px-4 py-8 text-blue-800" ]
           [ HH.text "Guess the player" ]
       , HH.h2 [ HP.class_ $ ClassName "text-center text-lg px-4 py-8" ] 
           [ HH.text "Type your question into the search bar and guess who the football player is based on the answers" ]
-      , questionInput inputText
+      , questionInput state
     ]
 
 component :: forall q o m. MonadEffect m => H.Component q Unit o m
