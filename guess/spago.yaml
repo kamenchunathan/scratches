@@ -6,6 +6,7 @@ package:
     - effect
     - foldable-traversable
     - halogen
+    - parsing
     - prelude
     - web-html
     - web-uievents
