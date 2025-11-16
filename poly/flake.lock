@@ -4,7 +4,7 @@
       "flake": false,
       "locked": {
         "lastModified": 1,
-        "narHash": "sha256-lbYIk4pyvyMrenDI385yHqPSViF6xmdhz04EfRVrRHs=",
+        "narHash": "sha256-afRkaYEr9cuLXo0oaJni3wHbakCGEv9wmweKUglyG+0=",
         "path": "./nix/clang-p2996",
         "type": "path"
       },

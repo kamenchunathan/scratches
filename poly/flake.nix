@@ -28,7 +28,7 @@
       devShells = forEachSupportedSystem (
         { pkgs }:
         let
-            clang-p2996-pkg = pkgs.callPackage inputs.clang-p2996 { };
+          clang-p2996-pkg = pkgs.callPackage inputs.clang-p2996 { };
         in
         {
           default =
@@ -39,7 +39,7 @@
                   [
                     meson
                     ninja
-                    clang-p2996-pkg
+                    # clang-p2996-pkg
                   ];
               };
         }
