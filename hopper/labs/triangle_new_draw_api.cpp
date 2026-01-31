@@ -131,10 +131,10 @@ public:
 #if PLATFORM_WASM
         auto presenter = std::make_unique<web::BrowserPresenter>();
 #else
-        auto* term_layer_ptr = app->world.get_resource<TerminalLayer*>();
+        auto term_layer_ptr = app->world.get_resource<TerminalLayer*>();
         if (!term_layer_ptr || !*term_layer_ptr)
             return;
-        auto presenter = (*term_layer_ptr)->terminal->presenter();
+        auto presenter = term_layer_ptr->get()->terminal->presenter();
 #endif
 
         auto renderer =
@@ -170,30 +170,30 @@ public:
 ///////////////////////////////////////////////// Systems  /////////////////////////////////////////////////
 
 void input_system(ecs::World& world) {
-    auto* input_state = world.get_resource<core::input::InputState>();
+    auto input_state = world.get_resource<core::input::InputState>();
     if (!input_state)
         return;
 
     const float move_speed = 0.02f;
 
     for (auto [entity, transform]: ecs::Query<Transform>(&world)) {
-        if (input_state->is_button_down(core::input::KeyCode::W)
-            || input_state->is_button_down(core::input::KeyCode::Up))
+        if (input_state->get().is_button_down(core::input::KeyCode::W)
+            || input_state->get().is_button_down(core::input::KeyCode::Up))
         {
             transform.y += move_speed;
         }
-        if (input_state->is_button_down(core::input::KeyCode::S)
-            || input_state->is_button_down(core::input::KeyCode::Down))
+        if (input_state->get().is_button_down(core::input::KeyCode::S)
+            || input_state->get().is_button_down(core::input::KeyCode::Down))
         {
             transform.y -= move_speed;
         }
-        if (input_state->is_button_down(core::input::KeyCode::A)
-            || input_state->is_button_down(core::input::KeyCode::Left))
+        if (input_state->get().is_button_down(core::input::KeyCode::A)
+            || input_state->get().is_button_down(core::input::KeyCode::Left))
         {
             transform.x -= move_speed;
         }
-        if (input_state->is_button_down(core::input::KeyCode::D)
-            || input_state->is_button_down(core::input::KeyCode::Right))
+        if (input_state->get().is_button_down(core::input::KeyCode::D)
+            || input_state->get().is_button_down(core::input::KeyCode::Right))
         {
             transform.x += move_speed;
         }
@@ -202,29 +202,29 @@ void input_system(ecs::World& world) {
         transform.y = std::clamp(transform.y, -1.5f, 1.5f);
     }
 
-    if (input_state->just_pressed(core::input::KeyCode::Q)
-        || input_state->just_pressed(core::input::KeyCode::Escape))
+    if (input_state->get().just_pressed(core::input::KeyCode::Q)
+        || input_state->get().just_pressed(core::input::KeyCode::Escape))
     {
-        if (auto* app_ptr = world.get_resource<core::Application*>()) {
-            (*app_ptr)->set_should_exit(true);
+        if (auto app_ptr = world.get_resource<core::Application*>()) {
+            app_ptr->get()->set_should_exit(true);
         }
     }
 }
 
 void render_system(ecs::World& world) {
-    auto* renderer_ptr = world.get_resource<std::unique_ptr<renderer::Renderer>>();
-    if (!renderer_ptr || !*renderer_ptr)
+    auto renderer_ptr = world.get_resource<std::unique_ptr<renderer::Renderer>>();
+    if (!renderer_ptr)
         return;
-    auto* renderer = (*renderer_ptr).get();
-
-    auto* resources = world.get_resource<RenderResources>();
-    if (!resources)
+    auto renderer = renderer_ptr->get().get();
+    auto resources_opt = world.get_resource<RenderResources>();
+    if (!resources_opt)
         return;
+    auto resources = resources_opt->get();
 
     // Submit clear command
     renderer->submit(std::make_unique<renderer::halfblock::ClearColorCommand>(
         &renderer->resource_registry,
-        resources->color_texture,
+        resources.color_texture,
         core::ColorRGBA32F::BLACK
     ));
 
@@ -258,7 +258,7 @@ void render_system(ecs::World& world) {
         };
 
         // Update vertex buffer
-        if (auto vb = renderer->resource_registry.get_buffer_mut(resources->vertex_buffer);
+        if (auto vb = renderer->resource_registry.get_buffer_mut(resources.vertex_buffer);
             vb.has_value())
         {
             std::copy(vertices.begin(), vertices.end(), vb.value().begin());
@@ -268,7 +268,7 @@ void render_system(ecs::World& world) {
         renderer::FrameBuffer<renderer::Attachment<core::ColorRGBA32F>> target {
             .attachments = {renderer::Attachment<core::ColorRGBA32F> {
                 .view =
-                    {.texture = resources->color_texture,
+                    {.texture = resources.color_texture,
                      .x = 0,
                      .y = 0,
                      .widht = renderer->viewport_width,
@@ -279,20 +279,13 @@ void render_system(ecs::World& world) {
         };
 
         renderer->submit(std::make_unique<ColorPassCommand>(
-            resources->pipeline,
+            resources.pipeline,
             target,
-            resources->vertex_buffer,
+            resources.vertex_buffer,
             Eigen::Vector2f(transform.x, transform.y),
             vertices.size()
         ));
     }
-
-    // Submit halfblock conversion
-    renderer->submit(std::make_unique<renderer::halfblock::HalfBlockConversionCommand>(
-        &renderer->resource_registry,
-        resources->color_texture,
-        resources->char_texture
-    ));
 
     renderer->render_frame();
 }
@@ -305,7 +298,7 @@ int main() {
 #if PLATFORM_WASM
     app->add_layer(BrowserLayer {});
 #else
-    TerminalLayer term_layer {.frame_rate = 60, .terminal = std::make_unique<Terminal>()};
+    TerminalLayer term_layer(std::make_unique<Terminal>(), 60);
     app->world.insert_resource<TerminalLayer*>(&term_layer);
     app->add_layer(term_layer);
 #endif

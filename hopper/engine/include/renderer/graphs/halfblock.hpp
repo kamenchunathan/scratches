@@ -149,6 +149,13 @@ namespace halfblock {
         pixel_pass->add_dependency(halfblock::COLOR_PASS_FG);
         renderer.render_graph.add_pass(std::move(pixel_pass));
 
+        // Submit halfblock conversion
+        renderer.submit(std::make_unique<renderer::halfblock::HalfBlockConversionCommand>(
+            &renderer.resource_registry,
+            color_texture,
+            std::get<0>(renderer.render_target().attachments).view.texture
+        ));
+
         return color_texture;
     }
 
