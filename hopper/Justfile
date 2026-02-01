@@ -64,10 +64,16 @@ watch_lab binary_name:
             kill $child_pid 2>/dev/null
         fi
 
-        meson compile -C build {{binary_name}}
+        meson compile -C build/debug {{binary_name}}
         if [ $? -eq 0 ]; then
             clear
-            ./build/labs/{{binary_name}} & 
+    
+            # BUG:  Running in the background redirects IO which means:
+            #   1. IO is not detected as a tty and the interactive programs will fail
+            #   2. It is difficult to run interactive programs in the background and rendering
+            #    often fails in unexpected ways
+            #  TODO: Explore how to solve this
+            ./build/debug/labs/{{binary_name}} & 
             child_pid=$!
         fi
     }
