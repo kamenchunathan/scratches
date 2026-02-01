@@ -39,9 +39,6 @@ public:
         return texture_data_;
     }
 
-    // TODO: Move to asset manager
-    static std::optional<Texture2D> load_png(const std::string& path);
-
 private:
     std::uint32_t width_, height_;
     std::vector<PixelType> texture_data_;

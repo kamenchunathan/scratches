@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "application.hpp"
+#include "asset.hpp"
 #include "color.hpp"
 #include "ecs/query.hpp"
 #include "ecs/system.hpp"
@@ -190,14 +191,14 @@ public:
 
     void execute(renderer::RenderPassEncoderPrev&) override {
         // Get buffer handles from ECS resources
-        auto* color_buffer_res = world_->get_resource<ColorBufferResource>();
-        auto* char_buffer_res = world_->get_resource<CharacterBufferResource>();
+        auto color_buffer_res = world_->get_resource<ColorBufferResource>();
+        auto char_buffer_res = world_->get_resource<CharacterBufferResource>();
 
         if (!color_buffer_res || !char_buffer_res)
             return;
 
-        auto* color_buffer = resource_registry_->get_buffer(color_buffer_res->handle);
-        auto* char_buffer = resource_registry_->get_buffer(char_buffer_res->handle);
+        auto* color_buffer = resource_registry_->get_buffer(color_buffer_res->get().handle);
+        auto* char_buffer = resource_registry_->get_buffer(char_buffer_res->get().handle);
 
         if (!color_buffer || !char_buffer)
             return;
@@ -258,22 +259,20 @@ public:
         const std::uint32_t pixel_width = 160;
         const std::uint32_t pixel_height = 90;
 
-        auto* term_layer_ptr = app->world.get_resource<TerminalLayer*>();
+        auto term_layer_ptr = app->world.get_resource<TerminalLayer*>();
         if (!term_layer_ptr || !*term_layer_ptr)
             return;
 
         auto renderer = std::make_unique<renderer::RendererPrev>(
             char_width,
             char_height,
-            (*term_layer_ptr)->terminal->presenter()
+            term_layer_ptr->get()->terminal->presenter()
         );
 
-        renderer->register_pipeline(
-            std::make_unique<TexturePipeline>(
-                renderer::PipelineDescriptor {},
-                std::make_unique<TextureShader>()
-            )
-        );
+        renderer->register_pipeline(std::make_unique<TexturePipeline>(
+            renderer::PipelineDescriptor {},
+            std::make_unique<TextureShader>()
+        ));
 
         auto color_buffer =
             renderer->buffer_registry.create_buffer<core::ColorRGBA32F>(pixel_width, pixel_height);
@@ -304,39 +303,40 @@ public:
 
 // Systems
 void input_system(ecs::World& world) {
-    auto* input_state = world.get_resource<core::input::InputState>();
-    if (!input_state)
+    auto input_state_opt = world.get_resource<core::input::InputState>();
+    if (!input_state_opt)
         return;
+    auto input_state = input_state_opt->get();
 
     const float move_speed = 0.1f;
     const float scale_speed = 0.02f;
 
     for (auto [entity, transform]: ecs::Query<Transform>(&world).without<BackgroundTag>()) {
-        if (input_state->is_button_down(core::input::KeyCode::W)
-            || input_state->is_button_down(core::input::KeyCode::Up))
+        if (input_state.is_button_down(core::input::KeyCode::W)
+            || input_state.is_button_down(core::input::KeyCode::Up))
         {
             transform.y += move_speed;
         }
-        if (input_state->is_button_down(core::input::KeyCode::S)
-            || input_state->is_button_down(core::input::KeyCode::Down))
+        if (input_state.is_button_down(core::input::KeyCode::S)
+            || input_state.is_button_down(core::input::KeyCode::Down))
         {
             transform.y -= move_speed;
         }
-        if (input_state->is_button_down(core::input::KeyCode::A)
-            || input_state->is_button_down(core::input::KeyCode::Left))
+        if (input_state.is_button_down(core::input::KeyCode::A)
+            || input_state.is_button_down(core::input::KeyCode::Left))
         {
             transform.x -= move_speed;
         }
-        if (input_state->is_button_down(core::input::KeyCode::D)
-            || input_state->is_button_down(core::input::KeyCode::Right))
+        if (input_state.is_button_down(core::input::KeyCode::D)
+            || input_state.is_button_down(core::input::KeyCode::Right))
         {
             transform.x += move_speed;
         }
 
-        if (input_state->is_button_down(core::input::KeyCode::I)) {
+        if (input_state.is_button_down(core::input::KeyCode::I)) {
             transform.scale += scale_speed;
         }
-        if (input_state->is_button_down(core::input::KeyCode::K)) {
+        if (input_state.is_button_down(core::input::KeyCode::K)) {
             transform.scale -= scale_speed;
         }
 
@@ -346,29 +346,32 @@ void input_system(ecs::World& world) {
         transform.scale = std::clamp(transform.scale, 0.1f, 2.0f);
     }
 
-    if (input_state->just_pressed(core::input::KeyCode::Q)
-        || input_state->just_pressed(core::input::KeyCode::Escape))
+    if (input_state.just_pressed(core::input::KeyCode::Q)
+        || input_state.just_pressed(core::input::KeyCode::Escape))
     {
-        if (auto* app_ptr = world.get_resource<core::Application*>()) {
-            (*app_ptr)->set_should_exit(true);
+        if (auto app_ptr = world.get_resource<core::Application*>(); app_ptr) {
+            app_ptr->get()->set_should_exit(true);
         }
     }
 }
 
 void render_system(ecs::World& world) {
-    auto* renderer_ptr = world.get_resource<std::unique_ptr<renderer::RendererPrev>>();
-    if (!renderer_ptr || !*renderer_ptr)
+    auto renderer_ptr = world.get_resource<std::unique_ptr<renderer::RendererPrev>>();
+    if (!renderer_ptr)
         return;
-    auto& renderer = **renderer_ptr;
+    auto& renderer = *renderer_ptr->get();
 
-    auto* color_buffer_res = world.get_resource<ColorBufferResource>();
-    auto* vertex_buffer_res = world.get_resource<VertexBufferResource>();
+    auto color_buffer_res_opt = world.get_resource<ColorBufferResource>();
+    auto vertex_buffer_res_opt = world.get_resource<VertexBufferResource>();
 
-    if (!color_buffer_res || !vertex_buffer_res)
+    if (!color_buffer_res_opt || !vertex_buffer_res_opt)
         return;
+
+    auto& color_buffer_res = color_buffer_res_opt->get();
+    auto& vertex_buffer_res = vertex_buffer_res_opt->get();
 
     renderer.submit(
-        std::make_unique<ClearCommand>(color_buffer_res->handle, &renderer.buffer_registry)
+        std::make_unique<ClearCommand>(color_buffer_res.handle, &renderer.buffer_registry)
     );
 
     // Draw background
@@ -385,17 +388,15 @@ void render_system(ecs::World& world) {
             {-1.0f, 1.0f, 0.0f, 0.0f}, // top-left
         };
 
-        renderer.submit(
-            std::make_unique<ColorPassCommand>(
-                vertex_buffer_res->handle,
-                color_buffer_res->handle,
-                std::move(vertices),
-                "color_pass_bg",
-                &renderer.shader_resource_registry,
-                &renderer.buffer_registry,
-                sprite.texture
-            )
-        );
+        renderer.submit(std::make_unique<ColorPassCommand>(
+            vertex_buffer_res.handle,
+            color_buffer_res.handle,
+            std::move(vertices),
+            "color_pass_bg",
+            &renderer.shader_resource_registry,
+            &renderer.buffer_registry,
+            sprite.texture
+        ));
     }
 
     // Update quad vertices based on transform
@@ -415,17 +416,15 @@ void render_system(ecs::World& world) {
             {transform.x - half_width, transform.y + half_height, 0.0f, 0.0f}, // top-left
         };
 
-        renderer.submit(
-            std::make_unique<ColorPassCommand>(
-                vertex_buffer_res->handle,
-                color_buffer_res->handle,
-                std::move(vertices),
-                "color_pass_fg",
-                &renderer.shader_resource_registry,
-                &renderer.buffer_registry,
-                sprite.texture
-            )
-        );
+        renderer.submit(std::make_unique<ColorPassCommand>(
+            vertex_buffer_res.handle,
+            color_buffer_res.handle,
+            std::move(vertices),
+            "color_pass_fg",
+            &renderer.shader_resource_registry,
+            &renderer.buffer_registry,
+            sprite.texture
+        ));
     }
 
     renderer.submit(std::make_unique<HalfBlockCommand>(&renderer.buffer_registry, &world));
@@ -434,30 +433,31 @@ void render_system(ecs::World& world) {
 }
 
 int main() {
-    core::Application app;
+    auto app = std::make_shared<core::Application>();
 
-    app.add_layer(core::input::InputLayer {});
-    TerminalLayer term_layer {.frame_rate = 60, .terminal = std::make_unique<Terminal>()};
-    app.world.insert_resource<TerminalLayer*>(&term_layer);
-    app.world.insert_resource<core::Application*>(&app);
-    app.add_layer(term_layer);
-    app.add_layer(RendererLayer {});
+    app->add_layer(core::input::InputLayer {});
+    TerminalLayer term_layer(std::make_unique<Terminal>(), 60);
+    app->world.insert_resource<TerminalLayer*>(&term_layer);
+    app->world.insert_resource<core::Application*>(app.get());
+    app->add_layer(term_layer);
+    app->add_layer(RendererLayer {});
 
-    auto bg_tex_opt = renderer::Texture2D<core::ColorRGBA8>::load_png("./assets/background.png");
+    auto bg_tex_opt = assets::load_png("./assets/background.png");
     if (!bg_tex_opt.has_value())
         return 1;
     auto bg_tex = std::make_shared<renderer::Texture2D<core::ColorRGBA8>>(std::move(*bg_tex_opt));
-    app.world.spawn(Transform {0.0f, 0.0f, 0.0f, 1.0f}, SpriteComponent {bg_tex}, BackgroundTag {});
+    app->world
+        .spawn(Transform {0.0f, 0.0f, 0.0f, 1.0f}, SpriteComponent {bg_tex}, BackgroundTag {});
 
-    auto tex_opt = renderer::Texture2D<core::ColorRGBA8>::load_png("./assets/bingo.png");
+    auto tex_opt = assets::load_png("./assets/bingo.png");
     if (!tex_opt.has_value())
         return 1;
     auto tex = std::make_shared<renderer::Texture2D<core::ColorRGBA8>>(std::move(*tex_opt));
-    app.world.spawn(Transform {0.0f, 0.0f, 0.0f, 0.5f}, SpriteComponent {tex});
+    app->world.spawn(Transform {0.0f, 0.0f, 0.0f, 0.5f}, SpriteComponent {tex});
 
-    app.scheduler.add_system(ecs::SystemStage::Update, input_system);
-    app.scheduler.add_system(ecs::SystemStage::Update, render_system);
+    app->scheduler.add_system(ecs::SystemStage::Update, input_system);
+    app->scheduler.add_system(ecs::SystemStage::Update, render_system);
 
-    app.run();
+    app->run();
     return 0;
 }
