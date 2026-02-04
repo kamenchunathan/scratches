@@ -3,6 +3,7 @@
 
   inputs = {
     nixpkgs.url = "https://flakehub.com/f/NixOS/nixpkgs/0.1";
+    nixgl.url = "github:nix-community/nixGL";
     rust-overlay = {
       url = "github:oxalica/rust-overlay";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -18,6 +19,7 @@
           overlays = [
             inputs.rust-overlay.overlays.default
             inputs.self.overlays.default
+            inputs.nixgl.overlay
           ];
         };
       });
@@ -48,7 +50,7 @@
             cargo-edit
             cargo-watch
             rust-analyzer
-            
+
             # Optimizations
             clang
             mold
@@ -56,10 +58,19 @@
             # Game dev deps
             alsa-lib
             systemd
-            udev
-            libx11
+
+            vulkan-loader
+            vulkan-tools
+
+            xorg.libX11
+            xorg.libXcursor
+            xorg.libXi
+            xorg.libXrandr
+            libxkbcommon
+
+            nixgl.nixVulkanIntel
           ];
-          
+
 
           shellHook = ''
             mkdir -p .cargo
@@ -73,6 +84,13 @@
           env = {
             # Required by rust-analyzer
             RUST_SRC_PATH = "${pkgs.rustToolchain}/lib/rustlib/src/rust/library";
+            LD_LIBRARY_PATH = with pkgs; inputs.nixpkgs.lib.makeLibraryPath [
+              vulkan-loader
+              xorg.libX11
+              xorg.libXi
+              xorg.libXcursor
+              libxkbcommon
+            ];
           };
         };
       });

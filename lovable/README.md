@@ -6,6 +6,8 @@ A pet for your desktop
 
 ## Project Overview
 
+Run with `nixVulkanIntel cargo r`
+
 **Current Status:** Early Development  
 **Tech Stack:** Rust + Bevy Engine  
 **UI Prototype:** React (to be converted to Bevy UI)  
