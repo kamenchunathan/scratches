@@ -1,9 +1,11 @@
 use bevy::{
     ecs::resource::Resource,
     prelude::{Color, Oklcha},
+    reflect::Reflect,
 };
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Resource)]
+#[derive(Debug, Resource, Serialize, Deserialize, Reflect)]
 pub struct Palette {
     pub background: Color,
     pub foreground: Color,
@@ -37,6 +39,12 @@ pub struct Palette {
     pub sidebar_accent_foreground: Color,
     pub sidebar_border: Color,
     pub sidebar_ring: Color,
+}
+
+impl Default for Palette {
+    fn default() -> Self {
+        DEFAULT_THEME
+    }
 }
 
 pub const DEFAULT_THEME: Palette = Palette {

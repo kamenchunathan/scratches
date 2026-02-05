@@ -1,6 +1,10 @@
 pub mod palette;
 
-use bevy::{ecs::relationship::RelatedSpawnerCommands, prelude::*};
+use bevy::{
+    ecs::relationship::RelatedSpawnerCommands,
+    prelude::*,
+    text::{TextLayoutInfo, cosmic_text::Align},
+};
 use palette::Palette;
 
 use crate::ui::palette::GAMING_THEME;
@@ -52,7 +56,7 @@ pub struct LovableUI;
 impl Plugin for LovableUI {
     fn build(&self, app: &mut App) {
         app.insert_resource(UiState {
-            active_tab: Tab::Dashboard,
+            active_tab: Tab::About,
             pets: vec![
                 Pet {
                     id: "1".to_string(),
@@ -121,7 +125,7 @@ fn setup_ui(mut commands: Commands, ui_state: Res<UiState>, palette: Res<Palette
                 },
             ));
             parent.spawn((
-                Text::new("Level up your desktop with digital companions!"),
+                Text::new("Pets for your desktop"),
                 TextColor(palette.foreground),
                 TextFont {
                     font_size: 20.0,
@@ -175,9 +179,11 @@ fn spawn_tab_button(
                 border: UiRect::all(Val::Px(1.0)),
                 ..default()
             },
+            BorderRadius::all(Val::Px(10.0)),
             BorderColor(palette.border),
             BackgroundColor(palette.card),
             TabButton(tab),
+            Button,
         ))
         .with_children(|parent| {
             parent.spawn((
@@ -186,7 +192,9 @@ fn spawn_tab_button(
                     font_size: 16.0,
                     ..default()
                 },
-                BackgroundColor(palette.card_foreground),
+                TextColor(palette.card_foreground),
+                BackgroundColor(palette.card),
+                BorderRadius::all(Val::Px(5.0)),
             ));
         });
 }
@@ -229,92 +237,11 @@ fn spawn_dashboard_tab(
                             font_size: 24.0,
                             ..default()
                         },
-                    ));
-                    parent.spawn((
-                        Text::new("Control how many adorable companions appear on your desktop"),
-                        TextColor(palette.muted_foreground),
-                        TextFont {
-                            font_size: 16.0,
-                            ..default()
+                        TextLayout {
+                            justify: JustifyText::Center,
+                            ..Default::default()
                         },
                     ));
-
-                    // Monitor Layout
-                    parent.spawn((
-                        Text::new("Monitor Layout"),
-                        TextColor(palette.primary),
-                        TextFont {
-                            font_size: 20.0,
-                            ..default()
-                        },
-                        Node {
-                            margin: UiRect::top(Val::Px(20.0)),
-                            ..default()
-                        },
-                    ));
-                    parent
-                        .spawn((Node {
-                            flex_direction: FlexDirection::Row,
-                            justify_content: JustifyContent::SpaceAround,
-                            margin: UiRect::top(Val::Px(10.0)),
-                            ..default()
-                        },))
-                        .with_children(|parent| {
-                            for monitor in &ui_state.monitors {
-                                parent
-                                    .spawn((
-                                        Node {
-                                            flex_direction: FlexDirection::Column,
-                                            align_items: AlignItems::Center,
-                                            padding: UiRect::all(Val::Px(10.0)),
-                                            border: UiRect::all(Val::Px(1.0)),
-                                            margin: UiRect::horizontal(Val::Px(10.0)),
-                                            ..default()
-                                        },
-                                        BorderColor(palette.border),
-                                        BackgroundColor(palette.muted),
-                                    ))
-                                    .with_children(|parent| {
-                                        parent.spawn((
-                                            Text::new(&monitor.name),
-                                            TextFont {
-                                                font_size: 16.0,
-                                                ..default()
-                                            },
-                                            TextColor(palette.muted_foreground),
-                                        ));
-                                        parent.spawn((
-                                            Text::new(&monitor.resolution),
-                                            TextFont {
-                                                font_size: 12.0,
-                                                ..default()
-                                            },
-                                            TextColor(palette.muted_foreground),
-                                        ));
-                                        // Pets on monitor
-                                        parent
-                                            .spawn((Node {
-                                                flex_direction: FlexDirection::Row,
-                                                margin: UiRect::top(Val::Px(10.0)),
-                                                ..default()
-                                            },))
-                                            .with_children(|parent| {
-                                                for pet in ui_state.pets.iter().filter(|p| {
-                                                    p.is_active
-                                                        && p.assigned_monitor == Some(monitor.id)
-                                                }) {
-                                                    parent.spawn((
-                                                        Text::new(&pet.emoji),
-                                                        TextFont {
-                                                            font_size: 24.0,
-                                                            ..default()
-                                                        },
-                                                    ));
-                                                }
-                                            });
-                                    });
-                            }
-                        });
                 });
         });
 }
@@ -523,6 +450,7 @@ fn spawn_about_tab(
             Node {
                 display: Display::None,
                 flex_direction: FlexDirection::Column,
+                width: Val::Percent(100.0),
                 align_items: AlignItems::Center,
                 ..default()
             },

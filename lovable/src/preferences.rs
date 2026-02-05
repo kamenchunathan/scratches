@@ -1,7 +1,6 @@
 use bevy::{
-    asset::{Asset, AssetLoader, AsyncReadExt, uuid::Uuid},
-    asset::{AssetLoadFailedEvent, AssetPath},
-    log::warn,
+    asset::{Asset, AssetLoadFailedEvent, AssetLoader, AssetPath, AsyncReadExt},
+    platform::collections::HashMap,
     prelude::*,
     reflect::Reflect,
     scene::ron,
@@ -10,10 +9,90 @@ use bevy::{
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-#[derive(Serialize, Deserialize, Reflect, Asset, Debug, Default)]
+#[derive(Serialize, Deserialize, Reflect, Asset, Debug)]
 pub struct Preferences {
-    /// Critters that should be displayed on screen
-    critter_ids: Vec<Uuid>,
+    /// Version for migrations
+    pub version: String,
+
+    /// Active theme
+    pub theme: crate::ui::palette::Palette,
+
+    /// Per Monitor settings
+    pub monitors: Vec<MonitorSettings>,
+
+    /// Application level settings
+    pub app_settings: ApplicationSettings,
+
+    /// Map of monitor Id to critter
+    pub critters: HashMap<u32, crate::critter::Critter>,
+
+    /// Global Critter settings
+    pub global_critter_settings: GlobalCritterSettings,
+
+    /// If this is the first launch of the application
+    /// Useful for running an onboarding process
+    pub first_start: bool,
+}
+
+impl Default for Preferences {
+    fn default() -> Self {
+        Self {
+            version: Default::default(),
+            theme: Default::default(),
+            monitors: Default::default(),
+            app_settings: Default::default(),
+            critters: Default::default(),
+            global_critter_settings: Default::default(),
+            first_start: true,
+        }
+    }
+}
+
+/// Monitor specific settings for critters
+#[derive(Debug, Default, Serialize, Deserialize, Reflect)]
+pub struct MonitorSettings {
+    /// Monitor identifier
+    pub id: u32,
+
+    /// Whether critters are enabled on this monitor
+    pub enabled: bool,
+
+    /// Safe zones where critters shouldn't go (for taskbars, docks, etc.)
+    /// Format: (x, y, width, height) as percentages of screen size
+    pub exclusion_zones: Vec<(f32, f32, f32, f32)>,
+}
+
+#[derive(Debug, Default, Serialize, Deserialize, Reflect)]
+pub struct ApplicationSettings {
+    /// Start application on system startup
+    pub start_on_boot: bool,
+
+    /// Start minimized to system tray
+    pub start_minimized: bool,
+
+    /// Show system tray icon
+    pub show_tray_icon: bool,
+
+    /// Close to tray instead of exiting
+    pub close_to_tray: bool,
+
+    /// Check for updates on startup
+    pub check_updates: bool,
+
+    /// Send anonymous usage statistics
+    pub send_analytics: bool,
+}
+
+#[derive(Debug, Default, Serialize, Deserialize, Reflect)]
+pub struct GlobalCritterSettings {
+    /// Whether critters can interact with the mouse or respond to user actions
+    pub interactions_enabled: bool,
+
+    /// Display critter names on hover
+    pub display_critter_name_on_hover: bool,
+
+    /// Whether critters can play sounds
+    pub sound_enabled: bool,
 }
 
 #[derive(Error, Debug)]
@@ -22,7 +101,7 @@ pub enum PreferencesLoadError {
     #[error("IO Error")]
     IoError(#[from] std::io::Error),
 
-    #[error("deserialization Error")]
+    #[error("Deserialization Error")]
     DeserializationError(#[from] ron::de::SpannedError),
 }
 
@@ -61,7 +140,7 @@ pub fn monitor_preferences_loading(
     mut events: EventReader<AssetLoadFailedEvent<Preferences>>,
 ) {
     if events.read().next().is_some() {
-        warn!("Preferences not found, Creating default preferences");
+        info!("Preferences not found, Creating default preferences");
         prefs_store.insert(&prefs_handle.0, Preferences::default());
     }
 }

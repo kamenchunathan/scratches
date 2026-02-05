@@ -36,16 +36,23 @@ impl Plugin for Lovable {
             ))
             .register_asset_loader(PreferencesLoader)
             .init_asset::<Preferences>()
+            .insert_state(AppState::Loading)
             .add_systems(Startup, access_prefs)
             .add_systems(
                 Update,
                 (
-                    monitor_preferences_loading,
+                    monitor_preferences_loading.run_if(in_state(AppState::Loading)),
                     save_preferences_on_exit,
                     quit_on_esc,
                 ),
             );
     }
+}
+
+#[derive(States, Debug, Clone, PartialEq, Eq, Hash)]
+pub enum AppState {
+    Loading,
+    Running,
 }
 
 fn quit_on_esc(keys: ResMut<ButtonInput<KeyCode>>, mut app_exit_events: EventWriter<AppExit>) {
