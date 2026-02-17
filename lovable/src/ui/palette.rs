@@ -5,7 +5,7 @@ use bevy::{
 };
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Resource, Serialize, Deserialize, Reflect)]
+#[derive(Debug, Clone, Resource, Serialize, Deserialize, Reflect)]
 pub struct Palette {
     pub background: Color,
     pub foreground: Color,

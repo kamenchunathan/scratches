@@ -1,7 +1,7 @@
 use std::hash::{DefaultHasher, Hash, Hasher};
 
 use bevy::{
-    asset::{Asset, AssetLoadFailedEvent, AssetLoader, AssetPath, AsyncReadExt },
+    asset::{Asset, AssetLoadFailedEvent, AssetLoader, AssetPath, AsyncReadExt},
     platform::collections::HashMap,
     prelude::*,
     reflect::Reflect,
@@ -12,7 +12,7 @@ use bevy::{
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-#[derive(Serialize, Deserialize, Reflect, Asset, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize, Reflect, Asset)]
 pub struct Preferences {
     /// Version for migrations
     pub version: String,
@@ -52,7 +52,7 @@ impl Default for Preferences {
 }
 
 /// Monitor specific settings for critters
-#[derive(Debug, Default, Serialize, Deserialize, Reflect)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize, Reflect)]
 pub struct MonitorSettings {
     /// Monitor identifier
     pub id: u64,
@@ -65,7 +65,7 @@ pub struct MonitorSettings {
     pub exclusion_zones: Vec<(f32, f32, f32, f32)>,
 }
 
-#[derive(Debug, Default, Serialize, Deserialize, Reflect)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize, Reflect)]
 pub struct ApplicationSettings {
     /// Start application on system startup
     pub start_on_boot: bool,
@@ -86,7 +86,7 @@ pub struct ApplicationSettings {
     pub send_analytics: bool,
 }
 
-#[derive(Debug, Default, Serialize, Deserialize, Reflect)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize, Reflect)]
 pub struct GlobalCritterSettings {
     /// Whether critters can interact with the mouse or respond to user actions
     pub interactions_enabled: bool,
@@ -196,11 +196,14 @@ pub fn save_preferences_on_exit(
 ) {
     if app_exit_events.read().next().is_some() {
         if let Some(prefs) = prefs_store.get(&prefs_handle.0) {
+            let mut prefs = prefs.clone();
+            prefs.first_start = false;
+
             AsyncComputeTaskPool::get()
                 .spawn({
                     let asset_server = asset_server.clone();
                     let serialized_prefs =
-                        ron::ser::to_string_pretty(prefs, ron::ser::PrettyConfig::new())
+                        ron::ser::to_string_pretty(&prefs, ron::ser::PrettyConfig::new())
                             .expect("Unable to serialize preferences");
 
                     async move {

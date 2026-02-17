@@ -31,6 +31,7 @@ impl Plugin for LovableUI {
         app
             // Resources
             .insert_resource(UiState::default())
+            // TODO: Fetch from web
             .insert_resource(CritterRoster::default())
             .insert_resource(AppSettingsUiState::default())
             .insert_resource(MonitorList::stub_primary())
@@ -312,7 +313,7 @@ fn spawn_footer(
         ))
         .with_children(|footer| {
             footer.spawn((
-                Text::new("Lovable  ·  v0.2 Beta"),
+                Text::new(format!("Lovable  · {}", env!("CARGO_PKG_VERSION"))),
                 TextFont {
                     font_size: 11.0,
                     ..default()

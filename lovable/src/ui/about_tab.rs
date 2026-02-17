@@ -29,9 +29,8 @@ pub fn spawn_about_tab(parent: &mut RelatedSpawnerCommands<'_, ChildOf>, palette
             ));
 
             // ── Version card ────────────────────────────────────────────────
-            spawn_info_card(tab, "Version", "0.2 Beta", palette);
+            spawn_info_card(tab, "Version", env!("CARGO_PKG_VERSION"), palette);
             spawn_info_card(tab, "Created by", "Sandboxedideas", palette);
-            spawn_info_card(tab, "Built with", "Bevy 0.16", palette);
 
             spawn_separator(tab, palette);
 

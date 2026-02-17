@@ -1,10 +1,13 @@
 use bevy::prelude::*;
 
-use crate::ui::{
-    events::*,
-    palette::Palette,
-    state::{AppSettingsUiState, CritterRoster, OnboardingStep, UiState},
-    widgets::*,
+use crate::{
+    preferences::{Preferences, PreferencesHandle},
+    ui::{
+        events::*,
+        palette::Palette,
+        state::{AppSettingsUiState, CritterRoster, OnboardingStep, UiState},
+        widgets::*,
+    },
 };
 
 // ─── Tab navigation ───────────────────────────────────────────────────────────
@@ -50,6 +53,8 @@ pub fn update_tab_visibility(ui_state: Res<UiState>, mut query: Query<(&mut Node
 /// Shows either the onboarding root or the main UI root based on completion state.
 pub fn update_onboarding_main_visibility(
     ui_state: Res<UiState>,
+    prefs_handle: Res<PreferencesHandle>,
+    prefs_store: Res<Assets<Preferences>>,
     mut onboarding_query: Query<&mut Node, (With<OnboardingRoot>, Without<MainUiRoot>)>,
     mut main_query: Query<&mut Node, (With<MainUiRoot>, Without<OnboardingRoot>)>,
 ) {
@@ -57,7 +62,11 @@ pub fn update_onboarding_main_visibility(
         return;
     }
 
-    let show_onboarding = !ui_state.onboarding_complete;
+    let Some(prefs) = prefs_store.get(&prefs_handle.0) else {
+        return;
+    };
+
+    let show_onboarding = prefs.first_start && !ui_state.onboarding_complete;
 
     if let Ok(mut node) = onboarding_query.single_mut() {
         node.display = if show_onboarding {

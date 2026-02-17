@@ -24,12 +24,17 @@ pub enum OnboardingStep {
 #[derive(Resource)]
 pub struct UiState {
     pub active_tab: Tab,
+
     pub onboarding_complete: bool,
+
     pub onboarding_step: OnboardingStep,
+
     /// Index into CRITTER_TEMPLATES; tracks selection in onboarding step 1.
     pub selected_onboarding_critter: usize,
+
     /// Index into CritterRoster::owned; which row is expanded in the critters tab.
     pub expanded_critter_idx: Option<usize>,
+
     /// Index into CritterRoster::owned; which row has delete confirmation shown.
     pub delete_confirm_idx: Option<usize>,
 }
