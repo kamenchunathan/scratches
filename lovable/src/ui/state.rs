@@ -8,6 +8,7 @@ pub enum Tab {
     Home,
     Critters,
     Settings,
+    About,
 }
 
 // Onboarding is a linear 4-step flow shown only on first launch.

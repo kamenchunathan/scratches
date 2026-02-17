@@ -1,3 +1,4 @@
+pub mod about_tab;
 pub mod critters_tab;
 pub mod events;
 pub mod home_tab;
@@ -11,6 +12,7 @@ pub mod widgets;
 use bevy::prelude::*;
 
 use crate::ui::{
+    about_tab::spawn_about_tab,
     critters_tab::spawn_critters_tab,
     events::*,
     home_tab::spawn_home_tab,
@@ -19,6 +21,7 @@ use crate::ui::{
     settings_tab::spawn_settings_tab,
     state::*,
     systems::*,
+    widgets::*,
 };
 
 pub struct LovableUI;
@@ -96,17 +99,21 @@ fn setup_ui(
 
     commands.spawn(Camera2d);
 
-    // ── Outermost full-screen container ──────────────────────────────────────
+    // ── Full-screen background layer ─────────────────────────────────────────
+    // The outermost node fills the window and horizontally centres its single
+    // child (the content column). This gives us the "max-width centred panel"
+    // layout from the prototype without hard-coding pixel positions.
     commands
         .spawn((
             Node {
                 width: Val::Percent(100.0),
                 height: Val::Percent(100.0),
                 flex_direction: FlexDirection::Column,
+                align_items: AlignItems::Center,
                 ..default()
             },
             BackgroundColor(palette.background),
-            widgets::UiRoot,
+            UiRoot,
         ))
         .with_children(|root| {
             // ── Onboarding flow (hidden after first launch) ───────────────
@@ -120,15 +127,18 @@ fn setup_ui(
                     flex_direction: FlexDirection::Column,
                     width: Val::Percent(100.0),
                     height: Val::Percent(100.0),
+                    align_items: AlignItems::Center,
                     ..default()
                 },
-                widgets::OnboardingRoot,
+                OnboardingRoot,
             ))
             .with_children(|onboarding| {
                 spawn_onboarding(onboarding, ui_state, roster, monitors, palette);
             });
 
             // ── Main application UI (hidden during onboarding) ────────────
+            // Capped at 680 px so it reads like a compact control panel rather
+            // than stretching across an ultrawide screen.
             root.spawn((
                 Node {
                     display: if ui_state.onboarding_complete {
@@ -137,12 +147,12 @@ fn setup_ui(
                         Display::None
                     },
                     flex_direction: FlexDirection::Column,
-                    width: Val::Percent(100.0),
+                    width: Val::Px(680.0),
                     height: Val::Percent(100.0),
-                    padding: UiRect::all(Val::Px(24.0)),
+                    padding: UiRect::axes(Val::Px(0.0), Val::Px(24.0)),
                     ..default()
                 },
-                widgets::MainUiRoot,
+                MainUiRoot,
             ))
             .with_children(|main| {
                 spawn_header(main, palette);
@@ -162,6 +172,8 @@ fn spawn_header(
     parent
         .spawn((Node {
             flex_direction: FlexDirection::Column,
+            align_items: AlignItems::Center,
+            width: Val::Percent(100.0),
             margin: UiRect::bottom(Val::Px(24.0)),
             ..default()
         },))
@@ -172,7 +184,7 @@ fn spawn_header(
                     font_size: 36.0,
                     ..default()
                 },
-                TextColor(palette.foreground),
+                TextColor(palette.primary),
             ));
             header.spawn((
                 Text::new("Your digital companion management center"),
@@ -191,36 +203,47 @@ fn spawn_tab_bar(
     parent: &mut bevy::ecs::relationship::RelatedSpawnerCommands<'_, ChildOf>,
     palette: &Palette,
 ) {
+    // The outer wrapper centres the pill without stretching it to full width.
     parent
-        .spawn((
-            Node {
-                flex_direction: FlexDirection::Row,
-                margin: UiRect::bottom(Val::Px(20.0)),
-                border: UiRect::all(Val::Px(1.0)),
-                padding: UiRect::all(Val::Px(4.0)),
-                ..default()
-            },
-            BorderRadius::all(Val::Px(8.0)),
-            BorderColor(palette.border),
-            BackgroundColor(palette.muted),
-        ))
-        .with_children(|bar| {
-            spawn_tab_button(bar, "Home", state::Tab::Home, palette);
-            spawn_tab_button(bar, "My Critters", state::Tab::Critters, palette);
-            spawn_tab_button(bar, "Settings", state::Tab::Settings, palette);
+        .spawn((Node {
+            flex_direction: FlexDirection::Row,
+            justify_content: JustifyContent::Center,
+            width: Val::Percent(100.0),
+            margin: UiRect::bottom(Val::Px(20.0)),
+            ..default()
+        },))
+        .with_children(|wrapper| {
+            wrapper
+                .spawn((
+                    Node {
+                        flex_direction: FlexDirection::Row,
+                        border: UiRect::all(Val::Px(1.0)),
+                        padding: UiRect::all(Val::Px(4.0)),
+                        ..default()
+                    },
+                    BorderRadius::all(Val::Px(8.0)),
+                    BorderColor(palette.border),
+                    BackgroundColor(palette.muted),
+                ))
+                .with_children(|bar| {
+                    spawn_tab_button(bar, "Home", Tab::Home, palette);
+                    spawn_tab_button(bar, "My Critters", Tab::Critters, palette);
+                    spawn_tab_button(bar, "Settings", Tab::Settings, palette);
+                    spawn_tab_button(bar, "About", Tab::About, palette);
+                });
         });
 }
 
 fn spawn_tab_button(
     parent: &mut bevy::ecs::relationship::RelatedSpawnerCommands<'_, ChildOf>,
     label: &str,
-    tab: state::Tab,
+    tab: Tab,
     palette: &Palette,
 ) {
     parent
         .spawn((
             Node {
-                padding: UiRect::axes(Val::Px(20.0), Val::Px(8.0)),
+                padding: UiRect::axes(Val::Px(18.0), Val::Px(8.0)),
                 margin: UiRect::right(Val::Px(4.0)),
                 align_items: AlignItems::Center,
                 justify_content: JustifyContent::Center,
@@ -229,7 +252,7 @@ fn spawn_tab_button(
             BorderRadius::all(Val::Px(6.0)),
             BackgroundColor(palette.card),
             Button,
-            widgets::TabButton(tab),
+            TabButton(tab),
         ))
         .with_children(|btn| {
             btn.spawn((
@@ -253,11 +276,11 @@ fn spawn_tab_area(
     monitors: &MonitorList,
     palette: &Palette,
 ) {
-    // Scroll-capable container for tab content
     parent
         .spawn((Node {
             flex_direction: FlexDirection::Column,
             flex_grow: 1.0,
+            width: Val::Percent(100.0),
             overflow: Overflow::scroll_y(),
             ..default()
         },))
@@ -265,6 +288,7 @@ fn spawn_tab_area(
             spawn_home_tab(area, roster, monitors, palette);
             spawn_critters_tab(area, ui_state, roster, monitors, palette);
             spawn_settings_tab(area, settings, monitors, palette);
+            spawn_about_tab(area, palette);
         });
 }
 
@@ -281,13 +305,14 @@ fn spawn_footer(
                 padding: UiRect::top(Val::Px(12.0)),
                 margin: UiRect::top(Val::Px(12.0)),
                 justify_content: JustifyContent::Center,
+                width: Val::Percent(100.0),
                 ..default()
             },
             BorderColor(palette.border),
         ))
         .with_children(|footer| {
             footer.spawn((
-                Text::new("About Lovable  ·  Support  ·  v0.2 Beta"),
+                Text::new("Lovable  ·  v0.2 Beta"),
                 TextFont {
                     font_size: 11.0,
                     ..default()
