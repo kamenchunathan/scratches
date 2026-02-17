@@ -8,8 +8,8 @@ use bevy::{asset::io::AssetSourceId, prelude::*, window::WindowTheme};
 
 use crate::{
     preferences::{
-        Preferences, PreferencesLoader, access_prefs, monitor_preferences_loading,
-        save_preferences_on_exit,
+        Preferences, PreferencesLoader, create_default_prefs_on_fail, query_monitor_info,
+        save_preferences_on_exit, set_prefs_resource_on_load,
     },
     ui::LovableUI,
 };
@@ -37,11 +37,17 @@ impl Plugin for Lovable {
             .register_asset_loader(PreferencesLoader)
             .init_asset::<Preferences>()
             .insert_state(AppState::Loading)
-            .add_systems(Startup, access_prefs)
+            .add_systems(
+                Startup,
+                (
+                    set_prefs_resource_on_load,
+                    query_monitor_info.after(set_prefs_resource_on_load),
+                ),
+            )
             .add_systems(
                 Update,
                 (
-                    monitor_preferences_loading.run_if(in_state(AppState::Loading)),
+                    create_default_prefs_on_fail.run_if(in_state(AppState::Loading)),
                     save_preferences_on_exit,
                     quit_on_esc,
                 ),

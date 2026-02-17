@@ -1,10 +1,6 @@
 pub mod palette;
 
-use bevy::{
-    ecs::relationship::RelatedSpawnerCommands,
-    prelude::*,
-    text::{TextLayoutInfo, cosmic_text::Align},
-};
+use bevy::{ecs::relationship::RelatedSpawnerCommands, prelude::*};
 use palette::Palette;
 
 use crate::ui::palette::GAMING_THEME;
@@ -12,9 +8,6 @@ use crate::ui::palette::GAMING_THEME;
 #[derive(Resource)]
 struct UiState {
     active_tab: Tab,
-    pets: Vec<Pet>,
-    monitors: Vec<Monitor>,
-    active_pet_count: usize,
 }
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
@@ -23,23 +16,6 @@ enum Tab {
     Pets,
     Settings,
     About,
-}
-
-#[derive(Component, Clone)]
-struct Pet {
-    id: String,
-    name: String,
-    emoji: String,
-    is_active: bool,
-    is_owned: bool,
-    assigned_monitor: Option<u32>,
-}
-
-#[derive(Component, Clone)]
-struct Monitor {
-    id: u32,
-    name: String,
-    resolution: String,
 }
 
 #[derive(Component)]
@@ -56,38 +32,7 @@ pub struct LovableUI;
 impl Plugin for LovableUI {
     fn build(&self, app: &mut App) {
         app.insert_resource(UiState {
-            active_tab: Tab::About,
-            pets: vec![
-                Pet {
-                    id: "1".to_string(),
-                    name: "Biscuit".to_string(),
-                    emoji: "🍪".to_string(),
-                    is_active: true,
-                    is_owned: true,
-                    assigned_monitor: Some(1),
-                },
-                Pet {
-                    id: "2".to_string(),
-                    name: "Whiskers".to_string(),
-                    emoji: "🐱".to_string(),
-                    is_active: false,
-                    is_owned: true,
-                    assigned_monitor: Some(1),
-                },
-            ],
-            monitors: vec![
-                Monitor {
-                    id: 1,
-                    name: "Primary Monitor".to_string(),
-                    resolution: "1920x1080".to_string(),
-                },
-                Monitor {
-                    id: 2,
-                    name: "Secondary Monitor".to_string(),
-                    resolution: "1440x900".to_string(),
-                },
-            ],
-            active_pet_count: 3,
+            active_tab: Tab::Dashboard,
         })
         .insert_resource(GAMING_THEME)
         .add_systems(Startup, setup_ui)
@@ -193,7 +138,6 @@ fn spawn_tab_button(
                     ..default()
                 },
                 TextColor(palette.card_foreground),
-                BackgroundColor(palette.card),
                 BorderRadius::all(Val::Px(5.0)),
             ));
         });
@@ -231,7 +175,7 @@ fn spawn_dashboard_tab(
                 .with_children(|parent| {
                     // Card Header
                     parent.spawn((
-                        Text::new("Your digital companions are ready for action!"),
+                        Text::new("Critters to live in your descktop"),
                         TextColor(palette.card_foreground),
                         TextFont {
                             font_size: 24.0,
@@ -293,40 +237,6 @@ fn spawn_pets_tab(
                         },
                         TextColor(palette.muted_foreground),
                     ));
-
-                    for pet in ui_state.pets.iter().filter(|p| p.is_owned) {
-                        parent
-                            .spawn((
-                                Node {
-                                    flex_direction: FlexDirection::Row,
-                                    align_items: AlignItems::Center,
-                                    justify_content: JustifyContent::SpaceBetween,
-                                    padding: UiRect::all(Val::Px(10.0)),
-                                    margin: UiRect::top(Val::Px(5.0)),
-                                    border: UiRect::all(Val::Px(1.0)),
-                                    ..default()
-                                },
-                                BorderColor(palette.border),
-                            ))
-                            .with_children(|parent| {
-                                parent.spawn((
-                                    Text::new(&pet.emoji),
-                                    TextFont {
-                                        font_size: 24.0,
-                                        ..default()
-                                    },
-                                ));
-                                parent.spawn((
-                                    Text::new(&pet.name),
-                                    TextFont {
-                                        font_size: 16.0,
-                                        ..default()
-                                    },
-                                    TextColor(palette.foreground),
-                                ));
-                                // TODO: Add rename and hide/show buttons
-                            });
-                    }
                 });
 
             // Available Pets Card
@@ -359,47 +269,12 @@ fn spawn_pets_tab(
                         TextColor(palette.muted_foreground),
                     ));
 
-                    parent
-                        .spawn((Node {
-                            flex_direction: FlexDirection::Row,
-                            flex_wrap: FlexWrap::Wrap,
-                            margin: UiRect::top(Val::Px(10.0)),
-                            ..default()
-                        },))
-                        .with_children(|parent| {
-                            for pet in ui_state.pets.iter().filter(|p| !p.is_owned) {
-                                parent
-                                    .spawn((
-                                        Node {
-                                            flex_direction: FlexDirection::Column,
-                                            align_items: AlignItems::Center,
-                                            padding: UiRect::all(Val::Px(10.0)),
-                                            margin: UiRect::all(Val::Px(5.0)),
-                                            border: UiRect::all(Val::Px(1.0)),
-                                            ..default()
-                                        },
-                                        BorderColor(palette.border),
-                                    ))
-                                    .with_children(|parent| {
-                                        parent.spawn((
-                                            Text::new(&pet.emoji),
-                                            TextFont {
-                                                font_size: 36.0,
-                                                ..default()
-                                            },
-                                        ));
-                                        parent.spawn((
-                                            Text::new(&pet.name),
-                                            TextFont {
-                                                font_size: 16.0,
-                                                ..default()
-                                            },
-                                            TextColor(palette.foreground),
-                                        ));
-                                        // TODO: Add unlock button
-                                    });
-                            }
-                        });
+                    parent.spawn((Node {
+                        flex_direction: FlexDirection::Row,
+                        flex_wrap: FlexWrap::Wrap,
+                        margin: UiRect::top(Val::Px(10.0)),
+                        ..default()
+                    },));
                 });
         });
 }

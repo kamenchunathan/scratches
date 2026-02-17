@@ -1,10 +1,13 @@
+use std::hash::{DefaultHasher, Hash, Hasher};
+
 use bevy::{
-    asset::{Asset, AssetLoadFailedEvent, AssetLoader, AssetPath, AsyncReadExt},
+    asset::{Asset, AssetLoadFailedEvent, AssetLoader, AssetPath, AsyncReadExt },
     platform::collections::HashMap,
     prelude::*,
     reflect::Reflect,
     scene::ron,
     tasks::AsyncComputeTaskPool,
+    window::Monitor,
 };
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -37,7 +40,7 @@ pub struct Preferences {
 impl Default for Preferences {
     fn default() -> Self {
         Self {
-            version: Default::default(),
+            version: env!("CARGO_PKG_VERSION").to_string(),
             theme: Default::default(),
             monitors: Default::default(),
             app_settings: Default::default(),
@@ -52,7 +55,7 @@ impl Default for Preferences {
 #[derive(Debug, Default, Serialize, Deserialize, Reflect)]
 pub struct MonitorSettings {
     /// Monitor identifier
-    pub id: u32,
+    pub id: u64,
 
     /// Whether critters are enabled on this monitor
     pub enabled: bool,
@@ -127,14 +130,14 @@ impl AssetLoader for PreferencesLoader {
 }
 
 #[derive(Resource)]
-pub struct PreferencesHandle(Handle<Preferences>);
+pub struct PreferencesHandle(pub Handle<Preferences>);
 
-pub fn access_prefs(mut commands: Commands, asset_server: Res<AssetServer>) {
+pub fn set_prefs_resource_on_load(mut commands: Commands, asset_server: Res<AssetServer>) {
     let prefs: Handle<Preferences> = asset_server.load("appdata://preferences.ron");
     commands.insert_resource(PreferencesHandle(prefs.clone()));
 }
 
-pub fn monitor_preferences_loading(
+pub fn create_default_prefs_on_fail(
     prefs_handle: Res<PreferencesHandle>,
     mut prefs_store: ResMut<Assets<Preferences>>,
     mut events: EventReader<AssetLoadFailedEvent<Preferences>>,
@@ -142,6 +145,46 @@ pub fn monitor_preferences_loading(
     if events.read().next().is_some() {
         info!("Preferences not found, Creating default preferences");
         prefs_store.insert(&prefs_handle.0, Preferences::default());
+    }
+}
+
+/// Generates a fingerprint for each monitor using stable values
+/// Should survive disconnection and uses position to handle monitors with
+/// identical characteristics
+pub fn generate_monitor_fingerprint(monitor: &Monitor) -> u64 {
+    let mut hasher = DefaultHasher::new();
+
+    monitor.name.hash(&mut hasher);
+    monitor.physical_height.hash(&mut hasher);
+    monitor.physical_width.hash(&mut hasher);
+
+    // Quantize position to reduce sensitivity to small changes
+    let quantized_x = (monitor.physical_position.x / 10) * 10;
+    let quantized_y = (monitor.physical_position.y / 10) * 10;
+    quantized_x.hash(&mut hasher);
+    quantized_y.hash(&mut hasher);
+
+    hasher.finish()
+}
+
+pub fn query_monitor_info(
+    monitors: Query<&Monitor>,
+    prefs_handle: Res<PreferencesHandle>,
+    mut prefs_store: ResMut<Assets<Preferences>>,
+) {
+    for monitor in monitors {
+        let Some(prefs) = prefs_store.get_mut(&prefs_handle.0) else {
+            return;
+        };
+
+        let monitor_id = generate_monitor_fingerprint(&monitor);
+        if prefs.monitors.iter().find(|m| m.id == monitor_id).is_none() {
+            prefs.monitors.push(MonitorSettings {
+                id: monitor_id,
+                enabled: true,
+                exclusion_zones: Vec::new(),
+            });
+        }
     }
 }
 
@@ -157,7 +200,8 @@ pub fn save_preferences_on_exit(
                 .spawn({
                     let asset_server = asset_server.clone();
                     let serialized_prefs =
-                        ron::to_string(prefs).expect("Unable to serialize preferences");
+                        ron::ser::to_string_pretty(prefs, ron::ser::PrettyConfig::new())
+                            .expect("Unable to serialize preferences");
 
                     async move {
                         let asset_path = AssetPath::parse("appdata://preferences.ron");
