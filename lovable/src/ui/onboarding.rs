@@ -1,27 +1,26 @@
-use bevy::{ecs::relationship::RelatedSpawnerCommands, prelude::*};
+use bevy::{ecs::relationship::RelatedSpawnerCommands, prelude::*, window::Monitor};
 
-use crate::ui::{
-    palette::Palette,
-    state::{CRITTER_TEMPLATES, CritterRoster, MonitorList, UiState},
-    widgets::*,
+use crate::{
+    critter::CritterRegistry,
+    ui::{
+        palette::Palette,
+        state::{AppScreen, OnboardingState},
+        widgets::*,
+    },
 };
 
-/// Spawns all four onboarding screens as siblings. Only the active screen is visible;
-/// visibility is driven by `update_onboarding_step_visibility` in systems.rs.
 pub fn spawn_onboarding(
     parent: &mut RelatedSpawnerCommands<'_, ChildOf>,
-    ui_state: &UiState,
-    roster: &CritterRoster,
-    monitors: &MonitorList,
+    screen: &AppScreen,
+    registry: &CritterRegistry,
+    monitors: &[(&Monitor, u64)],
     palette: &Palette,
 ) {
     spawn_welcome_screen(parent, palette);
-    spawn_pick_critter_screen(parent, ui_state, palette);
-    spawn_choose_monitor_screen(parent, roster, monitors, palette);
+    spawn_pick_critter_screen(parent, screen, registry, palette);
+    spawn_choose_monitor_screen(parent, screen, monitors, palette);
     spawn_info_screen(parent, palette);
 }
-
-// ─── Step 0: Welcome ─────────────────────────────────────────────────────────
 
 fn spawn_welcome_screen(parent: &mut RelatedSpawnerCommands<'_, ChildOf>, palette: &Palette) {
     parent
@@ -69,13 +68,19 @@ fn spawn_welcome_screen(parent: &mut RelatedSpawnerCommands<'_, ChildOf>, palett
         });
 }
 
-// ─── Step 1: Pick your first companion ───────────────────────────────────────
-
 fn spawn_pick_critter_screen(
     parent: &mut RelatedSpawnerCommands<'_, ChildOf>,
-    ui_state: &UiState,
+    screen: &AppScreen,
+    registry: &CritterRegistry,
     palette: &Palette,
 ) {
+    let selected_def_id = match screen {
+        AppScreen::Onboarding(OnboardingState::PickCritter { selected_def_id }) => {
+            selected_def_id.as_str()
+        }
+        _ => "",
+    };
+
     parent
         .spawn((
             Node {
@@ -88,8 +93,8 @@ fn spawn_pick_critter_screen(
             },
             OnboardingScreen(1),
         ))
-        .with_children(|screen| {
-            screen.spawn((
+        .with_children(|screen_node| {
+            screen_node.spawn((
                 Text::new("Pick your first companion"),
                 TextFont {
                     font_size: 28.0,
@@ -101,7 +106,7 @@ fn spawn_pick_critter_screen(
                     ..default()
                 },
             ));
-            screen.spawn((
+            screen_node.spawn((
                 Text::new("You can adopt more later — this is just your first one."),
                 TextFont {
                     font_size: 14.0,
@@ -114,8 +119,7 @@ fn spawn_pick_critter_screen(
                 },
             ));
 
-            // Critter selection grid
-            screen
+            screen_node
                 .spawn((Node {
                     flex_direction: FlexDirection::Row,
                     flex_wrap: FlexWrap::Wrap,
@@ -125,19 +129,8 @@ fn spawn_pick_critter_screen(
                     ..default()
                 },))
                 .with_children(|grid| {
-                    for (i, template) in CRITTER_TEMPLATES.iter().enumerate() {
-                        let is_selected = i == ui_state.selected_onboarding_critter;
-                        let border_col = if is_selected {
-                            palette.primary
-                        } else {
-                            palette.border
-                        };
-                        let bg_col = if is_selected {
-                            palette.accent
-                        } else {
-                            palette.card
-                        };
-
+                    for def in &registry.defs {
+                        let is_selected = def.id == selected_def_id;
                         grid.spawn((
                             Node {
                                 flex_direction: FlexDirection::Column,
@@ -149,67 +142,67 @@ fn spawn_pick_critter_screen(
                                 ..default()
                             },
                             BorderRadius::all(Val::Px(8.0)),
-                            BorderColor(border_col),
-                            BackgroundColor(bg_col),
+                            BorderColor(if is_selected {
+                                palette.primary
+                            } else {
+                                palette.border
+                            }),
+                            BackgroundColor(if is_selected {
+                                palette.accent
+                            } else {
+                                palette.card
+                            }),
                             Button,
-                            OnboardingCritterCard(i),
+                            OnboardingCritterCard {
+                                def_id: def.id.clone(),
+                            },
                         ))
                         .with_children(|card| {
                             card.spawn((
-                                Text::new(template.species),
-                                TextFont {
-                                    font_size: 28.0,
-                                    ..default()
-                                },
-                                TextColor(palette.primary),
-                                Node {
-                                    margin: UiRect::bottom(Val::Px(8.0)),
-                                    ..default()
-                                },
-                            ));
-                            card.spawn((
-                                Text::new(template.name),
+                                Text::new(&def.name),
                                 TextFont {
                                     font_size: 14.0,
                                     ..default()
                                 },
                                 TextColor(palette.card_foreground),
                             ));
-                            card.spawn((
-                                Text::new(template.species),
-                                TextFont {
-                                    font_size: 11.0,
-                                    ..default()
-                                },
-                                TextColor(palette.muted_foreground),
-                            ));
                         });
                     }
                 });
 
-            screen
+            screen_node
                 .spawn((Node {
                     flex_direction: FlexDirection::Row,
                     ..default()
                 },))
                 .with_children(|actions| {
-                    let selected_name =
-                        CRITTER_TEMPLATES[ui_state.selected_onboarding_critter].name;
-                    let adopt_label = format!("Adopt {selected_name}");
-                    spawn_primary_button(actions, &adopt_label, palette, OnboardingPrimaryButton);
+                    let label = if selected_def_id.is_empty() {
+                        "Adopt".to_string()
+                    } else {
+                        registry
+                            .find(selected_def_id)
+                            .map(|d| format!("Adopt {}", d.name))
+                            .unwrap_or_else(|| "Adopt".to_string())
+                    };
+                    spawn_primary_button(actions, &label, palette, OnboardingPrimaryButton);
                     spawn_outline_button(actions, "Skip setup", palette, OnboardingSkipButton);
                 });
         });
 }
 
-// ─── Step 2: Choose a home (monitor assignment) ───────────────────────────────
-
 fn spawn_choose_monitor_screen(
     parent: &mut RelatedSpawnerCommands<'_, ChildOf>,
-    _roster: &CritterRoster,
-    monitors: &MonitorList,
+    screen: &AppScreen,
+    monitors: &[(&Monitor, u64)],
     palette: &Palette,
 ) {
+    let selected_fp = match screen {
+        AppScreen::Onboarding(OnboardingState::ChooseMonitor {
+            selected_monitor, ..
+        }) => *selected_monitor,
+        _ => None,
+    };
+
     parent
         .spawn((
             Node {
@@ -222,8 +215,8 @@ fn spawn_choose_monitor_screen(
             },
             OnboardingScreen(2),
         ))
-        .with_children(|screen| {
-            screen.spawn((
+        .with_children(|screen_node| {
+            screen_node.spawn((
                 Text::new("Choose a home"),
                 TextFont {
                     font_size: 28.0,
@@ -235,8 +228,8 @@ fn spawn_choose_monitor_screen(
                     ..default()
                 },
             ));
-            screen.spawn((
-                Text::new("Drag them anywhere you like — you can always move them later."),
+            screen_node.spawn((
+                Text::new("You can always move them later."),
                 TextFont {
                     font_size: 14.0,
                     ..default()
@@ -248,36 +241,55 @@ fn spawn_choose_monitor_screen(
                 },
             ));
 
-            for monitor in &monitors.monitors {
-                if !monitor.enabled {
-                    continue;
-                }
-                screen
+            for (monitor, fp) in monitors {
+                let is_selected = selected_fp == Some(*fp);
+                let name = monitor
+                    .name
+                    .clone()
+                    .unwrap_or_else(|| format!("Monitor {:x}", fp));
+                let resolution = format!("{}x{}", monitor.physical_width, monitor.physical_height);
+                let refresh_hz = monitor
+                    .refresh_rate_millihertz
+                    .map(|r| r / 1000)
+                    .unwrap_or(60);
+
+                screen_node
                     .spawn((
                         Node {
                             flex_direction: FlexDirection::Column,
                             padding: UiRect::all(Val::Px(16.0)),
-                            border: UiRect::all(Val::Px(1.0)),
+                            border: UiRect::all(Val::Px(2.0)),
                             width: Val::Percent(100.0),
                             margin: UiRect::bottom(Val::Px(12.0)),
                             ..default()
                         },
-                        BorderColor(palette.border),
-                        BackgroundColor(palette.card),
+                        BorderColor(if is_selected {
+                            palette.primary
+                        } else {
+                            palette.border
+                        }),
+                        BackgroundColor(if is_selected {
+                            palette.accent
+                        } else {
+                            palette.card
+                        }),
                         BorderRadius::all(Val::Px(8.0)),
+                        Button,
+                        OnboardingMonitorCard {
+                            monitor_fingerprint: *fp,
+                        },
                     ))
                     .with_children(|card| {
                         card.spawn((
-                            Text::new(&monitor.name),
+                            Text::new(name),
                             TextFont {
                                 font_size: 16.0,
                                 ..default()
                             },
                             TextColor(palette.card_foreground),
                         ));
-                        let sub = format!("{} · {}Hz", monitor.resolution, monitor.refresh_rate);
                         card.spawn((
-                            Text::new(sub),
+                            Text::new(format!("{resolution} · {refresh_hz}Hz")),
                             TextFont {
                                 font_size: 12.0,
                                 ..default()
@@ -288,32 +300,10 @@ fn spawn_choose_monitor_screen(
                                 ..default()
                             },
                         ));
-                        // Preview area representing the monitor canvas
-                        card.spawn((
-                            Node {
-                                width: Val::Percent(100.0),
-                                height: Val::Px(80.0),
-                                align_items: AlignItems::Center,
-                                justify_content: JustifyContent::Center,
-                                ..default()
-                            },
-                            BackgroundColor(palette.muted),
-                            BorderRadius::all(Val::Px(6.0)),
-                        ))
-                        .with_children(|preview| {
-                            preview.spawn((
-                                Text::new("[ desktop preview ]"),
-                                TextFont {
-                                    font_size: 12.0,
-                                    ..default()
-                                },
-                                TextColor(palette.muted_foreground),
-                            ));
-                        });
                     });
             }
 
-            screen
+            screen_node
                 .spawn((Node {
                     flex_direction: FlexDirection::Row,
                     ..default()
@@ -324,8 +314,6 @@ fn spawn_choose_monitor_screen(
                 });
         });
 }
-
-// ─── Step 3: Information screen ───────────────────────────────────────────────
 
 fn spawn_info_screen(parent: &mut RelatedSpawnerCommands<'_, ChildOf>, palette: &Palette) {
     parent
@@ -372,7 +360,7 @@ fn spawn_info_screen(parent: &mut RelatedSpawnerCommands<'_, ChildOf>, palette: 
                     spawn_info_row(
                         card,
                         "On your desktop",
-                        "They'll live on your desktop — you can keep working normally around them.",
+                        "They'll live on your desktop — keep working normally around them.",
                         palette,
                     );
                     spawn_info_row(

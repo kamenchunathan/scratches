@@ -1,17 +1,19 @@
-use bevy::{ecs::relationship::RelatedSpawnerCommands, prelude::*};
+use bevy::{ecs::relationship::RelatedSpawnerCommands, prelude::*, window::Monitor};
 
-use crate::ui::{
-    events::SettingToggleId,
-    palette::Palette,
-    state::{AppSettingsUiState, MonitorList, Tab},
-    widgets::*,
+use crate::{
+    preferences::Preferences,
+    ui::{
+        palette::Palette,
+        state::{AppSettingsUiState, Tab},
+        widgets::*,
+    },
 };
 
-/// Spawns the Settings tab content.
 pub fn spawn_settings_tab(
     parent: &mut RelatedSpawnerCommands<'_, ChildOf>,
     settings: &AppSettingsUiState,
-    monitors: &MonitorList,
+    prefs: &Preferences,
+    monitors: &[(&Monitor, u64)],
     palette: &Palette,
 ) {
     parent
@@ -29,13 +31,11 @@ pub fn spawn_settings_tab(
             spawn_separator(tab, palette);
             spawn_critter_settings_section(tab, settings, palette);
             spawn_separator(tab, palette);
-            spawn_monitor_management_section(tab, settings, monitors, palette);
+            spawn_monitor_management_section(tab, settings, prefs, monitors, palette);
             spawn_separator(tab, palette);
             spawn_updates_section(tab, palette);
         });
 }
-
-// ─── Application settings ─────────────────────────────────────────────────────
 
 fn spawn_app_settings_section(
     parent: &mut RelatedSpawnerCommands<'_, ChildOf>,
@@ -43,63 +43,55 @@ fn spawn_app_settings_section(
     palette: &Palette,
 ) {
     spawn_section_header(parent, "Application Settings", palette);
-
     spawn_toggle_row(
         parent,
         "Launch Lovable when I log in",
         "Startup behavior",
-        SettingToggleId::StartOnBoot,
+        SettingId::StartOnBoot,
         settings.start_on_boot,
         palette,
     );
-
     spawn_toggle_row(
         parent,
         "Go straight to the tray, skip the window",
         "Start minimized",
-        SettingToggleId::StartMinimized,
+        SettingId::StartMinimized,
         settings.start_minimized,
         palette,
     );
-
     spawn_toggle_row(
         parent,
         "Keep an icon in the system tray",
         "Tray visibility",
-        SettingToggleId::ShowTrayIcon,
+        SettingId::ShowTrayIcon,
         settings.show_tray_icon,
         palette,
     );
-
     spawn_toggle_row(
         parent,
         "Closing this window keeps critters running",
         "Close to tray",
-        SettingToggleId::CloseToTray,
+        SettingId::CloseToTray,
         settings.close_to_tray,
         palette,
     );
-
     spawn_toggle_row(
         parent,
         "Check for new versions when Lovable starts",
         "Auto-update checks",
-        SettingToggleId::CheckForUpdates,
+        SettingId::CheckForUpdates,
         settings.check_for_updates,
         palette,
     );
-
     spawn_toggle_row(
         parent,
-        "Share anonymous usage data to help improve Lovable",
+        "Share anonymous usage data",
         "Analytics",
-        SettingToggleId::SendAnalytics,
+        SettingId::SendAnalytics,
         settings.send_analytics,
         palette,
     );
 }
-
-// ─── Global critter settings ──────────────────────────────────────────────────
 
 fn spawn_critter_settings_section(
     parent: &mut RelatedSpawnerCommands<'_, ChildOf>,
@@ -107,37 +99,32 @@ fn spawn_critter_settings_section(
     palette: &Palette,
 ) {
     spawn_section_header(parent, "Global Critter Settings", palette);
-
     spawn_toggle_row(
         parent,
         "Let my critters respond to the mouse",
         "Interactions enabled",
-        SettingToggleId::InteractionsEnabled,
+        SettingId::InteractionsEnabled,
         settings.interactions_enabled,
         palette,
     );
-
     spawn_toggle_row(
         parent,
         "Show their name when I hover over them",
         "Hover display",
-        SettingToggleId::ShowNameOnHover,
+        SettingId::ShowNameOnHover,
         settings.show_name_on_hover,
         palette,
     );
-
-    // Sound toggle — shown always; note below shown when sound is enabled
     spawn_toggle_row(
         parent,
         "Let critters make sounds",
         "Audio control",
-        SettingToggleId::SoundEnabled,
+        SettingId::SoundEnabled,
         settings.sound_enabled,
         palette,
     );
 
     if settings.sound_enabled {
-        // Volume display - a full Select widget would replace this in a future pass
         parent.spawn((
             Text::new("Volume: 70%  (use Settings > Audio to adjust)"),
             TextFont {
@@ -157,17 +144,16 @@ fn spawn_critter_settings_section(
     }
 }
 
-// ─── Monitor management ───────────────────────────────────────────────────────
-
 fn spawn_monitor_management_section(
     parent: &mut RelatedSpawnerCommands<'_, ChildOf>,
     settings: &AppSettingsUiState,
-    monitors: &MonitorList,
+    prefs: &Preferences,
+    monitors: &[(&Monitor, u64)],
     palette: &Palette,
 ) {
     spawn_section_header(parent, "Monitor Management", palette);
 
-    // Cross-monitor roaming toggle
+    // Cross-monitor roaming
     parent
         .spawn((
             Node {
@@ -209,21 +195,37 @@ fn spawn_monitor_management_section(
                 });
             spawn_toggle_widget(
                 row,
-                SettingToggleId::AllowCritterRoaming,
+                SettingId::AllowCritterRoaming,
                 settings.allow_critter_roaming,
                 palette,
             );
         });
 
-    // Per-monitor cards
-    for (idx, monitor) in monitors.monitors.iter().enumerate() {
+    // Per-monitor cards — derived from live Monitor query + MonitorSettings from Preferences
+    for (monitor, fp) in monitors {
+        let monitor_settings = prefs.monitors.iter().find(|m| m.fingerprint == *fp);
+        let enabled = monitor_settings.map(|s| s.enabled).unwrap_or(true);
+        let exclusion_count = monitor_settings
+            .map(|s| s.exclusion_zones.len())
+            .unwrap_or(0);
+
+        let name = monitor
+            .name
+            .clone()
+            .unwrap_or_else(|| format!("Monitor {:x}", fp));
+        let resolution = format!("{}x{}", monitor.physical_width, monitor.physical_height);
+        let refresh_hz = monitor
+            .refresh_rate_millihertz
+            .map(|r| r / 1000)
+            .unwrap_or(60);
+
         spawn_monitor_card(
             parent,
-            idx,
-            monitor.name.as_str(),
-            &monitor.resolution,
-            monitor.refresh_rate,
-            monitor.enabled,
+            &name,
+            &resolution,
+            refresh_hz,
+            enabled,
+            exclusion_count,
             palette,
         );
     }
@@ -231,11 +233,11 @@ fn spawn_monitor_management_section(
 
 fn spawn_monitor_card(
     parent: &mut RelatedSpawnerCommands<'_, ChildOf>,
-    _idx: usize,
     name: &str,
     resolution: &str,
     refresh_rate: u32,
     enabled: bool,
+    exclusion_count: usize,
     palette: &Palette,
 ) {
     parent
@@ -253,7 +255,6 @@ fn spawn_monitor_card(
             BackgroundColor(palette.card),
         ))
         .with_children(|card| {
-            // Monitor header row
             card.spawn((Node {
                 flex_direction: FlexDirection::Row,
                 align_items: AlignItems::Center,
@@ -276,9 +277,8 @@ fn spawn_monitor_card(
                                 },
                                 TextColor(palette.card_foreground),
                             ));
-                            let sub = format!("{resolution} · {refresh_rate}Hz");
                             info.spawn((
-                                Text::new(sub),
+                                Text::new(format!("{resolution} · {refresh_rate}Hz")),
                                 TextFont {
                                     font_size: 11.0,
                                     ..default()
@@ -286,13 +286,10 @@ fn spawn_monitor_card(
                                 TextColor(palette.muted_foreground),
                             ));
                         });
-                    // Enable/disable toggle — uses a simple bool display for now.
-                    // A per-monitor ToggleWidget variant would be wired in future.
-                    let status = if enabled { "Enabled" } else { "Disabled" };
-                    let status_color = if enabled {
-                        palette.primary
+                    let (status, status_color) = if enabled {
+                        ("Enabled", palette.primary)
                     } else {
-                        palette.muted_foreground
+                        ("Disabled", palette.muted_foreground)
                     };
                     header.spawn((
                         Text::new(status),
@@ -305,7 +302,6 @@ fn spawn_monitor_card(
                 });
 
             if enabled {
-                // Exclusion zones section
                 card.spawn((
                     Node {
                         border: UiRect::top(Val::Px(1.0)),
@@ -329,7 +325,7 @@ fn spawn_monitor_card(
                         },
                     ));
                     section.spawn((
-                        Text::new("0 zones configured"),
+                        Text::new(format!("{exclusion_count} zone(s) configured")),
                         TextFont {
                             font_size: 11.0,
                             ..default()
@@ -340,7 +336,6 @@ fn spawn_monitor_card(
                             ..default()
                         },
                     ));
-                    // Add exclusion zone button (action stubbed — opens zone editor)
                     section
                         .spawn((
                             Node {
@@ -355,7 +350,6 @@ fn spawn_monitor_card(
                             BorderColor(palette.border),
                             BackgroundColor(palette.card),
                             Button,
-                            // TODO: AddExclusionZoneButton(monitor_idx) — implement with zone editor
                         ))
                         .with_children(|btn| {
                             btn.spawn((
@@ -372,11 +366,8 @@ fn spawn_monitor_card(
         });
 }
 
-// ─── Updates section ──────────────────────────────────────────────────────────
-
 fn spawn_updates_section(parent: &mut RelatedSpawnerCommands<'_, ChildOf>, palette: &Palette) {
     spawn_section_header(parent, "Updates", palette);
-
     parent
         .spawn((
             Node {

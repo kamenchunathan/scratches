@@ -1,16 +1,16 @@
-use bevy::{ecs::relationship::RelatedSpawnerCommands, prelude::*};
+use bevy::{ecs::relationship::RelatedSpawnerCommands, prelude::*, window::Monitor};
 
-use crate::ui::{
-    palette::Palette,
-    state::{CRITTER_TEMPLATES, CritterRoster, MonitorList, Tab},
-    widgets::*,
+use crate::{
+    critter::CritterRegistry,
+    preferences::Preferences,
+    ui::{palette::Palette, state::Tab, widgets::*},
 };
 
-/// Spawns the Home tab content. Visibility is driven by the tab system.
 pub fn spawn_home_tab(
     parent: &mut RelatedSpawnerCommands<'_, ChildOf>,
-    roster: &CritterRoster,
-    monitors: &MonitorList,
+    prefs: &Preferences,
+    registry: &CritterRegistry,
+    monitors: &[(&Monitor, u64)],
     palette: &Palette,
 ) {
     parent
@@ -24,27 +24,33 @@ pub fn spawn_home_tab(
             TabContent(Tab::Home),
         ))
         .with_children(|tab| {
-            spawn_greeting_card(tab, roster, palette);
+            spawn_greeting_card(tab, prefs, palette);
             spawn_separator(tab, palette);
-            spawn_companions_strip(tab, roster, palette);
+            spawn_companions_strip(tab, prefs, registry, palette);
             spawn_separator(tab, palette);
-            spawn_monitor_layout(tab, roster, monitors, palette);
+            spawn_monitor_layout(tab, prefs, registry, monitors, palette);
             spawn_separator(tab, palette);
             spawn_quick_actions(tab, palette);
-            spawn_discovery_nudge(tab, roster, palette);
+            spawn_discovery_nudge(tab, prefs, registry, palette);
         });
 }
 
-// ─── Greeting card ────────────────────────────────────────────────────────────
-
 fn spawn_greeting_card(
     parent: &mut RelatedSpawnerCommands<'_, ChildOf>,
-    roster: &CritterRoster,
+    prefs: &Preferences,
     palette: &Palette,
 ) {
-    let status = build_status_message(roster);
-    // Greeting and status are computed at spawn time from current roster state.
-    // based on time-of-day if desired.
+    let visible: Vec<_> = prefs.critters.iter().filter(|c| c.is_visible).collect();
+    let status = match visible.len() {
+        0 => "All your companions are hiding right now.".to_string(),
+        1 => format!("{} is settled in and ready for the day.", visible[0].name),
+        2 => format!(
+            "{} and {} are both out and about.",
+            visible[0].name, visible[1].name
+        ),
+        n => format!("Your {n} companions are out and about."),
+    };
+
     spawn_card(parent, palette, UiRect::bottom(Val::Px(0.0)), |card| {
         card.spawn((
             Text::new("Good day!"),
@@ -69,24 +75,10 @@ fn spawn_greeting_card(
     });
 }
 
-fn build_status_message(roster: &CritterRoster) -> String {
-    let visible: Vec<_> = roster.owned.iter().filter(|c| c.is_visible).collect();
-    match visible.len() {
-        0 => "All your companions are hiding right now.".to_string(),
-        1 => format!("{} is settled in and ready for the day.", visible[0].name),
-        2 => format!(
-            "{} and {} are both out and about.",
-            visible[0].name, visible[1].name
-        ),
-        n => format!("Your {n} companions are out and about."),
-    }
-}
-
-// ─── Companions strip ─────────────────────────────────────────────────────────
-
 fn spawn_companions_strip(
     parent: &mut RelatedSpawnerCommands<'_, ChildOf>,
-    roster: &CritterRoster,
+    prefs: &Preferences,
+    registry: &CritterRegistry,
     palette: &Palette,
 ) {
     spawn_section_header(parent, "Your Companions", palette);
@@ -110,12 +102,17 @@ fn spawn_companions_strip(
             ..default()
         },))
         .with_children(|strip| {
-            for critter in &roster.owned {
+            for critter in &prefs.critters {
+                let def_name = registry
+                    .find(&critter.def_id)
+                    .map(|d| d.name.as_str())
+                    .unwrap_or("Unknown");
                 let visibility_color = if critter.is_visible {
                     palette.primary
                 } else {
                     palette.muted_foreground
                 };
+
                 strip
                     .spawn((
                         Node {
@@ -132,9 +129,8 @@ fn spawn_companions_strip(
                         BackgroundColor(palette.card),
                     ))
                     .with_children(|card| {
-                        // Species label acts as the visual identifier (emoji requires custom font)
                         card.spawn((
-                            Text::new(critter.template_id.to_uppercase()),
+                            Text::new(def_name),
                             TextFont {
                                 font_size: 11.0,
                                 ..default()
@@ -153,7 +149,6 @@ fn spawn_companions_strip(
                             },
                             TextColor(palette.card_foreground),
                         ));
-                        // Visibility indicator dot
                         card.spawn((
                             Node {
                                 width: Val::Px(8.0),
@@ -169,32 +164,25 @@ fn spawn_companions_strip(
         });
 }
 
-// ─── Monitor layout preview ───────────────────────────────────────────────────
-
 fn spawn_monitor_layout(
     parent: &mut RelatedSpawnerCommands<'_, ChildOf>,
-    roster: &CritterRoster,
-    monitors: &MonitorList,
+    prefs: &Preferences,
+    registry: &CritterRegistry,
+    monitors: &[(&Monitor, u64)],
     palette: &Palette,
 ) {
-    parent
-        .spawn((Node {
-            flex_direction: FlexDirection::Row,
-            align_items: AlignItems::Center,
-            justify_content: JustifyContent::SpaceBetween,
+    parent.spawn((
+        Text::new("Monitor Layout"),
+        TextFont {
+            font_size: 13.0,
+            ..default()
+        },
+        TextColor(palette.foreground),
+        Node {
             margin: UiRect::bottom(Val::Px(10.0)),
             ..default()
-        },))
-        .with_children(|header| {
-            header.spawn((
-                Text::new("Monitor Layout"),
-                TextFont {
-                    font_size: 13.0,
-                    ..default()
-                },
-                TextColor(palette.foreground),
-            ));
-        });
+        },
+    ));
 
     parent
         .spawn((Node {
@@ -203,14 +191,24 @@ fn spawn_monitor_layout(
             ..default()
         },))
         .with_children(|grid| {
-            for (monitor_idx, monitor) in monitors.monitors.iter().enumerate() {
-                if !monitor.enabled {
+            for (monitor, fp) in monitors {
+                let settings = prefs.monitors.iter().find(|m| m.fingerprint == *fp);
+                if settings.map(|s| !s.enabled).unwrap_or(false) {
                     continue;
                 }
-                let occupants: Vec<_> = roster
-                    .owned
+
+                let name = monitor
+                    .name
+                    .clone()
+                    .unwrap_or_else(|| format!("Monitor {:x}", fp));
+                let width = monitor.physical_width;
+                let height = monitor.physical_height;
+                let resolution = format!("{width}x{height}");
+
+                let occupants: Vec<_> = prefs
+                    .critters
                     .iter()
-                    .filter(|c| c.assigned_monitor_idx == monitor_idx)
+                    .filter(|c| c.monitor_fingerprint == *fp)
                     .collect();
 
                 grid.spawn((
@@ -232,7 +230,7 @@ fn spawn_monitor_layout(
                 ))
                 .with_children(|card| {
                     card.spawn((
-                        Text::new(&monitor.name),
+                        Text::new(name),
                         TextFont {
                             font_size: 12.0,
                             ..default()
@@ -243,7 +241,6 @@ fn spawn_monitor_layout(
                             ..default()
                         },
                     ));
-                    // Inner canvas
                     card.spawn((
                         Node {
                             width: Val::Percent(100.0),
@@ -260,7 +257,7 @@ fn spawn_monitor_layout(
                     ))
                     .with_children(|canvas| {
                         canvas.spawn((
-                            Text::new(&monitor.resolution),
+                            Text::new(resolution),
                             TextFont {
                                 font_size: 9.0,
                                 ..default()
@@ -298,8 +295,6 @@ fn spawn_monitor_layout(
         });
 }
 
-// ─── Quick actions ────────────────────────────────────────────────────────────
-
 fn spawn_quick_actions(parent: &mut RelatedSpawnerCommands<'_, ChildOf>, palette: &Palette) {
     parent
         .spawn((Node {
@@ -313,16 +308,19 @@ fn spawn_quick_actions(parent: &mut RelatedSpawnerCommands<'_, ChildOf>, palette
         });
 }
 
-// ─── Discovery nudge ─────────────────────────────────────────────────────────
-
-/// Shows a preview of up to 2 adoptable critters. Hidden when none are available.
 fn spawn_discovery_nudge(
     parent: &mut RelatedSpawnerCommands<'_, ChildOf>,
-    roster: &CritterRoster,
+    prefs: &Preferences,
+    registry: &CritterRegistry,
     palette: &Palette,
 ) {
-    let available = roster.available_templates();
-    if available.is_empty() || roster.owned.len() >= 5 {
+    let available: Vec<_> = registry
+        .defs
+        .iter()
+        .filter(|d| !prefs.critters.iter().any(|c| c.def_id == d.id))
+        .collect();
+
+    if available.is_empty() || prefs.critters.len() >= 5 {
         return;
     }
 
@@ -340,7 +338,7 @@ fn spawn_discovery_nudge(
             ..default()
         },))
         .with_children(|grid| {
-            for template in available.iter().take(2) {
+            for def in available.iter().take(2) {
                 grid.spawn((
                     Node {
                         flex_direction: FlexDirection::Column,
@@ -357,19 +355,7 @@ fn spawn_discovery_nudge(
                 ))
                 .with_children(|card| {
                     card.spawn((
-                        Text::new(template.species),
-                        TextFont {
-                            font_size: 13.0,
-                            ..default()
-                        },
-                        TextColor(palette.primary),
-                        Node {
-                            margin: UiRect::bottom(Val::Px(4.0)),
-                            ..default()
-                        },
-                    ));
-                    card.spawn((
-                        Text::new(template.name),
+                        Text::new(&def.name),
                         TextFont {
                             font_size: 14.0,
                             ..default()
@@ -380,11 +366,9 @@ fn spawn_discovery_nudge(
                             ..default()
                         },
                     ));
-                    // Adopt button
                     card.spawn((
                         Node {
                             padding: UiRect::axes(Val::Px(16.0), Val::Px(8.0)),
-                            border: UiRect::all(Val::Px(0.0)),
                             align_items: AlignItems::Center,
                             justify_content: JustifyContent::Center,
                             width: Val::Percent(100.0),
@@ -393,7 +377,9 @@ fn spawn_discovery_nudge(
                         BorderRadius::all(Val::Px(6.0)),
                         BackgroundColor(palette.primary),
                         Button,
-                        CritterAdoptButton(template.id),
+                        AdoptButton {
+                            def_id: def.id.clone(),
+                        },
                     ))
                     .with_children(|btn| {
                         btn.spawn((

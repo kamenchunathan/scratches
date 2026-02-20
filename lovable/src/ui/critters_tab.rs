@@ -1,24 +1,21 @@
-use bevy::{ecs::relationship::RelatedSpawnerCommands, prelude::*};
+use bevy::{ecs::relationship::RelatedSpawnerCommands, prelude::*, window::Monitor};
 
-use crate::ui::{
-    palette::Palette,
-    state::{CritterRoster, MonitorList, Tab, UiState},
-    widgets::*,
+use crate::{
+    critter::{Critter, CritterRegistry},
+    preferences::{Preferences, generate_monitor_fingerprint},
+    ui::{
+        palette::Palette,
+        state::{AppScreen, CrittersTabState, DeleteConfirmState, Tab},
+        widgets::*,
+    },
 };
 
-/// Spawns the My Critters tab content.
-/// Expandable rows and delete confirmations are spawned in full; their visibility
-/// is toggled by `update_critter_expand_visibility` and `update_delete_confirm_visibility`
-/// in systems.rs based on `UiState.expanded_critter_idx` / `delete_confirm_idx`.
-///
-/// NOTE: Adopting or deleting critters changes `CritterRoster`, which requires
-/// rebuilding this tab. Mark this tab with a dirty flag and respawn when the
-/// roster changes — that system is left as a future integration point.
 pub fn spawn_critters_tab(
     parent: &mut RelatedSpawnerCommands<'_, ChildOf>,
-    ui_state: &UiState,
-    roster: &CritterRoster,
-    monitors: &MonitorList,
+    screen: &AppScreen,
+    prefs: &Preferences,
+    registry: &CritterRegistry,
+    monitors: &[(&Monitor, u64)],
     palette: &Palette,
 ) {
     parent
@@ -32,25 +29,26 @@ pub fn spawn_critters_tab(
             TabContent(Tab::Critters),
         ))
         .with_children(|tab| {
-            spawn_owned_critters_section(tab, ui_state, roster, monitors, palette);
+            spawn_owned_section(tab, screen, prefs, registry, monitors, palette);
             spawn_separator(tab, palette);
-            spawn_available_critters_section(tab, roster, palette);
+            spawn_available_section(tab, prefs, registry, palette);
         });
 }
 
-// ─── Owned critters section ───────────────────────────────────────────────────
+// ─── Owned critters ───────────────────────────────────────────────────────────
 
-fn spawn_owned_critters_section(
+fn spawn_owned_section(
     parent: &mut RelatedSpawnerCommands<'_, ChildOf>,
-    ui_state: &UiState,
-    roster: &CritterRoster,
-    monitors: &MonitorList,
+    screen: &AppScreen,
+    prefs: &Preferences,
+    registry: &CritterRegistry,
+    monitors: &[(&Monitor, u64)],
     palette: &Palette,
 ) {
-    let label = format!("Your Companions ({})", roster.owned.len());
+    let label = format!("Your Companions ({})", prefs.critters.len());
     spawn_section_header(parent, &label, palette);
 
-    if roster.owned.is_empty() {
+    if prefs.critters.is_empty() {
         parent.spawn((
             Text::new("No critters adopted yet. Check out the gallery below!"),
             TextFont {
@@ -66,37 +64,51 @@ fn spawn_owned_critters_section(
         return;
     }
 
-    for (idx, critter) in roster.owned.iter().enumerate() {
+    let (expanded_id, confirm_pending) = match screen {
+        AppScreen::Main(m) => match &m.critters_tab {
+            CrittersTabState::Expanded {
+                critter_id,
+                confirm,
+            } => (Some(*critter_id), *confirm == DeleteConfirmState::Pending),
+            CrittersTabState::Collapsed => (None, false),
+        },
+        _ => (None, false),
+    };
+
+    for critter in &prefs.critters {
+        let def_name = registry
+            .find(&critter.def_id)
+            .map(|d| d.name.as_str())
+            .unwrap_or("Unknown");
+
         spawn_critter_row(
             parent,
-            idx,
-            critter.template_id,
-            &critter.name,
-            critter.is_visible,
-            critter.scale,
-            critter.opacity,
-            critter.assigned_monitor_idx,
-            ui_state,
+            critter,
+            def_name,
+            expanded_id,
+            confirm_pending,
             monitors,
             palette,
         );
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 fn spawn_critter_row(
     parent: &mut RelatedSpawnerCommands<'_, ChildOf>,
-    idx: usize,
-    template_id: &'static str,
-    name: &str,
-    is_visible: bool,
-    scale: u32,
-    opacity: u32,
-    monitor_idx: usize,
-    ui_state: &UiState,
-    monitors: &MonitorList,
+    critter: &Critter,
+    def_name: &str,
+    expanded_id: Option<crate::critter::CritterId>,
+    confirm_pending: bool,
+    monitors: &[(&Monitor, u64)],
     palette: &Palette,
 ) {
+    let is_expanded = expanded_id == Some(critter.id);
+    let expand_display = if is_expanded {
+        Display::Flex
+    } else {
+        Display::None
+    };
+
     parent
         .spawn((
             Node {
@@ -111,7 +123,7 @@ fn spawn_critter_row(
             BackgroundColor(palette.card),
         ))
         .with_children(|row| {
-            // ── Collapsed header (always visible, clickable to expand) ─────
+            // ── Collapsed header ──────────────────────────────────────────
             row.spawn((
                 Node {
                     flex_direction: FlexDirection::Row,
@@ -121,10 +133,11 @@ fn spawn_critter_row(
                     ..default()
                 },
                 Button,
-                CritterHeaderButton(idx),
+                CritterExpandButton {
+                    critter_id: critter.id,
+                },
             ))
             .with_children(|header| {
-                // Species + name + monitor assignment
                 header
                     .spawn((Node {
                         flex_direction: FlexDirection::Row,
@@ -133,14 +146,14 @@ fn spawn_critter_row(
                     },))
                     .with_children(|info| {
                         info.spawn((
-                            Text::new(template_id.to_uppercase()),
+                            Text::new(def_name.to_uppercase()),
                             TextFont {
                                 font_size: 11.0,
                                 ..default()
                             },
                             TextColor(palette.primary),
                             Node {
-                                width: Val::Px(36.0),
+                                width: Val::Px(60.0),
                                 margin: UiRect::right(Val::Px(12.0)),
                                 ..default()
                             },
@@ -151,18 +164,19 @@ fn spawn_critter_row(
                         },))
                             .with_children(|col| {
                                 col.spawn((
-                                    Text::new(name),
+                                    Text::new(&critter.name),
                                     TextFont {
                                         font_size: 14.0,
                                         ..default()
                                     },
                                     TextColor(palette.card_foreground),
                                 ));
+                                // Show assigned monitor name
                                 let monitor_name = monitors
-                                    .monitors
-                                    .get(monitor_idx)
-                                    .map(|m| m.name.as_str())
-                                    .unwrap_or("Unassigned");
+                                    .iter()
+                                    .find(|(_, fp)| *fp == critter.monitor_fingerprint)
+                                    .and_then(|(m, _)| m.name.clone())
+                                    .unwrap_or_else(|| "Unassigned".to_string());
                                 col.spawn((
                                     Text::new(monitor_name),
                                     TextFont {
@@ -174,7 +188,6 @@ fn spawn_critter_row(
                             });
                     });
 
-                // Visibility dot + chevron
                 header
                     .spawn((Node {
                         flex_direction: FlexDirection::Row,
@@ -182,7 +195,7 @@ fn spawn_critter_row(
                         ..default()
                     },))
                     .with_children(|right| {
-                        let dot_color = if is_visible {
+                        let dot_color = if critter.is_visible {
                             palette.primary
                         } else {
                             palette.muted_foreground
@@ -197,13 +210,8 @@ fn spawn_critter_row(
                             BorderRadius::all(Val::Px(5.0)),
                             BackgroundColor(dot_color),
                         ));
-                        let chevron = if ui_state.expanded_critter_idx == Some(idx) {
-                            "v"
-                        } else {
-                            ">"
-                        };
                         right.spawn((
-                            Text::new(chevron),
+                            Text::new(if is_expanded { "v" } else { ">" }),
                             TextFont {
                                 font_size: 12.0,
                                 ..default()
@@ -213,13 +221,7 @@ fn spawn_critter_row(
                     });
             });
 
-            // ── Expanded content (hidden by default, toggled by system) ────
-            let expand_display = if ui_state.expanded_critter_idx == Some(idx) {
-                Display::Flex
-            } else {
-                Display::None
-            };
-
+            // ── Expanded content ──────────────────────────────────────────
             row.spawn((
                 Node {
                     display: expand_display,
@@ -230,12 +232,13 @@ fn spawn_critter_row(
                 },
                 BorderColor(palette.border),
                 BackgroundColor(palette.muted),
-                CritterExpandContent(idx),
+                CritterExpandContent {
+                    critter_id: critter.id,
+                },
             ))
             .with_children(|expanded| {
-                // Scale selector (shown as text for now; a Select widget could replace)
                 expanded.spawn((
-                    Text::new(format!("Scale: {scale}%")),
+                    Text::new(format!("Scale: {}%", (critter.scale * 100.0) as u32)),
                     TextFont {
                         font_size: 12.0,
                         ..default()
@@ -246,9 +249,8 @@ fn spawn_critter_row(
                         ..default()
                     },
                 ));
-                // Opacity selector
                 expanded.spawn((
-                    Text::new(format!("Opacity: {opacity}%")),
+                    Text::new(format!("Opacity: {}%", (critter.opacity * 100.0) as u32)),
                     TextFont {
                         font_size: 12.0,
                         ..default()
@@ -260,7 +262,78 @@ fn spawn_critter_row(
                     },
                 ));
 
-                // Action row: visibility toggle + delete button
+                // ── Monitor assignment chips ───────────────────────────────
+                expanded.spawn((
+                    Text::new("Assign to monitor"),
+                    TextFont {
+                        font_size: 11.0,
+                        ..default()
+                    },
+                    TextColor(palette.muted_foreground),
+                    Node {
+                        margin: UiRect::bottom(Val::Px(6.0)),
+                        ..default()
+                    },
+                ));
+                expanded
+                    .spawn((Node {
+                        flex_direction: FlexDirection::Row,
+                        flex_wrap: FlexWrap::Wrap,
+                        margin: UiRect::bottom(Val::Px(12.0)),
+                        ..default()
+                    },))
+                    .with_children(|chips| {
+                        for (monitor, fp) in monitors {
+                            let is_assigned = *fp == critter.monitor_fingerprint;
+                            let name = monitor
+                                .name
+                                .clone()
+                                .unwrap_or_else(|| format!("Monitor {:x}", fp));
+                            chips
+                                .spawn((
+                                    Node {
+                                        padding: UiRect::axes(Val::Px(10.0), Val::Px(6.0)),
+                                        border: UiRect::all(Val::Px(1.0)),
+                                        margin: UiRect::right(Val::Px(6.0)),
+                                        align_items: AlignItems::Center,
+                                        justify_content: JustifyContent::Center,
+                                        ..default()
+                                    },
+                                    BorderRadius::all(Val::Px(6.0)),
+                                    BorderColor(if is_assigned {
+                                        palette.primary
+                                    } else {
+                                        palette.border
+                                    }),
+                                    BackgroundColor(if is_assigned {
+                                        palette.accent
+                                    } else {
+                                        palette.card
+                                    }),
+                                    Button,
+                                    MonitorAssignButton {
+                                        critter_id: critter.id,
+                                        monitor_fingerprint: *fp,
+                                    },
+                                ))
+                                .with_children(|chip| {
+                                    chip.spawn((
+                                        Text::new(name),
+                                        TextFont {
+                                            font_size: 11.0,
+                                            ..default()
+                                        },
+                                        TextColor(if is_assigned {
+                                            palette.primary
+                                        } else {
+                                            palette.muted_foreground
+                                        }),
+                                    ));
+                                });
+                        }
+                    });
+
+                // ── Action row ────────────────────────────────────────────
                 expanded
                     .spawn((
                         Node {
@@ -274,15 +347,19 @@ fn spawn_critter_row(
                         BorderColor(palette.border),
                     ))
                     .with_children(|actions| {
-                        let vis_label = if is_visible { "Showing" } else { "Hidden" };
+                        let vis_label = if critter.is_visible {
+                            "Showing"
+                        } else {
+                            "Hidden"
+                        };
                         spawn_outline_button(
                             actions,
                             vis_label,
                             palette,
-                            CritterVisibilityButton(idx),
+                            CritterVisibilityButton {
+                                critter_id: critter.id,
+                            },
                         );
-
-                        // Delete button
                         actions
                             .spawn((
                                 Node {
@@ -296,7 +373,9 @@ fn spawn_critter_row(
                                 BorderColor(palette.destructive),
                                 BackgroundColor(palette.card),
                                 Button,
-                                CritterDeleteButton(idx),
+                                CritterDeleteButton {
+                                    critter_id: critter.id,
+                                },
                             ))
                             .with_children(|btn| {
                                 btn.spawn((
@@ -310,13 +389,12 @@ fn spawn_critter_row(
                             });
                     });
 
-                // ── Delete confirmation panel (hidden until delete is pressed) ──
-                let confirm_display = if ui_state.delete_confirm_idx == Some(idx) {
+                // ── Delete confirmation panel ─────────────────────────────
+                let confirm_display = if is_expanded && confirm_pending {
                     Display::Flex
                 } else {
                     Display::None
                 };
-
                 expanded
                     .spawn((
                         Node {
@@ -330,7 +408,7 @@ fn spawn_critter_row(
                         BorderRadius::all(Val::Px(6.0)),
                         BorderColor(palette.destructive),
                         BackgroundColor(palette.card),
-                        DeleteConfirmPanel(idx),
+                        DeleteConfirmPanel(critter.id),
                     ))
                     .with_children(|panel| {
                         panel.spawn((
@@ -362,7 +440,9 @@ fn spawn_critter_row(
                                     BorderRadius::all(Val::Px(6.0)),
                                     BackgroundColor(palette.destructive),
                                     Button,
-                                    DeleteConfirmButton(idx),
+                                    DeleteConfirmButton {
+                                        critter_id: critter.id,
+                                    },
                                 ))
                                 .with_children(|btn| {
                                     btn.spawn((
@@ -374,12 +454,7 @@ fn spawn_critter_row(
                                         TextColor(palette.destructive_foreground),
                                     ));
                                 });
-                                spawn_outline_button(
-                                    btns,
-                                    "Cancel",
-                                    palette,
-                                    DeleteCancelButton(idx),
-                                );
+                                spawn_outline_button(btns, "Cancel", palette, DeleteCancelButton);
                             });
                     });
             });
@@ -388,14 +463,20 @@ fn spawn_critter_row(
 
 // ─── Available critters gallery ───────────────────────────────────────────────
 
-fn spawn_available_critters_section(
+fn spawn_available_section(
     parent: &mut RelatedSpawnerCommands<'_, ChildOf>,
-    roster: &CritterRoster,
+    prefs: &Preferences,
+    registry: &CritterRegistry,
     palette: &Palette,
 ) {
     spawn_section_header(parent, "Available Companions", palette);
 
-    let available = roster.available_templates();
+    let available: Vec<_> = registry
+        .defs
+        .iter()
+        .filter(|d| !prefs.critters.iter().any(|c| c.def_id == d.id))
+        .collect();
+
     if available.is_empty() {
         parent.spawn((
             Text::new("You've adopted all available companions!"),
@@ -415,7 +496,7 @@ fn spawn_available_critters_section(
             ..default()
         },))
         .with_children(|grid| {
-            for template in available {
+            for def in available {
                 grid.spawn((
                     Node {
                         flex_direction: FlexDirection::Column,
@@ -436,19 +517,7 @@ fn spawn_available_critters_section(
                 ))
                 .with_children(|card| {
                     card.spawn((
-                        Text::new(template.species.to_uppercase()),
-                        TextFont {
-                            font_size: 10.0,
-                            ..default()
-                        },
-                        TextColor(palette.muted_foreground),
-                        Node {
-                            margin: UiRect::bottom(Val::Px(4.0)),
-                            ..default()
-                        },
-                    ));
-                    card.spawn((
-                        Text::new(template.name),
+                        Text::new(&def.name),
                         TextFont {
                             font_size: 15.0,
                             ..default()
@@ -470,7 +539,9 @@ fn spawn_available_critters_section(
                         BorderRadius::all(Val::Px(6.0)),
                         BackgroundColor(palette.primary),
                         Button,
-                        CritterAdoptButton(template.id),
+                        AdoptButton {
+                            def_id: def.id.clone(),
+                        },
                     ))
                     .with_children(|btn| {
                         btn.spawn((

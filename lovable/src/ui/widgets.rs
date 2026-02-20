@@ -1,8 +1,26 @@
 use bevy::{ecs::relationship::RelatedSpawnerCommands, prelude::*};
 
-use crate::ui::{events::SettingToggleId, palette::Palette, state::Tab};
+use crate::critter::CritterId;
+use crate::ui::{palette::Palette, state::Tab};
 
-// ─── Marker Components ────────────────────────────────────────────────────────
+/// Identifies which setting a `ToggleWidget` controls.
+/// Used only for reading current value from `AppSettingsUiState` and dispatching
+/// the correct `SettingsMsg` variant — no string dispatch anywhere.
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub enum SettingId {
+    StartOnBoot,
+    StartMinimized,
+    ShowTrayIcon,
+    CloseToTray,
+    CheckForUpdates,
+    SendAnalytics,
+    InteractionsEnabled,
+    ShowNameOnHover,
+    SoundEnabled,
+    AllowCritterRoaming,
+}
+
+//  Marker components
 
 #[derive(Component)]
 pub struct UiRoot;
@@ -13,15 +31,13 @@ pub struct OnboardingRoot;
 #[derive(Component)]
 pub struct MainUiRoot;
 
-/// Marks the top-level node of each onboarding screen.
-#[derive(Component, Clone, PartialEq, Eq)]
-pub struct OnboardingScreen(pub u8); // 0=Welcome, 1=Pick, 2=Monitor, 3=Info
+/// Marks the top-level node of each onboarding screen. `0` = Welcome, `1` = Pick, `2` = Monitor, `3` = Info.
+#[derive(Component, Clone)]
+pub struct OnboardingScreen(pub u8);
 
-/// Marks each tab's content node.
 #[derive(Component)]
 pub struct TabContent(pub Tab);
 
-/// Marks the tab bar button for a tab.
 #[derive(Component)]
 pub struct TabButton(pub Tab);
 
@@ -32,59 +48,79 @@ pub struct OnboardingPrimaryButton;
 #[derive(Component)]
 pub struct OnboardingSkipButton;
 
-/// Card in the onboarding critter selection grid.
-#[derive(Component)]
-pub struct OnboardingCritterCard(pub usize); // index into CRITTER_TEMPLATES
+/// Card in the critter-selection grid during onboarding.
+#[derive(Component, Clone)]
+pub struct OnboardingCritterCard {
+    pub def_id: String,
+}
 
-// Home tab actions
+/// Card in the monitor-selection grid during onboarding.
+#[derive(Component, Clone)]
+pub struct OnboardingMonitorCard {
+    pub monitor_fingerprint: u64,
+}
+
+// Home tab
 #[derive(Component)]
 pub struct HideAllButton;
 
 #[derive(Component)]
 pub struct ShowAllButton;
 
-// Critter rows in the critters tab
+// Critters tab — all carry `CritterId` so the single interaction reader can
+// dispatch the right `Msg` variant without per-marker query fanout.
 #[derive(Component)]
-pub struct CritterHeaderButton(pub usize); // index in CritterRoster::owned
+pub struct CritterExpandButton {
+    pub critter_id: CritterId,
+}
 
 #[derive(Component)]
-pub struct CritterExpandContent(pub usize);
+pub struct CritterExpandContent {
+    pub critter_id: CritterId,
+}
+#[derive(Component)]
+pub struct CritterVisibilityButton {
+    pub critter_id: CritterId,
+}
+#[derive(Component)]
+pub struct CritterDeleteButton {
+    pub critter_id: CritterId,
+}
+#[derive(Component)]
+pub struct DeleteConfirmButton {
+    pub critter_id: CritterId,
+}
+#[derive(Component)]
+pub struct DeleteCancelButton;
+#[derive(Component)]
+pub struct DeleteConfirmPanel(pub CritterId);
+
+/// Assign button chip inside an expanded critter row.
+#[derive(Component, Clone)]
+pub struct MonitorAssignButton {
+    pub critter_id: CritterId,
+    pub monitor_fingerprint: u64,
+}
 
 #[derive(Component)]
-pub struct DeleteConfirmPanel(pub usize);
+pub struct AdoptButton {
+    pub def_id: String,
+}
 
-#[derive(Component)]
-pub struct CritterDeleteButton(pub usize);
-
-#[derive(Component)]
-pub struct DeleteConfirmButton(pub usize);
-
-#[derive(Component)]
-pub struct DeleteCancelButton(pub usize);
-
-#[derive(Component)]
-pub struct CritterVisibilityButton(pub usize);
-
-#[derive(Component)]
-pub struct CritterAdoptButton(pub &'static str); // template id
-
-// Settings toggles
+// Settings
 #[derive(Component)]
 pub struct ToggleWidget {
-    pub id: SettingToggleId,
+    pub id: SettingId,
     pub is_on: bool,
 }
 
-/// The sliding thumb inside a ToggleWidget. Updated by toggle system.
 #[derive(Component)]
 pub struct ToggleThumb;
-
 #[derive(Component)]
 pub struct CheckForUpdatesButton;
 
-// ─── Layout Helpers ───────────────────────────────────────────────────────────
+// ─── Layout helpers ───────────────────────────────────────────────────────────
 
-/// Spawns a full-width horizontal divider line.
 pub fn spawn_separator(parent: &mut RelatedSpawnerCommands<'_, ChildOf>, palette: &Palette) {
     parent.spawn((
         Node {
@@ -97,7 +133,6 @@ pub fn spawn_separator(parent: &mut RelatedSpawnerCommands<'_, ChildOf>, palette
     ));
 }
 
-/// Spawns a small section heading (e.g. "Application Settings").
 pub fn spawn_section_header(
     parent: &mut RelatedSpawnerCommands<'_, ChildOf>,
     text: &str,
@@ -117,8 +152,6 @@ pub fn spawn_section_header(
     ));
 }
 
-/// Spawns a card container (rounded border, card background) and passes a child spawner
-/// to `children` for populating its contents.
 pub fn spawn_card(
     parent: &mut RelatedSpawnerCommands<'_, ChildOf>,
     palette: &Palette,
@@ -142,14 +175,11 @@ pub fn spawn_card(
         .with_children(children);
 }
 
-/// Spawns a labelled toggle row:
-///   [label column] [toggle widget]
-/// The toggle widget is a Button; clicking it fires toggle logic in systems.rs.
 pub fn spawn_toggle_row(
     parent: &mut RelatedSpawnerCommands<'_, ChildOf>,
     label: &str,
     sublabel: &str,
-    id: SettingToggleId,
+    id: SettingId,
     is_on: bool,
     palette: &Palette,
 ) {
@@ -170,7 +200,6 @@ pub fn spawn_toggle_row(
             BorderRadius::all(Val::Px(8.0)),
         ))
         .with_children(|row| {
-            // Label column
             row.spawn((Node {
                 flex_direction: FlexDirection::Column,
                 ..default()
@@ -193,16 +222,13 @@ pub fn spawn_toggle_row(
                         TextColor(palette.muted_foreground),
                     ));
                 });
-
-            // Toggle pill button
             spawn_toggle_widget(row, id, is_on, palette);
         });
 }
 
-/// Spawns a pill-shaped toggle button with a sliding thumb.
 pub fn spawn_toggle_widget(
     parent: &mut RelatedSpawnerCommands<'_, ChildOf>,
-    id: SettingToggleId,
+    id: SettingId,
     is_on: bool,
     palette: &Palette,
 ) {
@@ -246,7 +272,6 @@ pub fn spawn_toggle_widget(
         });
 }
 
-/// Spawns a styled action button (filled primary style).
 pub fn spawn_primary_button(
     parent: &mut RelatedSpawnerCommands<'_, ChildOf>,
     text: &str,
@@ -258,7 +283,6 @@ pub fn spawn_primary_button(
             Node {
                 padding: UiRect::axes(Val::Px(20.0), Val::Px(10.0)),
                 margin: UiRect::right(Val::Px(8.0)),
-                border: UiRect::all(Val::Px(0.0)),
                 align_items: AlignItems::Center,
                 justify_content: JustifyContent::Center,
                 ..default()
@@ -280,7 +304,6 @@ pub fn spawn_primary_button(
         });
 }
 
-/// Spawns a styled action button (outline secondary style).
 pub fn spawn_outline_button(
     parent: &mut RelatedSpawnerCommands<'_, ChildOf>,
     text: &str,

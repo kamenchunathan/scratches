@@ -1,7 +1,7 @@
 pub mod about_tab;
 pub mod critters_tab;
-pub mod events;
 pub mod home_tab;
+pub mod messages;
 pub mod onboarding;
 pub mod palette;
 pub mod settings_tab;
@@ -9,101 +9,111 @@ pub mod state;
 pub mod systems;
 pub mod widgets;
 
-use bevy::prelude::*;
+use bevy::{prelude::*, window::Monitor};
 
-use crate::ui::{
-    about_tab::spawn_about_tab,
-    critters_tab::spawn_critters_tab,
-    events::*,
-    home_tab::spawn_home_tab,
-    onboarding::spawn_onboarding,
-    palette::{GAMING_THEME, Palette},
-    settings_tab::spawn_settings_tab,
-    state::*,
-    systems::*,
-    widgets::*,
+use crate::{
+    AppState,
+    critter::CritterRegistry,
+    preferences::{Preferences, PreferencesHandle, RegistryHandle, generate_monitor_fingerprint},
+    ui::{
+        about_tab::spawn_about_tab,
+        critters_tab::spawn_critters_tab,
+        home_tab::spawn_home_tab,
+        messages::Msg,
+        onboarding::spawn_onboarding,
+        palette::{GAMING_THEME, Palette},
+        settings_tab::spawn_settings_tab,
+        state::{AppScreen, AppSettingsUiState},
+        systems::*,
+        widgets::*,
+    },
 };
 
 pub struct LovableUI;
 
 impl Plugin for LovableUI {
     fn build(&self, app: &mut App) {
-        app
-            // Resources
-            .insert_resource(UiState::default())
-            // TODO: Fetch from web
-            .insert_resource(CritterRoster::default())
-            .insert_resource(AppSettingsUiState::default())
-            .insert_resource(MonitorList::stub_primary())
+        app.add_event::<Msg>()
             .insert_resource(GAMING_THEME)
-            // Events (backend systems subscribe to these to react to user actions)
-            .add_event::<AdoptCritterRequested>()
-            .add_event::<DeleteCritterConfirmed>()
-            .add_event::<ToggleCritterVisibility>()
-            .add_event::<HideAllCritters>()
-            .add_event::<ShowAllCritters>()
-            .add_event::<SettingChanged>()
-            .add_event::<AssignCritterToMonitor>()
-            .add_event::<CheckForUpdatesRequested>()
-            .add_event::<OnboardingComplete>()
-            .add_event::<OnboardingStepAdvanced>()
-            // Setup
-            .add_systems(Startup, setup_ui)
-            // Navigation systems
             .add_systems(
-                Update,
-                (
-                    handle_tab_buttons,
-                    update_tab_visibility,
-                    update_onboarding_main_visibility,
-                    update_onboarding_step_visibility,
-                    handle_onboarding_primary,
-                    handle_onboarding_skip,
-                    handle_onboarding_critter_selection,
-                    update_onboarding_critter_card_visuals,
-                ),
+                OnEnter(AppState::Running),
+                (build_app_screen_from_prefs, setup_ui).chain(),
             )
-            // Interaction systems
             .add_systems(
                 Update,
                 (
-                    handle_toggle_clicks,
-                    handle_critter_header_click,
-                    update_critter_expand_visibility,
-                    handle_delete_button,
-                    handle_delete_confirm,
-                    handle_delete_cancel,
-                    update_delete_confirm_visibility,
-                    handle_critter_visibility_toggle,
-                    handle_adopt_button,
-                    handle_hide_all,
-                    handle_show_all,
-                    handle_check_for_updates,
-                ),
+                    read_inp_and_dispatch_msg,
+                    update,
+                    (
+                        handle_tab_press,
+                        sync_tab_visibility,
+                        sync_onboarding_main_visibility,
+                        sync_onboarding_step,
+                        sync_critter_expand,
+                        sync_toggle_visuals,
+                        sync_onboarding_critter_cards,
+                        sync_tab_button_visuals,
+                    ),
+                )
+                    .chain()
+                    .run_if(in_state(AppState::Running)),
             );
     }
 }
 
+/// Derives `AppScreen` and `AppSettingsUiState` from loaded `Preferences`.
+/// Runs once on transition into `Running`.
+pub fn build_app_screen_from_prefs(
+    mut commands: Commands,
+    prefs_handle: Res<PreferencesHandle>,
+    prefs_store: Res<Assets<Preferences>>,
+) {
+    let prefs = prefs_store
+        .get(&prefs_handle.0)
+        .expect("Preferences must be loaded before Running is entered");
+
+    commands.insert_resource(AppScreen::from_preferences(prefs));
+
+    commands.insert_resource(AppSettingsUiState {
+        start_on_boot: prefs.app_settings.start_on_boot,
+        start_minimized: prefs.app_settings.start_minimized,
+        show_tray_icon: prefs.app_settings.show_tray_icon,
+        close_to_tray: prefs.app_settings.close_to_tray,
+        check_for_updates: prefs.app_settings.check_updates,
+        send_analytics: prefs.app_settings.send_analytics,
+        interactions_enabled: prefs.global_critter_settings.interactions_enabled,
+        show_name_on_hover: prefs.global_critter_settings.display_critter_name_on_hover,
+        sound_enabled: prefs.global_critter_settings.sound_enabled,
+        allow_critter_roaming: false,
+    });
+}
+
+/// Spawns the full UI tree. Runs once after `build_app_screen_from_prefs`.
 fn setup_ui(
     mut commands: Commands,
-    ui_state: Res<UiState>,
-    roster: Res<CritterRoster>,
+    screen: Res<AppScreen>,
     settings: Res<AppSettingsUiState>,
-    monitors: Res<MonitorList>,
     palette: Res<Palette>,
+    prefs_handle: Res<PreferencesHandle>,
+    prefs_store: Res<Assets<Preferences>>,
+    registry_handle: Res<RegistryHandle>,
+    registry_store: Res<Assets<CritterRegistry>>,
+    monitors: Query<&Monitor>,
 ) {
     let palette = palette.into_inner();
-    let ui_state = ui_state.into_inner();
-    let roster = roster.into_inner();
+    let screen = screen.into_inner();
     let settings = settings.into_inner();
-    let monitors = monitors.into_inner();
+    let prefs = prefs_store.get(&prefs_handle.0).unwrap();
+    let registry = registry_store.get(&registry_handle.0).unwrap();
+
+    // Build the (monitor, fingerprint) slice once; passed into every tab that needs it.
+    let monitor_list: Vec<(&Monitor, u64)> = monitors
+        .iter()
+        .map(|m| (m, generate_monitor_fingerprint(m)))
+        .collect();
 
     commands.spawn(Camera2d);
 
-    // ── Full-screen background layer ─────────────────────────────────────────
-    // The outermost node fills the window and horizontally centres its single
-    // child (the content column). This gives us the "max-width centred panel"
-    // layout from the prototype without hard-coding pixel positions.
     commands
         .spawn((
             Node {
@@ -117,13 +127,13 @@ fn setup_ui(
             UiRoot,
         ))
         .with_children(|root| {
-            // ── Onboarding flow (hidden after first launch) ───────────────
+            // Onboarding root
             root.spawn((
                 Node {
-                    display: if ui_state.onboarding_complete {
-                        Display::None
-                    } else {
+                    display: if matches!(screen, AppScreen::Onboarding(_)) {
                         Display::Flex
+                    } else {
+                        Display::None
                     },
                     flex_direction: FlexDirection::Column,
                     width: Val::Percent(100.0),
@@ -133,16 +143,14 @@ fn setup_ui(
                 },
                 OnboardingRoot,
             ))
-            .with_children(|onboarding| {
-                spawn_onboarding(onboarding, ui_state, roster, monitors, palette);
+            .with_children(|ob| {
+                spawn_onboarding(ob, screen, registry, &monitor_list, palette);
             });
 
-            // ── Main application UI (hidden during onboarding) ────────────
-            // Capped at 680 px so it reads like a compact control panel rather
-            // than stretching across an ultrawide screen.
+            // Main UI root
             root.spawn((
                 Node {
-                    display: if ui_state.onboarding_complete {
+                    display: if matches!(screen, AppScreen::Main(_)) {
                         Display::Flex
                     } else {
                         Display::None
@@ -158,13 +166,19 @@ fn setup_ui(
             .with_children(|main| {
                 spawn_header(main, palette);
                 spawn_tab_bar(main, palette);
-                spawn_tab_area(main, ui_state, roster, settings, monitors, palette);
+                spawn_tab_area(
+                    main,
+                    screen,
+                    settings,
+                    prefs,
+                    registry,
+                    &monitor_list,
+                    palette,
+                );
                 spawn_footer(main, palette);
             });
         });
 }
-
-// ─── Header ───────────────────────────────────────────────────────────────────
 
 fn spawn_header(
     parent: &mut bevy::ecs::relationship::RelatedSpawnerCommands<'_, ChildOf>,
@@ -198,13 +212,10 @@ fn spawn_header(
         });
 }
 
-// ─── Tab bar ──────────────────────────────────────────────────────────────────
-
 fn spawn_tab_bar(
     parent: &mut bevy::ecs::relationship::RelatedSpawnerCommands<'_, ChildOf>,
     palette: &Palette,
 ) {
-    // The outer wrapper centres the pill without stretching it to full width.
     parent
         .spawn((Node {
             flex_direction: FlexDirection::Row,
@@ -227,54 +238,48 @@ fn spawn_tab_bar(
                     BackgroundColor(palette.muted),
                 ))
                 .with_children(|bar| {
-                    spawn_tab_button(bar, "Home", Tab::Home, palette);
-                    spawn_tab_button(bar, "My Critters", Tab::Critters, palette);
-                    spawn_tab_button(bar, "Settings", Tab::Settings, palette);
-                    spawn_tab_button(bar, "About", Tab::About, palette);
+                    use crate::ui::state::Tab;
+                    for (label, tab) in [
+                        ("Home", Tab::Home),
+                        ("My Critters", Tab::Critters),
+                        ("Settings", Tab::Settings),
+                        ("About", Tab::About),
+                    ] {
+                        bar.spawn((
+                            Node {
+                                padding: UiRect::axes(Val::Px(18.0), Val::Px(8.0)),
+                                margin: UiRect::right(Val::Px(4.0)),
+                                align_items: AlignItems::Center,
+                                justify_content: JustifyContent::Center,
+                                ..default()
+                            },
+                            BorderRadius::all(Val::Px(6.0)),
+                            BackgroundColor(palette.card),
+                            Button,
+                            TabButton(tab),
+                        ))
+                        .with_children(|btn| {
+                            btn.spawn((
+                                Text::new(label),
+                                TextFont {
+                                    font_size: 14.0,
+                                    ..default()
+                                },
+                                TextColor(palette.card_foreground),
+                            ));
+                        });
+                    }
                 });
         });
 }
 
-fn spawn_tab_button(
-    parent: &mut bevy::ecs::relationship::RelatedSpawnerCommands<'_, ChildOf>,
-    label: &str,
-    tab: Tab,
-    palette: &Palette,
-) {
-    parent
-        .spawn((
-            Node {
-                padding: UiRect::axes(Val::Px(18.0), Val::Px(8.0)),
-                margin: UiRect::right(Val::Px(4.0)),
-                align_items: AlignItems::Center,
-                justify_content: JustifyContent::Center,
-                ..default()
-            },
-            BorderRadius::all(Val::Px(6.0)),
-            BackgroundColor(palette.card),
-            Button,
-            TabButton(tab),
-        ))
-        .with_children(|btn| {
-            btn.spawn((
-                Text::new(label),
-                TextFont {
-                    font_size: 14.0,
-                    ..default()
-                },
-                TextColor(palette.card_foreground),
-            ));
-        });
-}
-
-// ─── Tab content area ─────────────────────────────────────────────────────────
-
 fn spawn_tab_area(
     parent: &mut bevy::ecs::relationship::RelatedSpawnerCommands<'_, ChildOf>,
-    ui_state: &UiState,
-    roster: &CritterRoster,
+    screen: &AppScreen,
     settings: &AppSettingsUiState,
-    monitors: &MonitorList,
+    prefs: &Preferences,
+    registry: &CritterRegistry,
+    monitors: &[(&Monitor, u64)],
     palette: &Palette,
 ) {
     parent
@@ -286,14 +291,12 @@ fn spawn_tab_area(
             ..default()
         },))
         .with_children(|area| {
-            spawn_home_tab(area, roster, monitors, palette);
-            spawn_critters_tab(area, ui_state, roster, monitors, palette);
-            spawn_settings_tab(area, settings, monitors, palette);
+            spawn_home_tab(area, prefs, registry, monitors, palette);
+            spawn_critters_tab(area, screen, prefs, registry, monitors, palette);
+            spawn_settings_tab(area, settings, prefs, monitors, palette);
             spawn_about_tab(area, palette);
         });
 }
-
-// ─── Footer ───────────────────────────────────────────────────────────────────
 
 fn spawn_footer(
     parent: &mut bevy::ecs::relationship::RelatedSpawnerCommands<'_, ChildOf>,
@@ -313,7 +316,7 @@ fn spawn_footer(
         ))
         .with_children(|footer| {
             footer.spawn((
-                Text::new(format!("Lovable  · {}", env!("CARGO_PKG_VERSION"))),
+                Text::new(format!("Lovable · {}", env!("CARGO_PKG_VERSION"))),
                 TextFont {
                     font_size: 11.0,
                     ..default()
