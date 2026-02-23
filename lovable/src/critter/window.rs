@@ -60,7 +60,7 @@ pub(crate) fn spawn_window_for_critter(
             window_level: WindowLevel::AlwaysOnTop,
             skip_taskbar: true,
             has_shadow: false,
-            composite_alpha_mode: bevy::window::CompositeAlphaMode::PreMultiplied,
+            composite_alpha_mode: bevy::window::CompositeAlphaMode::Inherit,
             resizable: false,
             movable_by_window_background: critter.interactible,
             resolution: WindowResolution::new(size, size),
