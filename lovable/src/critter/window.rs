@@ -50,7 +50,6 @@ pub(crate) fn spawn_window_for_critter(
         monitor_origin.y + critter.position.y as i32,
     );
 
-    // Window size scales with the critter's scale setting; base size 128 px.
     let size = 128.0 * critter.scale.max(0.25);
 
     commands.spawn((
@@ -60,10 +59,14 @@ pub(crate) fn spawn_window_for_critter(
             transparent: true,
             window_level: WindowLevel::AlwaysOnTop,
             skip_taskbar: true,
+            has_shadow: false,
+            composite_alpha_mode: bevy::window::CompositeAlphaMode::PreMultiplied,
             resizable: false,
             movable_by_window_background: critter.interactible,
             resolution: WindowResolution::new(size, size),
             position: WindowPosition::At(abs_pos),
+            focused: false,
+            window_theme: None,
             ..default()
         },
         CritterWindow {
@@ -93,7 +96,6 @@ pub fn spawn_placeholder_geometry(
     new_windows: Query<(Entity, &CritterWindow), Added<CritterWindow>>,
 ) {
     for (window_entity, cw) in &new_windows {
-        // Stable hue: first byte of the UUID, mapped to [0, 360)
         let hue = (cw.critter_id.0.as_bytes()[0] as f32 / 255.0) * 360.0;
         let color = Color::hsl(hue, 0.75, 0.55);
 
@@ -109,7 +111,6 @@ pub fn spawn_placeholder_geometry(
             },
         ));
 
-        // Triangle centred in the 128 × 128 logical window space.
         commands.spawn((
             Mesh2d(meshes.add(Triangle2d::new(
                 Vec2::new(0.0, 46.0),
@@ -126,38 +127,60 @@ pub fn spawn_placeholder_geometry(
 }
 
 /// Watches `Preferences` for changes and opens or closes windows to match.
-/// Handles three cases:
-///   - Critter marked visible but no window exists  → open window
-///   - Critter marked hidden but window exists      → despawn window
-///   - Critter deleted entirely                     → despawn window
 ///
-/// Rendering entities (camera, mesh) are cleaned up by
-/// `sync_critter_render_despawn`, which runs after this system.
+/// Key improvement over the original: before despawning a hidden critter's window
+/// we flush its current OS position back into `Preferences` so the saved position
+/// matches where the user actually dragged it, not just the last auto-saved value.
 pub fn sync_critter_window_visibility(
     mut commands: Commands,
     prefs_handle: Res<PreferencesHandle>,
-    prefs_store: Res<Assets<Preferences>>,
-    existing_windows: Query<(Entity, &CritterWindow)>,
+    mut prefs_store: ResMut<Assets<Preferences>>,
+    existing_windows: Query<(Entity, &CritterWindow, &Window)>,
     monitors: Query<&Monitor>,
 ) {
-    // Only run when preferences have actually been mutated this frame.
     if !prefs_store.is_changed() {
         return;
     }
 
-    let Some(prefs) = prefs_store.get(&prefs_handle.0) else {
+    let Some(prefs) = prefs_store.get_mut(&prefs_handle.0) else {
         return;
     };
 
-    for critter in &prefs.critters {
-        let window_entity = existing_windows
+    for critter in &mut prefs.critters {
+        let window_state = existing_windows
             .iter()
-            .find(|(_, cw)| cw.critter_id == critter.id)
-            .map(|(e, _)| e);
+            .find(|(_, cw, _)| cw.critter_id == critter.id)
+            .map(|(e, _, w)| (e, w.position.clone()));
 
-        match (critter.is_visible, window_entity) {
-            (true, None) => spawn_window_for_critter(&mut commands, critter, &monitors),
-            (false, Some(entity)) => {
+        match (critter.is_visible, window_state) {
+            (true, None) => {
+                spawn_window_for_critter(&mut commands, critter, &monitors);
+            }
+
+            (false, Some((entity, pos))) => {
+                // Preserve the current dragged position before despawning
+                if let WindowPosition::At(abs) = pos {
+                    let containing_monitor = monitors.iter().find(|m| {
+                        abs.x >= m.physical_position.x
+                            && abs.x < m.physical_position.x + m.physical_width as i32
+                            && abs.y >= m.physical_position.y
+                            && abs.y < m.physical_position.y + m.physical_height as i32
+                    });
+
+                    let (origin, new_fp) = containing_monitor
+                        .map(|m| {
+                            (
+                                IVec2::new(m.physical_position.x, m.physical_position.y),
+                                generate_monitor_fingerprint(m),
+                            )
+                        })
+                        .unwrap_or((IVec2::ZERO, critter.monitor_fingerprint));
+
+                    critter.position =
+                        Vec2::new((abs.x - origin.x) as f32, (abs.y - origin.y) as f32);
+                    critter.monitor_fingerprint = new_fp;
+                }
+
                 commands.entity(entity).despawn();
             }
             _ => {}
@@ -165,15 +188,16 @@ pub fn sync_critter_window_visibility(
     }
 
     // Windows for critters that were deleted
-    for (entity, cw) in &existing_windows {
-        if !prefs.critters.iter().any(|c| c.id == cw.critter_id) {
+    let critter_ids: Vec<_> = prefs.critters.iter().map(|c| c.id).collect();
+    for (entity, cw, _) in &existing_windows {
+        if !critter_ids.contains(&cw.critter_id) {
             commands.entity(entity).despawn();
         }
     }
 }
 
 /// Cleans up orphaned `CritterRenderEntity` nodes (cameras, meshes) after
-/// their window has been despawned by `sync_critter_window_visibility`.
+/// their window has been despawned.
 pub fn sync_critter_render_despawn(
     mut commands: Commands,
     windows: Query<&CritterWindow>,
@@ -186,8 +210,8 @@ pub fn sync_critter_render_despawn(
     }
 }
 
-/// Writes the current window position back to `Preferences` whenever the window moves
-/// Positions are stored monitor-relative so they survive monitor reconfigurations
+/// Writes the current window position back to `Preferences` whenever the window moves.
+/// Positions are stored monitor-relative so they survive monitor reconfigurations.
 pub fn persist_critter_window_positions(
     windows: Query<(&Window, &CritterWindow), Changed<Window>>,
     monitors: Query<&Monitor>,
@@ -203,7 +227,6 @@ pub fn persist_critter_window_positions(
             continue;
         };
 
-        // Find the monitor whose rectangle contains the window's top-left corner.
         let containing_monitor = monitors.iter().find(|m| {
             abs.x >= m.physical_position.x
                 && abs.x < m.physical_position.x + m.physical_width as i32
@@ -219,7 +242,6 @@ pub fn persist_critter_window_positions(
                 )
             })
             .unwrap_or_else(|| {
-                // Window is off all known monitors (edge case); keep existing fp.
                 let fallback_fp = prefs
                     .critters
                     .iter()

@@ -9,6 +9,7 @@ pub enum Msg {
     Critters(CrittersMsg),
     Settings(SettingsMsg),
     Onboarding(OnboardingMsg),
+    System(SystemMsg),
 }
 
 // Home tab
@@ -57,4 +58,15 @@ pub enum OnboardingMsg {
     Skip,
     SelectCritter(String),
     SelectMonitor(u64),
+}
+
+// System-level messages
+#[derive(Debug, Clone)]
+pub enum SystemMsg {
+    CheckForUpdates,
+    OpenUrl(String),
+    TrayShowHide,
+    TrayQuit,
+    TrayToggleCritter(CritterId),
+    SaveNow,
 }

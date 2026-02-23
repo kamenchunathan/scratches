@@ -27,10 +27,10 @@ pub struct Lovable;
 #[derive(States, Debug, Clone, PartialEq, Eq, Hash, Default)]
 pub enum AppState {
     #[default]
-    /// asset loading, platform queries, first-run detection.
+    /// Asset loading, platform queries, first-run detection.
     Loading,
 
-    /// normal application loop; nothing substantial runs before this.
+    /// Normal application loop; nothing substantial runs before this.
     Running,
 }
 
@@ -84,15 +84,8 @@ impl Plugin for Lovable {
                     sync_critter_render_despawn.after(sync_critter_window_visibility),
                     persist_critter_window_positions,
                     save_preferences_on_exit,
-                    quit_on_esc,
                 )
                     .run_if(in_state(AppState::Running)),
             );
-    }
-}
-
-fn quit_on_esc(keys: ResMut<ButtonInput<KeyCode>>, mut app_exit: EventWriter<AppExit>) {
-    if keys.just_pressed(KeyCode::Escape) || keys.just_pressed(KeyCode::KeyQ) {
-        app_exit.write(AppExit::Success);
     }
 }

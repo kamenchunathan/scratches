@@ -23,7 +23,7 @@ use crate::{
         onboarding::spawn_onboarding,
         palette::{GAMING_THEME, Palette},
         settings_tab::spawn_settings_tab,
-        state::{AppScreen, AppSettingsUiState},
+        state::{AppScreen, AppSettingsUiState, DirtyFlag, MainWindowVisible},
         systems::*,
         widgets::*,
     },
@@ -35,7 +35,9 @@ impl Plugin for LovableUI {
     fn build(&self, app: &mut App) {
         app.add_event::<Msg>()
             .insert_resource(GAMING_THEME)
-            // OnEnter(Running): build state from prefs, then spawn UI
+            .insert_resource(DirtyFlag::default())
+            .insert_resource(MainWindowVisible(true))
+            .insert_resource(NeedsRebuild::default())
             .add_systems(
                 OnEnter(AppState::Running),
                 (build_app_screen_from_prefs, setup_ui).chain(),
@@ -44,17 +46,29 @@ impl Plugin for LovableUI {
             .add_systems(
                 Update,
                 (
-                    read_inp_and_dispatch_msg,
+                    (
+                        dispatch_settings_toggles,
+                        dispatch_critter_buttons,
+                        dispatch_home_buttons,
+                        dispatch_onboarding_buttons,
+                        dispatch_system_buttons,
+                    ),
                     update,
+                    quit_on_esc,
                     (
                         handle_tab_press,
                         sync_tab_visibility,
+                        sync_tab_button_visuals,
                         sync_onboarding_main_visibility,
                         sync_onboarding_step,
                         sync_critter_expand,
                         sync_toggle_visuals,
                         sync_onboarding_critter_cards,
-                        sync_tab_button_visuals,
+                        scroll_tab_area,
+                        reset_scroll_on_tab_change,
+                        handle_window_close,
+                        periodic_save,
+                        rebuild_dynamic_tabs,
                     ),
                 )
                     .chain()
@@ -108,7 +122,6 @@ fn setup_ui(
     let prefs = prefs_store.get(&prefs_handle.0).unwrap();
     let registry = registry_store.get(&registry_handle.0).unwrap();
 
-    // Build the (monitor, fingerprint) slice once; passed into every tab that needs it.
     let monitor_list: Vec<(&Monitor, u64)> = monitors
         .iter()
         .map(|m| (m, generate_monitor_fingerprint(m)))
@@ -188,29 +201,74 @@ fn spawn_header(
 ) {
     parent
         .spawn((Node {
-            flex_direction: FlexDirection::Column,
+            flex_direction: FlexDirection::Row,
             align_items: AlignItems::Center,
+            justify_content: JustifyContent::SpaceBetween,
             width: Val::Percent(100.0),
             margin: UiRect::bottom(Val::Px(24.0)),
             ..default()
         },))
         .with_children(|header| {
-            header.spawn((
-                Text::new("LOVABLE"),
-                TextFont {
-                    font_size: 36.0,
+            header.spawn((Node {
+                width: Val::Px(64.0),
+                ..default()
+            },));
+
+            // Centre: title + subtitle
+            header
+                .spawn((Node {
+                    flex_direction: FlexDirection::Column,
+                    align_items: AlignItems::Center,
+                    flex_grow: 1.0,
                     ..default()
-                },
-                TextColor(palette.primary),
-            ));
-            header.spawn((
-                Text::new("Your digital companion management center"),
-                TextFont {
-                    font_size: 14.0,
+                },))
+                .with_children(|centre| {
+                    centre.spawn((
+                        Text::new("LOVABLE"),
+                        TextFont {
+                            font_size: 36.0,
+                            ..default()
+                        },
+                        TextColor(palette.primary),
+                    ));
+                    centre.spawn((
+                        Text::new("Your digital companion management center"),
+                        TextFont {
+                            font_size: 14.0,
+                            ..default()
+                        },
+                        TextColor(palette.muted_foreground),
+                    ));
+                });
+
+            // Right: window controls
+            header
+                .spawn((Node {
+                    flex_direction: FlexDirection::Row,
+                    align_items: AlignItems::Center,
+                    width: Val::Px(64.0),
+                    justify_content: JustifyContent::FlexEnd,
+                    column_gap: Val::Px(4.0),
                     ..default()
-                },
-                TextColor(palette.muted_foreground),
-            ));
+                },))
+                .with_children(|controls| {
+                    // Minimize-to-tray  ─
+                    spawn_window_control_button(
+                        controls,
+                        "–",
+                        palette.muted_foreground,
+                        palette,
+                        MinimizeToTrayButton,
+                    );
+                    // Close  ×
+                    spawn_window_control_button(
+                        controls,
+                        "×",
+                        palette.destructive,
+                        palette,
+                        CloseWindowButton,
+                    );
+                });
         });
 }
 
@@ -285,18 +343,18 @@ fn spawn_tab_area(
     palette: &Palette,
 ) {
     parent
-        .spawn((Node {
-            flex_direction: FlexDirection::Column,
-            flex_grow: 1.0,
-            // height: 0 + flex_grow: 1 is the taffy idiom that makes a flex child
-            // consume all remaining space without growing to wrap its content.
-            // Without this the scroll container expands to fit children and
-            // Overflow::scroll_y() never activates.
-            height: Val::Px(0.0),
-            width: Val::Percent(100.0),
-            overflow: Overflow::scroll_y(),
-            ..default()
-        },))
+        .spawn((
+            Node {
+                flex_direction: FlexDirection::Column,
+                flex_grow: 1.0,
+                height: Val::Px(0.0),
+                width: Val::Percent(100.0),
+                overflow: Overflow::scroll_y(),
+                ..default()
+            },
+            ScrollPosition::default(),
+            TabScrollArea,
+        ))
         .with_children(|area| {
             spawn_home_tab(area, prefs, registry, monitors, palette);
             spawn_critters_tab(area, screen, prefs, registry, monitors, palette);
@@ -329,6 +387,106 @@ fn spawn_footer(
                     ..default()
                 },
                 TextColor(palette.muted_foreground),
+            ));
+        });
+}
+
+/// Re-spawns the critters and home tab content when `NeedsRebuild` flags are set.
+/// Despawns the old `TabContent` node and replaces it in-place.
+pub fn rebuild_dynamic_tabs(
+    mut commands: Commands,
+    mut rebuild: ResMut<NeedsRebuild>,
+    screen: Res<AppScreen>,
+    settings: Res<AppSettingsUiState>,
+    palette: Res<Palette>,
+    prefs_handle: Res<PreferencesHandle>,
+    prefs_store: Res<Assets<Preferences>>,
+    registry_handle: Res<RegistryHandle>,
+    registry_store: Res<Assets<CritterRegistry>>,
+    monitors: Query<&Monitor>,
+    tab_area: Query<Entity, With<TabScrollArea>>,
+    home_roots: Query<Entity, With<HomeTabRoot>>,
+    critter_roots: Query<Entity, With<CrittersTabRoot>>,
+) {
+    if !rebuild.critters && !rebuild.home {
+        return;
+    }
+
+    let Some(prefs) = prefs_store.get(&prefs_handle.0) else {
+        return;
+    };
+    let Some(registry) = registry_store.get(&registry_handle.0) else {
+        return;
+    };
+    let Ok(area_entity) = tab_area.single() else {
+        return;
+    };
+
+    let monitor_list: Vec<(&Monitor, u64)> = monitors
+        .iter()
+        .map(|m| (m, generate_monitor_fingerprint(m)))
+        .collect();
+
+    let palette = palette.into_inner();
+    let screen = screen.into_inner();
+    let settings = settings.into_inner();
+
+    if rebuild.home {
+        // Despawn existing home tab content
+        for entity in &home_roots {
+            commands.entity(entity).despawn();
+        }
+        // Respawn into the tab area
+        commands.entity(area_entity).with_children(|area| {
+            spawn_home_tab(area, prefs, registry, &monitor_list, palette);
+        });
+        rebuild.home = false;
+    }
+
+    if rebuild.critters {
+        // Despawn existing critters tab content
+        for entity in &critter_roots {
+            commands.entity(entity).despawn();
+        }
+        // Respawn into the tab area
+        commands.entity(area_entity).with_children(|area| {
+            spawn_critters_tab(area, screen, prefs, registry, &monitor_list, palette);
+        });
+        rebuild.critters = false;
+    }
+}
+
+fn spawn_window_control_button<M: Component>(
+    parent: &mut bevy::ecs::relationship::RelatedSpawnerCommands<'_, ChildOf>,
+    label: &str,
+    fg: Color,
+    palette: &Palette,
+    marker: M,
+) {
+    parent
+        .spawn((
+            Node {
+                width: Val::Px(28.0),
+                height: Val::Px(28.0),
+                align_items: AlignItems::Center,
+                justify_content: JustifyContent::Center,
+                border: UiRect::all(Val::Px(1.0)),
+                ..default()
+            },
+            BorderRadius::all(Val::Px(6.0)),
+            BorderColor(palette.border),
+            BackgroundColor(palette.card),
+            Button,
+            marker,
+        ))
+        .with_children(|btn| {
+            btn.spawn((
+                Text::new(label),
+                TextFont {
+                    font_size: 16.0,
+                    ..default()
+                },
+                TextColor(fg),
             ));
         });
 }

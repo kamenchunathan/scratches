@@ -65,7 +65,7 @@ pub struct MonitorSettings {
     pub exclusion_zones: Vec<(f32, f32, f32, f32)>,
 }
 
-#[derive(Debug, Default, Clone, Serialize, Deserialize, Reflect)]
+#[derive(Debug, Clone, Serialize, Deserialize, Reflect)]
 pub struct ApplicationSettings {
     pub start_on_boot: bool,
 
@@ -80,13 +80,36 @@ pub struct ApplicationSettings {
     pub send_analytics: bool,
 }
 
-#[derive(Debug, Default, Clone, Serialize, Deserialize, Reflect)]
+impl Default for ApplicationSettings {
+    fn default() -> Self {
+        Self {
+            start_on_boot: false,
+            start_minimized: false,
+            show_tray_icon: true,
+            close_to_tray: true,
+            check_updates: true,
+            send_analytics: false,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Reflect)]
 pub struct GlobalCritterSettings {
     pub interactions_enabled: bool,
 
     pub display_critter_name_on_hover: bool,
 
     pub sound_enabled: bool,
+}
+
+impl Default for GlobalCritterSettings {
+    fn default() -> Self {
+        Self {
+            interactions_enabled: true,
+            display_critter_name_on_hover: true,
+            sound_enabled: false,
+        }
+    }
 }
 
 #[derive(Error, Debug)]

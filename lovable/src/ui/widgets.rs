@@ -41,6 +41,10 @@ pub struct TabContent(pub Tab);
 #[derive(Component)]
 pub struct TabButton(pub Tab);
 
+/// Marks the scrollable tab area node so we can drive `ScrollPosition`.
+#[derive(Component)]
+pub struct TabScrollArea;
+
 // Onboarding navigation
 #[derive(Component)]
 pub struct OnboardingPrimaryButton;
@@ -119,7 +123,31 @@ pub struct ToggleThumb;
 #[derive(Component)]
 pub struct CheckForUpdatesButton;
 
-// ─── Layout helpers ───────────────────────────────────────────────────────────
+/// Marks About-tab link chips, carrying the URL to open.
+#[derive(Component, Clone)]
+pub struct LinkChipButton {
+    pub url: String,
+}
+
+/// Root of the entire home tab content — rebuilt on adoption/delete.
+#[derive(Component)]
+pub struct HomeTabRoot;
+
+/// Root of the critters tab content list — rebuilt on adoption/delete.
+#[derive(Component)]
+pub struct CrittersTabRoot;
+
+/// Root of the available companions gallery section — rebuilt on adoption/delete.
+#[derive(Component)]
+pub struct AvailableGalleryRoot;
+
+/// Clicking this closes the app (or hides to tray, per preference).
+#[derive(Component)]
+pub struct CloseWindowButton;
+
+/// Clicking this hides the main window to the system tray.
+#[derive(Component)]
+pub struct MinimizeToTrayButton;
 
 pub fn spawn_separator(parent: &mut RelatedSpawnerCommands<'_, ChildOf>, palette: &Palette) {
     parent.spawn((

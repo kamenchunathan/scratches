@@ -27,6 +27,7 @@ pub fn spawn_critters_tab(
                 ..default()
             },
             TabContent(Tab::Critters),
+            CrittersTabRoot,
         ))
         .with_children(|tab| {
             spawn_owned_section(tab, screen, prefs, registry, monitors, palette);
@@ -171,7 +172,6 @@ fn spawn_critter_row(
                                     },
                                     TextColor(palette.card_foreground),
                                 ));
-                                // Show assigned monitor name
                                 let monitor_name = monitors
                                     .iter()
                                     .find(|(_, fp)| *fp == critter.monitor_fingerprint)

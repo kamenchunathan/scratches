@@ -1,18 +1,80 @@
-use bevy::{prelude::*, window::Monitor};
+use bevy::{input::mouse::MouseWheel, prelude::*, window::PrimaryWindow};
 
 use crate::{
     critter::{Critter, CritterId, CritterRegistry},
-    preferences::{Preferences, PreferencesHandle, RegistryHandle, generate_monitor_fingerprint},
+    preferences::{Preferences, PreferencesHandle, RegistryHandle},
     ui::{
-        messages::{CrittersMsg, HomeMsg, Msg, OnboardingMsg, SettingsMsg},
+        messages::{CrittersMsg, HomeMsg, Msg, OnboardingMsg, SettingsMsg, SystemMsg},
         palette::Palette,
         state::{
-            AppScreen, AppSettingsUiState, CrittersTabState, DeleteConfirmState, MainState,
-            OnboardingState, Tab,
+            AppScreen, AppSettingsUiState, CrittersTabState, DeleteConfirmState, DirtyFlag,
+            MainState, MainWindowVisible, OnboardingState,
         },
         widgets::*,
     },
 };
+
+const AUTO_SAVE_INTERVAL_SECS: f32 = 300.0;
+
+/// Marks preferences as dirty whenever they change, and auto-saves every
+/// `AUTO_SAVE_INTERVAL_SECS` seconds.
+pub fn periodic_save(
+    time: Res<Time>,
+    mut dirty: ResMut<DirtyFlag>,
+    prefs_handle: Res<PreferencesHandle>,
+    prefs_store: Res<Assets<Preferences>>,
+    asset_server: Res<AssetServer>,
+) {
+    if !dirty.dirty {
+        return;
+    }
+
+    dirty.last_save_timer += time.delta_secs();
+    if dirty.last_save_timer < AUTO_SAVE_INTERVAL_SECS {
+        return;
+    }
+
+    dirty.last_save_timer = 0.0;
+    dirty.dirty = false;
+
+    if let Some(prefs) = prefs_store.get(&prefs_handle.0) {
+        save_prefs(prefs.clone(), &asset_server);
+    }
+}
+
+pub fn save_prefs(mut prefs: Preferences, asset_server: &AssetServer) {
+    use bevy::asset::AssetPath;
+    use bevy::tasks::AsyncComputeTaskPool;
+
+    prefs.first_start = false;
+    let serialized = match bevy::scene::ron::ser::to_string_pretty(
+        &prefs,
+        bevy::scene::ron::ser::PrettyConfig::new(),
+    ) {
+        Ok(s) => s,
+        Err(e) => {
+            error!("Failed to serialize preferences: {e}");
+            return;
+        }
+    };
+
+    AsyncComputeTaskPool::get()
+        .spawn({
+            let asset_server = asset_server.clone();
+            async move {
+                let asset_path = AssetPath::parse("appdata://preferences.ron");
+                let path = asset_path.path();
+                let source = asset_server.get_source(asset_path.source()).unwrap();
+                let writer = source.writer().unwrap();
+                if let Err(e) = writer.write_bytes(path, serialized.as_bytes()).await {
+                    error!("Failed to write preferences: {e}");
+                }
+            }
+        })
+        .detach();
+}
+
+// ─── Main update ─────────────────────────────────────────────────────────────
 
 /// Single system that processes every `Msg` event, mirroring the Elm `update`
 /// function. Mutates `AppScreen`, `AppSettingsUiState`, and `Preferences` only
@@ -21,10 +83,16 @@ pub fn update(
     mut events: EventReader<Msg>,
     mut screen: ResMut<AppScreen>,
     mut settings: ResMut<AppSettingsUiState>,
+    mut dirty: ResMut<DirtyFlag>,
     prefs_handle: Res<PreferencesHandle>,
     mut prefs_store: ResMut<Assets<Preferences>>,
     registry_handle: Res<RegistryHandle>,
     registry_store: Res<Assets<CritterRegistry>>,
+    asset_server: Res<AssetServer>,
+    mut rebuild: ResMut<NeedsRebuild>,
+    mut app_exit: EventWriter<AppExit>,
+    mut windows: Query<(&mut Window, &mut Visibility), With<PrimaryWindow>>,
+    mut main_visible: ResMut<MainWindowVisible>,
 ) {
     let Some(prefs) = prefs_store.get_mut(&prefs_handle.0) else {
         return;
@@ -32,12 +100,48 @@ pub fn update(
 
     for msg in events.read() {
         match msg {
-            Msg::Home(m) => handle_home(m, prefs),
-            Msg::Critters(m) => {
-                handle_critters(m, &mut screen, prefs, &registry_store, &registry_handle)
+            Msg::Home(m) => {
+                handle_home(m, prefs);
+                dirty.dirty = true;
             }
-            Msg::Settings(m) => handle_settings(m, &mut settings, prefs),
-            Msg::Onboarding(m) => handle_onboarding(m, &mut screen, prefs),
+            Msg::Critters(m) => {
+                handle_critters(
+                    m,
+                    &mut screen,
+                    prefs,
+                    &registry_store,
+                    &registry_handle,
+                    &mut rebuild,
+                );
+                dirty.dirty = true;
+            }
+            Msg::Settings(m) => {
+                handle_settings(m, &mut settings, prefs);
+                dirty.dirty = true;
+            }
+            Msg::Onboarding(m) => {
+                handle_onboarding(
+                    m,
+                    &mut screen,
+                    prefs,
+                    &registry_store,
+                    &registry_handle,
+                    &mut rebuild,
+                );
+                dirty.dirty = true;
+            }
+            Msg::System(m) => {
+                handle_system_events(
+                    m,
+                    prefs,
+                    &asset_server,
+                    &mut app_exit,
+                    &mut windows,
+                    &mut main_visible,
+                    &mut settings,
+                    &mut dirty,
+                );
+            }
         }
     }
 }
@@ -55,6 +159,7 @@ fn handle_critters(
     prefs: &mut Preferences,
     registry_store: &Assets<CritterRegistry>,
     registry_handle: &RegistryHandle,
+    rebuild: &mut NeedsRebuild,
 ) {
     match msg {
         CrittersMsg::ToggleExpand(id) => {
@@ -99,6 +204,8 @@ fn handle_critters(
             if let AppScreen::Main(main) = screen {
                 main.critters_tab = CrittersTabState::Collapsed;
             }
+            rebuild.critters = true;
+            rebuild.home = true;
         }
 
         CrittersMsg::CancelDelete => {
@@ -120,6 +227,7 @@ fn handle_critters(
             let Some(def) = registry.find(def_id) else {
                 return;
             };
+            let monitor_fp = prefs.monitors.first().map(|m| m.fingerprint).unwrap_or(0);
             prefs.critters.push(Critter {
                 id: CritterId::new(),
                 def_id: def.id.clone(),
@@ -128,9 +236,11 @@ fn handle_critters(
                 scale: 1.0,
                 opacity: 1.0,
                 is_visible: true,
-                monitor_fingerprint: prefs.monitors.first().map(|m| m.fingerprint).unwrap_or(0),
+                monitor_fingerprint: monitor_fp,
                 interactible: true,
             });
+            rebuild.critters = true;
+            rebuild.home = true;
         }
 
         CrittersMsg::AssignMonitor {
@@ -182,14 +292,21 @@ fn handle_settings(msg: &SettingsMsg, settings: &mut AppSettingsUiState, prefs: 
             settings.sound_enabled = *v;
             prefs.global_critter_settings.sound_enabled = *v;
         }
-        SettingsMsg::AllowCritterRoaming(_) => {
+        SettingsMsg::AllowCritterRoaming(v) => {
+            settings.allow_critter_roaming = *v;
             // TODO: Add setting to preferences
-            error!("Unimplemented setting")
         }
     }
 }
 
-fn handle_onboarding(msg: &OnboardingMsg, screen: &mut AppScreen, prefs: &mut Preferences) {
+fn handle_onboarding(
+    msg: &OnboardingMsg,
+    screen: &mut AppScreen,
+    prefs: &mut Preferences,
+    registry_store: &Assets<CritterRegistry>,
+    registry_handle: &RegistryHandle,
+    rebuild: &mut NeedsRebuild,
+) {
     let AppScreen::Onboarding(state) = screen else {
         return;
     };
@@ -204,8 +321,9 @@ fn handle_onboarding(msg: &OnboardingMsg, screen: &mut AppScreen, prefs: &mut Pr
             *selected_def_id = id.clone();
         }
         (OnboardingState::PickCritter { selected_def_id }, OnboardingMsg::Next) => {
+            let def_id = selected_def_id.clone();
             *screen = AppScreen::Onboarding(OnboardingState::ChooseMonitor {
-                selected_def_id: selected_def_id.clone(),
+                selected_def_id: def_id,
                 selected_monitor: None,
             });
         }
@@ -217,26 +335,175 @@ fn handle_onboarding(msg: &OnboardingMsg, screen: &mut AppScreen, prefs: &mut Pr
         ) => {
             *selected_monitor = Some(*fp);
         }
-        (OnboardingState::ChooseMonitor { .. }, OnboardingMsg::Next) => {
-            *screen = AppScreen::Onboarding(OnboardingState::InfoScreen);
+        (
+            OnboardingState::ChooseMonitor {
+                selected_def_id,
+                selected_monitor,
+            },
+            OnboardingMsg::Next,
+        ) => {
+            let def_id = selected_def_id.clone();
+            let monitor = *selected_monitor;
+            *screen = AppScreen::Onboarding(OnboardingState::InfoScreen {
+                selected_def_id: def_id,
+                selected_monitor: monitor,
+            });
         }
-        (OnboardingState::InfoScreen, OnboardingMsg::Next) => {
+        (
+            OnboardingState::InfoScreen {
+                selected_def_id,
+                selected_monitor,
+            },
+            OnboardingMsg::Next,
+        ) => {
+            let def_id = selected_def_id.clone();
+            let chosen_monitor = *selected_monitor;
+
+            if !def_id.is_empty() {
+                if let Some(registry) = registry_store.get(&registry_handle.0) {
+                    if let Some(def) = registry.find(&def_id) {
+                        let already_owned = prefs.critters.iter().any(|c| c.def_id == def_id);
+                        if !already_owned {
+                            let monitor_fp = chosen_monitor
+                                .or_else(|| prefs.monitors.first().map(|m| m.fingerprint))
+                                .unwrap_or(0);
+                            prefs.critters.push(Critter {
+                                id: CritterId::new(),
+                                def_id: def.id.clone(),
+                                name: def.name.clone(),
+                                position: bevy::math::Vec2::ZERO,
+                                scale: 1.0,
+                                opacity: 1.0,
+                                is_visible: true,
+                                monitor_fingerprint: monitor_fp,
+                                interactible: true,
+                            });
+                            // ← trigger UI rebuild so critters/home tabs update
+                            rebuild.critters = true;
+                            rebuild.home = true;
+                        }
+                    }
+                }
+            }
+
             prefs.first_start = false;
             *screen = AppScreen::Main(MainState::default());
         }
+
         (_, OnboardingMsg::Skip) => {
             prefs.first_start = false;
             *screen = AppScreen::Main(MainState::default());
         }
+
         _ => {}
     }
 }
 
-/// Reads all Bevy `Interaction` components and translates them into `Msg` events.
-pub fn read_inp_and_dispatch_msg(
+fn handle_system_events(
+    msg: &SystemMsg,
+    prefs: &mut Preferences,
+    asset_server: &AssetServer,
+    app_exit: &mut EventWriter<AppExit>,
+    windows: &mut Query<(&mut Window, &mut Visibility), With<PrimaryWindow>>,
+    main_visible: &mut MainWindowVisible,
+    _settings: &mut AppSettingsUiState,
+    dirty: &mut DirtyFlag,
+) {
+    match msg {
+        SystemMsg::CheckForUpdates => {
+            info!("Check for updates requested (stub)");
+        }
+        SystemMsg::OpenUrl(url) => {
+            info!("Opening URL: {url}");
+            #[cfg(target_os = "windows")]
+            {
+                let _ = std::process::Command::new("cmd")
+                    .args(["/C", "start", url.as_str()])
+                    .spawn();
+            }
+            #[cfg(target_os = "linux")]
+            {
+                let _ = std::process::Command::new("xdg-open")
+                    .arg(url.as_str())
+                    .spawn();
+            }
+            #[cfg(target_os = "macos")]
+            {
+                let _ = std::process::Command::new("open").arg(url.as_str()).spawn();
+            }
+        }
+        SystemMsg::TrayShowHide => {
+            for (mut _window, mut visibility) in windows.iter_mut() {
+                main_visible.0 = !main_visible.0;
+                *visibility = if main_visible.0 {
+                    Visibility::Visible
+                } else {
+                    Visibility::Hidden
+                };
+            }
+        }
+
+        SystemMsg::TrayQuit => {
+            dirty.dirty = false; // save happens in save_preferences_on_exit
+            app_exit.write(AppExit::Success);
+        }
+
+        SystemMsg::TrayToggleCritter(id) => {
+            if let Some(c) = prefs.critters.iter_mut().find(|c| &c.id == id) {
+                c.is_visible = !c.is_visible;
+                dirty.dirty = true;
+            }
+        }
+
+        SystemMsg::SaveNow => {
+            save_prefs(prefs.clone(), asset_server);
+            dirty.dirty = false;
+            dirty.last_save_timer = 0.0;
+            info!("Preferences saved");
+        }
+    }
+}
+
+/// Set this resource's flags when the critter list or home tab needs a full
+/// spawn-and-replace rebuild. Systems that do the rebuild clear the flag.
+#[derive(Resource, Default)]
+pub struct NeedsRebuild {
+    pub critters: bool,
+    pub home: bool,
+}
+
+// Each system handles one logical group of buttons so no single system
+// exceeds Bevy's system-parameter limit and the responsibilities stay clear.
+
+pub fn dispatch_settings_toggles(
     mut writer: EventWriter<Msg>,
-    tab_buttons: Query<(&Interaction, &TabButton), (Changed<Interaction>, With<Button>)>,
-    toggle_buttons: Query<(&Interaction, &ToggleWidget), (Changed<Interaction>, With<Button>)>,
+    mut toggle_buttons: Query<
+        (&Interaction, &mut ToggleWidget),
+        (Changed<Interaction>, With<Button>),
+    >,
+) {
+    for (interaction, btn) in &mut toggle_buttons {
+        if *interaction != Interaction::Pressed {
+            continue;
+        }
+        let msg = match btn.id {
+            SettingId::StartOnBoot => SettingsMsg::SetStartOnBoot(!btn.is_on),
+            SettingId::StartMinimized => SettingsMsg::SetStartMinimized(!btn.is_on),
+            SettingId::ShowTrayIcon => SettingsMsg::SetShowTrayIcon(!btn.is_on),
+            SettingId::CloseToTray => SettingsMsg::SetCloseToTray(!btn.is_on),
+            SettingId::CheckForUpdates => SettingsMsg::SetCheckForUpdates(!btn.is_on),
+            SettingId::SendAnalytics => SettingsMsg::SetSendAnalytics(!btn.is_on),
+            SettingId::InteractionsEnabled => SettingsMsg::SetInteractionsEnabled(!btn.is_on),
+            SettingId::ShowNameOnHover => SettingsMsg::SetShowNameOnHover(!btn.is_on),
+            SettingId::SoundEnabled => SettingsMsg::SetSoundEnabled(!btn.is_on),
+            SettingId::AllowCritterRoaming => SettingsMsg::AllowCritterRoaming(!btn.is_on),
+        };
+        writer.write(Msg::Settings(msg));
+    }
+}
+
+pub fn dispatch_critter_buttons(
+    mut writer: EventWriter<Msg>,
     adopt_buttons: Query<(&Interaction, &AdoptButton), (Changed<Interaction>, With<Button>)>,
     expand_buttons: Query<
         (&Interaction, &CritterExpandButton),
@@ -262,9 +529,67 @@ pub fn read_inp_and_dispatch_msg(
         (&Interaction, &MonitorAssignButton),
         (Changed<Interaction>, With<Button>),
     >,
+) {
+    for (i, btn) in &adopt_buttons {
+        if *i == Interaction::Pressed {
+            writer.write(Msg::Critters(CrittersMsg::Adopt(btn.def_id.clone())));
+        }
+    }
+    for (i, btn) in &expand_buttons {
+        if *i == Interaction::Pressed {
+            writer.write(Msg::Critters(CrittersMsg::ToggleExpand(btn.critter_id)));
+        }
+    }
+    for (i, btn) in &vis_buttons {
+        if *i == Interaction::Pressed {
+            writer.write(Msg::Critters(CrittersMsg::ToggleVisibility(btn.critter_id)));
+        }
+    }
+    for (i, btn) in &delete_buttons {
+        if *i == Interaction::Pressed {
+            writer.write(Msg::Critters(CrittersMsg::RequestDelete(btn.critter_id)));
+        }
+    }
+    for (i, btn) in &confirm_buttons {
+        if *i == Interaction::Pressed {
+            writer.write(Msg::Critters(CrittersMsg::ConfirmDelete(btn.critter_id)));
+        }
+    }
+    for (i, _) in &cancel_buttons {
+        if *i == Interaction::Pressed {
+            writer.write(Msg::Critters(CrittersMsg::CancelDelete));
+        }
+    }
+    for (i, btn) in &monitor_assign_buttons {
+        if *i == Interaction::Pressed {
+            writer.write(Msg::Critters(CrittersMsg::AssignMonitor {
+                critter: btn.critter_id,
+                monitor_fingerprint: btn.monitor_fingerprint,
+            }));
+        }
+    }
+}
+
+pub fn dispatch_home_buttons(
+    mut writer: EventWriter<Msg>,
     hide_all: Query<&Interaction, (Changed<Interaction>, With<Button>, With<HideAllButton>)>,
     show_all: Query<&Interaction, (Changed<Interaction>, With<Button>, With<ShowAllButton>)>,
-    onboarding_primary: Query<
+) {
+    for i in &hide_all {
+        if *i == Interaction::Pressed {
+            writer.write(Msg::Home(HomeMsg::HideAll));
+        }
+    }
+    for i in &show_all {
+        if *i == Interaction::Pressed {
+            writer.write(Msg::Home(HomeMsg::ShowAll));
+        }
+    }
+}
+
+pub fn dispatch_onboarding_buttons(
+    mut writer: EventWriter<Msg>,
+    primary: Query<
         &Interaction,
         (
             Changed<Interaction>,
@@ -272,7 +597,7 @@ pub fn read_inp_and_dispatch_msg(
             With<OnboardingPrimaryButton>,
         ),
     >,
-    onboarding_skip: Query<
+    skip: Query<
         &Interaction,
         (
             Changed<Interaction>,
@@ -280,125 +605,124 @@ pub fn read_inp_and_dispatch_msg(
             With<OnboardingSkipButton>,
         ),
     >,
-    onboarding_critter_cards: Query<
+    critter_cards: Query<
         (&Interaction, &OnboardingCritterCard),
         (Changed<Interaction>, With<Button>),
     >,
-    onboarding_monitor_cards: Query<
+    monitor_cards: Query<
         (&Interaction, &OnboardingMonitorCard),
         (Changed<Interaction>, With<Button>),
     >,
 ) {
-    for (i, btn) in &tab_buttons {
+    for i in &primary {
         if *i == Interaction::Pressed {
-            // Tab switching is handled directly in the render sync system via TabButton marker.
-            // Emit as a Critters no-op here; tab state lives in MainState.active_tab which
-            // the render sync reads. We handle this specially below via AppScreen mutation.
-            // For now route through a dedicated message — add TabMsg if needed.
+            writer.write(Msg::Onboarding(OnboardingMsg::Next));
         }
     }
-
-    for (i, btn) in &toggle_buttons {
+    for i in &skip {
         if *i == Interaction::Pressed {
-            let msg = match &btn.id {
-                SettingId::StartOnBoot => SettingsMsg::SetStartOnBoot(!btn.is_on),
-                SettingId::StartMinimized => SettingsMsg::SetStartMinimized(!btn.is_on),
-                SettingId::ShowTrayIcon => SettingsMsg::SetShowTrayIcon(!btn.is_on),
-                SettingId::CloseToTray => SettingsMsg::SetCloseToTray(!btn.is_on),
-                SettingId::CheckForUpdates => SettingsMsg::SetCheckForUpdates(!btn.is_on),
-                SettingId::SendAnalytics => SettingsMsg::SetSendAnalytics(!btn.is_on),
-                SettingId::InteractionsEnabled => SettingsMsg::SetInteractionsEnabled(!btn.is_on),
-                SettingId::ShowNameOnHover => SettingsMsg::SetShowNameOnHover(!btn.is_on),
-                SettingId::SoundEnabled => SettingsMsg::SetSoundEnabled(!btn.is_on),
-                SettingId::AllowCritterRoaming => SettingsMsg::AllowCritterRoaming(!btn.is_on),
-            };
-            writer.send(Msg::Settings(msg));
+            writer.write(Msg::Onboarding(OnboardingMsg::Skip));
         }
     }
-
-    for (i, btn) in &adopt_buttons {
+    for (i, card) in &critter_cards {
         if *i == Interaction::Pressed {
-            writer.send(Msg::Critters(CrittersMsg::Adopt(btn.def_id.clone())));
-        }
-    }
-
-    for (i, btn) in &expand_buttons {
-        if *i == Interaction::Pressed {
-            writer.send(Msg::Critters(CrittersMsg::ToggleExpand(btn.critter_id)));
-        }
-    }
-
-    for (i, btn) in &vis_buttons {
-        if *i == Interaction::Pressed {
-            writer.send(Msg::Critters(CrittersMsg::ToggleVisibility(btn.critter_id)));
-        }
-    }
-
-    for (i, btn) in &delete_buttons {
-        if *i == Interaction::Pressed {
-            writer.send(Msg::Critters(CrittersMsg::RequestDelete(btn.critter_id)));
-        }
-    }
-
-    for (i, btn) in &confirm_buttons {
-        if *i == Interaction::Pressed {
-            writer.send(Msg::Critters(CrittersMsg::ConfirmDelete(btn.critter_id)));
-        }
-    }
-
-    for (i, _) in &cancel_buttons {
-        if *i == Interaction::Pressed {
-            writer.send(Msg::Critters(CrittersMsg::CancelDelete));
-        }
-    }
-
-    for (i, btn) in &monitor_assign_buttons {
-        if *i == Interaction::Pressed {
-            writer.send(Msg::Critters(CrittersMsg::AssignMonitor {
-                critter: btn.critter_id,
-                monitor_fingerprint: btn.monitor_fingerprint,
-            }));
-        }
-    }
-
-    for i in &hide_all {
-        if *i == Interaction::Pressed {
-            writer.send(Msg::Home(HomeMsg::HideAll));
-        }
-    }
-
-    for i in &show_all {
-        if *i == Interaction::Pressed {
-            writer.send(Msg::Home(HomeMsg::ShowAll));
-        }
-    }
-
-    for i in &onboarding_primary {
-        if *i == Interaction::Pressed {
-            writer.send(Msg::Onboarding(OnboardingMsg::Next));
-        }
-    }
-
-    for i in &onboarding_skip {
-        if *i == Interaction::Pressed {
-            writer.send(Msg::Onboarding(OnboardingMsg::Skip));
-        }
-    }
-
-    for (i, card) in &onboarding_critter_cards {
-        if *i == Interaction::Pressed {
-            writer.send(Msg::Onboarding(OnboardingMsg::SelectCritter(
+            writer.write(Msg::Onboarding(OnboardingMsg::SelectCritter(
                 card.def_id.clone(),
             )));
         }
     }
-
-    for (i, card) in &onboarding_monitor_cards {
+    for (i, card) in &monitor_cards {
         if *i == Interaction::Pressed {
-            writer.send(Msg::Onboarding(OnboardingMsg::SelectMonitor(
+            writer.write(Msg::Onboarding(OnboardingMsg::SelectMonitor(
                 card.monitor_fingerprint,
             )));
         }
+    }
+}
+
+pub fn dispatch_system_buttons(
+    mut writer: EventWriter<Msg>,
+    mut app_exit: EventWriter<AppExit>,
+    settings: Res<AppSettingsUiState>,
+    check_update_buttons: Query<
+        &Interaction,
+        (
+            Changed<Interaction>,
+            With<Button>,
+            With<CheckForUpdatesButton>,
+        ),
+    >,
+    link_chip_buttons: Query<(&Interaction, &LinkChipButton), (Changed<Interaction>, With<Button>)>,
+    close_buttons: Query<
+        &Interaction,
+        (Changed<Interaction>, With<Button>, With<CloseWindowButton>),
+    >,
+    minimize_buttons: Query<
+        &Interaction,
+        (
+            Changed<Interaction>,
+            With<Button>,
+            With<MinimizeToTrayButton>,
+        ),
+    >,
+) {
+    for i in &check_update_buttons {
+        if *i == Interaction::Pressed {
+            writer.write(Msg::System(SystemMsg::CheckForUpdates));
+        }
+    }
+    for (i, chip) in &link_chip_buttons {
+        if *i == Interaction::Pressed {
+            writer.write(Msg::System(SystemMsg::OpenUrl(chip.url.clone())));
+        }
+    }
+    for i in &minimize_buttons {
+        if *i == Interaction::Pressed {
+            writer.write(Msg::System(SystemMsg::TrayShowHide));
+        }
+    }
+    for i in &close_buttons {
+        if *i == Interaction::Pressed {
+            if settings.close_to_tray {
+                writer.write(Msg::System(SystemMsg::TrayShowHide));
+            } else {
+                app_exit.write(AppExit::Success);
+            }
+        }
+    }
+}
+
+// ─── Scrolling ────────────────────────────────────────────────────────────────
+
+/// Drives the scroll position on `TabScrollArea` from `MouseWheel` events.
+pub fn scroll_tab_area(
+    mut mouse_wheel: EventReader<MouseWheel>,
+    mut scroll_query: Query<&mut ScrollPosition, With<TabScrollArea>>,
+) {
+    let Ok(mut scroll) = scroll_query.single_mut() else {
+        return;
+    };
+
+    for ev in mouse_wheel.read() {
+        let delta = match ev.unit {
+            bevy::input::mouse::MouseScrollUnit::Line => ev.y * 20.0,
+            bevy::input::mouse::MouseScrollUnit::Pixel => ev.y,
+        };
+        scroll.offset_y -= delta;
+        scroll.offset_y = scroll.offset_y.max(0.0);
+    }
+}
+
+/// Resets scroll to top whenever the active tab changes.
+pub fn reset_scroll_on_tab_change(
+    screen: Res<AppScreen>,
+    mut scroll_query: Query<&mut ScrollPosition, With<TabScrollArea>>,
+) {
+    if !screen.is_changed() {
+        return;
+    }
+    if let Ok(mut scroll) = scroll_query.single_mut() {
+        scroll.offset_y = 0.0;
     }
 }
 
@@ -460,7 +784,7 @@ pub fn sync_onboarding_step(
         AppScreen::Onboarding(OnboardingState::Welcome) => 0,
         AppScreen::Onboarding(OnboardingState::PickCritter { .. }) => 1,
         AppScreen::Onboarding(OnboardingState::ChooseMonitor { .. }) => 2,
-        AppScreen::Onboarding(OnboardingState::InfoScreen) => 3,
+        AppScreen::Onboarding(OnboardingState::InfoScreen { .. }) => 3,
         _ => return,
     };
     for (mut node, screen_marker) in &mut query {
@@ -502,6 +826,7 @@ pub fn sync_critter_expand(
     }
 
     for (mut node, panel) in &mut confirm_query {
+        // Always hide confirm panel when row is collapsed, even if state is Pending
         node.display = if Some(panel.0) == expanded_id && confirm_pending {
             Display::Flex
         } else {
@@ -511,16 +836,16 @@ pub fn sync_critter_expand(
 }
 
 /// Syncs toggle widget visuals after settings change.
+/// Also fixes `is_on` staleness by deriving the live value from `AppSettingsUiState`.
 pub fn sync_toggle_visuals(
-    screen: Res<AppScreen>,
     settings: Res<AppSettingsUiState>,
-    mut query: Query<(&mut BackgroundColor, &mut Node, &ToggleWidget)>,
+    mut query: Query<(&mut BackgroundColor, &mut Node, &mut ToggleWidget)>,
     palette: Res<Palette>,
 ) {
     if !settings.is_changed() {
         return;
     }
-    for (mut bg, mut node, toggle) in &mut query {
+    for (mut bg, mut node, mut toggle) in &mut query {
         let is_on = match toggle.id {
             SettingId::StartOnBoot => settings.start_on_boot,
             SettingId::StartMinimized => settings.start_minimized,
@@ -533,6 +858,8 @@ pub fn sync_toggle_visuals(
             SettingId::SoundEnabled => settings.sound_enabled,
             SettingId::AllowCritterRoaming => settings.allow_critter_roaming,
         };
+        // Keep the stored flag fresh so repeated presses always read the correct value
+        toggle.is_on = is_on;
         *bg = if is_on {
             BackgroundColor(palette.primary)
         } else {
@@ -576,12 +903,11 @@ pub fn sync_onboarding_critter_cards(
     }
 }
 
-/// Syncs tab button hover/active visuals.
+/// Syncs tab button hover/active visuals, including highlighting the active tab.
 pub fn sync_tab_button_visuals(
     screen: Res<AppScreen>,
-    mut query: Query<(&Interaction, &TabButton, &mut BackgroundColor), Changed<Interaction>>,
+    mut query: Query<(&Interaction, &TabButton, &mut BackgroundColor)>,
     palette: Res<Palette>,
-    mut writer: EventWriter<Msg>,
 ) {
     let active = match screen.as_ref() {
         AppScreen::Main(m) => Some(&m.active_tab),
@@ -589,15 +915,12 @@ pub fn sync_tab_button_visuals(
     };
 
     for (interaction, btn, mut bg) in &mut query {
-        match interaction {
-            Interaction::Pressed => {
-                // Directly mutate AppScreen for tab switches (not routed through Msg
-                // to avoid the round-trip; tabs are pure navigation with no persistence).
-                // Handled in a separate system below.
-            }
-            Interaction::Hovered => *bg = BackgroundColor(palette.accent),
-            Interaction::None => *bg = BackgroundColor(palette.card),
-        }
+        let is_active = active == Some(&btn.0);
+        *bg = match (interaction, is_active) {
+            (Interaction::Pressed, _) | (_, true) => BackgroundColor(palette.accent),
+            (Interaction::Hovered, false) => BackgroundColor(palette.muted),
+            (Interaction::None, false) => BackgroundColor(palette.card),
+        };
     }
 }
 
@@ -612,6 +935,40 @@ pub fn handle_tab_press(
             if let AppScreen::Main(main) = screen.as_mut() {
                 main.active_tab = btn.0.clone();
             }
+        }
+    }
+}
+
+/// Intercepts window close requests: when `close_to_tray` is set, hide the
+/// window instead of exiting.
+pub fn handle_window_close(
+    mut close_events: EventReader<bevy::window::WindowCloseRequested>,
+    settings: Res<AppSettingsUiState>,
+    mut writer: EventWriter<Msg>,
+    mut app_exit: EventWriter<AppExit>,
+) {
+    for _ in close_events.read() {
+        if settings.close_to_tray {
+            writer.write(Msg::System(SystemMsg::TrayShowHide));
+        } else {
+            app_exit.write(AppExit::Success);
+        }
+    }
+}
+
+pub fn quit_on_esc(
+    keys: Res<ButtonInput<KeyCode>>,
+    settings: Res<AppSettingsUiState>,
+    mut msg_writer: EventWriter<Msg>,
+    mut app_exit: EventWriter<AppExit>,
+) {
+    if keys.just_pressed(KeyCode::Escape) || keys.just_pressed(KeyCode::KeyQ) {
+        if settings.close_to_tray {
+            info!("Keyboard close — hiding to tray");
+            msg_writer.write(Msg::System(SystemMsg::TrayShowHide));
+        } else {
+            info!("Keyboard close — exiting");
+            app_exit.write(AppExit::Success);
         }
     }
 }

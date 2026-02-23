@@ -1,6 +1,6 @@
 use bevy::{ecs::relationship::RelatedSpawnerCommands, prelude::*};
 
-use crate::ui::{palette::Palette, state::Tab, widgets::spawn_separator};
+use crate::ui::{palette::Palette, state::Tab, widgets::*};
 
 pub fn spawn_about_tab(parent: &mut RelatedSpawnerCommands<'_, ChildOf>, palette: &Palette) {
     parent
@@ -12,7 +12,7 @@ pub fn spawn_about_tab(parent: &mut RelatedSpawnerCommands<'_, ChildOf>, palette
                 align_items: AlignItems::Center,
                 ..default()
             },
-            crate::ui::widgets::TabContent(Tab::About),
+            TabContent(Tab::About),
         ))
         .with_children(|tab| {
             tab.spawn((
@@ -82,9 +82,14 @@ pub fn spawn_about_tab(parent: &mut RelatedSpawnerCommands<'_, ChildOf>, palette
                 ..default()
             },))
                 .with_children(|row| {
-                    spawn_link_chip(row, "Privacy Policy", palette);
-                    spawn_link_chip(row, "Terms of Use", palette);
-                    spawn_link_chip(row, "Support", palette);
+                    spawn_link_chip(
+                        row,
+                        "Privacy Policy",
+                        "https://example.com/privacy",
+                        palette,
+                    );
+                    spawn_link_chip(row, "Terms of Use", "https://example.com/terms", palette);
+                    spawn_link_chip(row, "Support", "https://example.com/support", palette);
                 });
         });
 }
@@ -134,6 +139,7 @@ fn spawn_info_card(
 fn spawn_link_chip(
     parent: &mut RelatedSpawnerCommands<'_, ChildOf>,
     label: &str,
+    url: &str,
     palette: &Palette,
 ) {
     parent
@@ -150,6 +156,9 @@ fn spawn_link_chip(
             BorderColor(palette.border),
             BackgroundColor(palette.card),
             Button,
+            LinkChipButton {
+                url: url.to_string(),
+            },
         ))
         .with_children(|chip| {
             chip.spawn((

@@ -11,5 +11,16 @@
             ),
             desktop_animations: (),
         ),
+        (
+            id: "flop",
+            name: "Flop",
+            gltf: "critters/flop/flop.glb",
+            ui_animations: (
+                preview: 0,
+                celebrate: 1,
+                idle: 2,
+            ),
+            desktop_animations: (),
+        ),
     ],
 )

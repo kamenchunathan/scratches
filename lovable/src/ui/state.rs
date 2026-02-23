@@ -28,7 +28,10 @@ pub enum OnboardingState {
         selected_def_id: String,
         selected_monitor: Option<u64>,
     },
-    InfoScreen,
+    InfoScreen {
+        selected_def_id: String,
+        selected_monitor: Option<u64>,
+    },
 }
 
 #[derive(Default)]
@@ -80,3 +83,14 @@ pub struct AppSettingsUiState {
     pub sound_enabled: bool,
     pub allow_critter_roaming: bool,
 }
+
+/// Tracks whether preferences have unsaved changes.
+#[derive(Resource, Default)]
+pub struct DirtyFlag {
+    pub dirty: bool,
+    pub last_save_timer: f32,
+}
+
+/// Whether the main window is currently visible (for close-to-tray).
+#[derive(Resource, Default)]
+pub struct MainWindowVisible(pub bool);
