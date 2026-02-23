@@ -35,10 +35,12 @@ impl Plugin for LovableUI {
     fn build(&self, app: &mut App) {
         app.add_event::<Msg>()
             .insert_resource(GAMING_THEME)
+            // OnEnter(Running): build state from prefs, then spawn UI
             .add_systems(
                 OnEnter(AppState::Running),
                 (build_app_screen_from_prefs, setup_ui).chain(),
             )
+            // Running: input → update → render sync
             .add_systems(
                 Update,
                 (
@@ -286,6 +288,11 @@ fn spawn_tab_area(
         .spawn((Node {
             flex_direction: FlexDirection::Column,
             flex_grow: 1.0,
+            // height: 0 + flex_grow: 1 is the taffy idiom that makes a flex child
+            // consume all remaining space without growing to wrap its content.
+            // Without this the scroll container expands to fit children and
+            // Overflow::scroll_y() never activates.
+            height: Val::Px(0.0),
             width: Val::Percent(100.0),
             overflow: Overflow::scroll_y(),
             ..default()

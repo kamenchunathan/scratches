@@ -5,16 +5,21 @@ mod ui;
 
 use bevy::{asset::io::AssetSourceId, prelude::*, window::WindowTheme};
 
-use crate::preferences::{
-    PreferencesLoader, check_loading_complete, unpack_default_critter_manifest,
-};
 use crate::{
-    critter::loader::CritterRegistryLoader,
-    preferences::{
-        Preferences, create_default_prefs_on_fail, query_monitor_info, save_preferences_on_exit,
-        start_loading_assets,
+    critter::{
+        CritterDef, CritterRegistry,
+        builtin::install_builtin_critters_if_needed,
+        loader::CritterRegistryLoader,
+        window::{
+            persist_critter_window_positions, spawn_critter_windows, spawn_placeholder_geometry,
+            sync_critter_render_despawn, sync_critter_window_visibility,
+        },
     },
-    ui::LovableUI,
+    preferences::{
+        Preferences, PreferencesLoader, check_loading_complete, create_default_prefs_on_fail,
+        query_monitor_info, save_preferences_on_exit, start_loading_assets,
+    },
+    ui::{LovableUI, build_app_screen_from_prefs},
 };
 
 pub struct Lovable;
@@ -52,23 +57,36 @@ impl Plugin for Lovable {
             .register_asset_loader(PreferencesLoader)
             .register_asset_loader(CritterRegistryLoader)
             .init_asset::<Preferences>()
-            .init_asset::<crate::critter::CritterDef>()
-            .init_asset::<crate::critter::CritterRegistry>()
+            .init_asset::<CritterDef>()
+            .init_asset::<CritterRegistry>()
             .init_state::<AppState>()
             .add_systems(Startup, start_loading_assets)
             .add_systems(
                 Update,
                 (
                     create_default_prefs_on_fail,
-                    unpack_default_critter_manifest,
+                    install_builtin_critters_if_needed,
                     query_monitor_info,
                     check_loading_complete,
                 )
+                    .chain()
                     .run_if(in_state(AppState::Loading)),
             )
             .add_systems(
+                OnEnter(AppState::Running),
+                spawn_critter_windows.after(build_app_screen_from_prefs),
+            )
+            .add_systems(
                 Update,
-                (save_preferences_on_exit, quit_on_esc).run_if(in_state(AppState::Running)),
+                (
+                    spawn_placeholder_geometry,
+                    sync_critter_window_visibility,
+                    sync_critter_render_despawn.after(sync_critter_window_visibility),
+                    persist_critter_window_positions,
+                    save_preferences_on_exit,
+                    quit_on_esc,
+                )
+                    .run_if(in_state(AppState::Running)),
             );
     }
 }

@@ -1,0 +1,15 @@
+(
+    defs: [
+        (
+            id: "wobble",
+            name: "Wobble",
+            gltf: "critters/wobble/wobble.glb",
+            ui_animations: (
+                preview: 0,
+                celebrate: 1,
+                idle: 2,
+            ),
+            desktop_animations: (),
+        ),
+    ],
+)

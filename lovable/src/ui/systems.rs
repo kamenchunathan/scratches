@@ -129,6 +129,7 @@ fn handle_critters(
                 opacity: 1.0,
                 is_visible: true,
                 monitor_fingerprint: prefs.monitors.first().map(|m| m.fingerprint).unwrap_or(0),
+                interactible: true,
             });
         }
 
