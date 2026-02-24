@@ -7,10 +7,10 @@ pub mod palette;
 pub mod settings_tab;
 pub mod state;
 pub mod systems;
+pub mod tray;
 pub mod widgets;
 
 use bevy::{prelude::*, window::Monitor};
-use tray_icon::{TrayIcon, TrayIconBuilder, menu::Menu};
 
 use crate::{
     AppState,
@@ -26,6 +26,7 @@ use crate::{
         settings_tab::spawn_settings_tab,
         state::{AppScreen, AppSettingsUiState, DirtyFlag, MainWindowVisible},
         systems::*,
+        tray::{Tray, create_tray, load_tray_icon},
         widgets::*,
     },
 };
@@ -39,9 +40,13 @@ impl Plugin for LovableUI {
             .insert_resource(DirtyFlag::default())
             .insert_resource(MainWindowVisible(true))
             .insert_resource(NeedsRebuild::default())
+            .add_systems(Startup, load_tray_icon.run_if(in_state(AppState::Loading)))
             .add_systems(
                 OnEnter(AppState::Running),
-                (build_app_screen_from_prefs, setup_ui).chain(),
+                (
+                    (build_app_screen_from_prefs, setup_ui).chain(),
+                    load_tray_icon,
+                ),
             )
             // Running: input → update → render sync
             .add_systems(
@@ -74,48 +79,14 @@ impl Plugin for LovableUI {
                 )
                     .chain()
                     .run_if(in_state(AppState::Running)),
-            );
-    }
-}
-
-#[derive(Debug, Resource)]
-pub struct Tray {
-    icon: Handle<Image>,
-}
-
-pub fn load_image_assets(mut commands: Commands, asset_server: Res<AssetServer>) {
-    commands.insert_resource(Tray {
-        icon: asset_server.load("icons/tray.png"),
-    });
-}
-
-pub fn build_tray_icon(
-    prefs_handle: Res<PreferencesHandle>,
-    prefs_store: Res<Assets<Preferences>>,
-    tray: Res<Tray>,
-    images: Res<Assets<Image>>,
-) {
-    let prefs = prefs_store
-        .get(&prefs_handle.0)
-        .expect("Preferences not loaded");
-
-    if prefs.app_settings.show_tray_icon {
-        let Some(tray_icon_img) = images.get(tray.icon) else {
-            return;
-        };
-
-        TrayIconBuilder::new()
-            .with_title("Lovable")
-            .with_icon(
-                tray_icon::Icon::from_rgba(
-                    tray_icon_img.data.expect("Unable to load data"),
-                    tray_icon_img.width,
-                    tray_icon_img.height,
-                )
-                .expect("wrong icon format"),
             )
-            .with_menu(Box::new(Menu::new()))
-            .build();
+            .add_systems(
+                PostUpdate,
+                (
+                    create_tray.run_if(resource_added::<Tray>),
+                    // update_tray.run_if(resource_changed::<Tray>),
+                ),
+            );
     }
 }
 
