@@ -10,6 +10,7 @@ pub mod systems;
 pub mod widgets;
 
 use bevy::{prelude::*, window::Monitor};
+use tray_icon::{TrayIcon, TrayIconBuilder, menu::Menu};
 
 use crate::{
     AppState,
@@ -74,6 +75,47 @@ impl Plugin for LovableUI {
                     .chain()
                     .run_if(in_state(AppState::Running)),
             );
+    }
+}
+
+#[derive(Debug, Resource)]
+pub struct Tray {
+    icon: Handle<Image>,
+}
+
+pub fn load_image_assets(mut commands: Commands, asset_server: Res<AssetServer>) {
+    commands.insert_resource(Tray {
+        icon: asset_server.load("icons/tray.png"),
+    });
+}
+
+pub fn build_tray_icon(
+    prefs_handle: Res<PreferencesHandle>,
+    prefs_store: Res<Assets<Preferences>>,
+    tray: Res<Tray>,
+    images: Res<Assets<Image>>,
+) {
+    let prefs = prefs_store
+        .get(&prefs_handle.0)
+        .expect("Preferences not loaded");
+
+    if prefs.app_settings.show_tray_icon {
+        let Some(tray_icon_img) = images.get(tray.icon) else {
+            return;
+        };
+
+        TrayIconBuilder::new()
+            .with_title("Lovable")
+            .with_icon(
+                tray_icon::Icon::from_rgba(
+                    tray_icon_img.data.expect("Unable to load data"),
+                    tray_icon_img.width,
+                    tray_icon_img.height,
+                )
+                .expect("wrong icon format"),
+            )
+            .with_menu(Box::new(Menu::new()))
+            .build();
     }
 }
 

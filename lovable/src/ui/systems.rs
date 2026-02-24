@@ -91,7 +91,7 @@ pub fn update(
     asset_server: Res<AssetServer>,
     mut rebuild: ResMut<NeedsRebuild>,
     mut app_exit: EventWriter<AppExit>,
-    mut windows: Query<(&mut Window, &mut Visibility), With<PrimaryWindow>>,
+    mut primary_window: Query<&mut Window, With<PrimaryWindow>>,
     mut main_visible: ResMut<MainWindowVisible>,
 ) {
     let Some(prefs) = prefs_store.get_mut(&prefs_handle.0) else {
@@ -136,7 +136,7 @@ pub fn update(
                     prefs,
                     &asset_server,
                     &mut app_exit,
-                    &mut windows,
+                    &mut primary_window,
                     &mut main_visible,
                     &mut settings,
                     &mut dirty,
@@ -404,7 +404,7 @@ fn handle_system_events(
     prefs: &mut Preferences,
     asset_server: &AssetServer,
     app_exit: &mut EventWriter<AppExit>,
-    windows: &mut Query<(&mut Window, &mut Visibility), With<PrimaryWindow>>,
+    primary_window: &mut Query<&mut Window, With<PrimaryWindow>>,
     main_visible: &mut MainWindowVisible,
     _settings: &mut AppSettingsUiState,
     dirty: &mut DirtyFlag,
@@ -413,6 +413,7 @@ fn handle_system_events(
         SystemMsg::CheckForUpdates => {
             info!("Check for updates requested (stub)");
         }
+
         SystemMsg::OpenUrl(url) => {
             info!("Opening URL: {url}");
             #[cfg(target_os = "windows")]
@@ -432,14 +433,19 @@ fn handle_system_events(
                 let _ = std::process::Command::new("open").arg(url.as_str()).spawn();
             }
         }
+
         SystemMsg::TrayShowHide => {
-            for (mut _window, mut visibility) in windows.iter_mut() {
-                main_visible.0 = !main_visible.0;
-                *visibility = if main_visible.0 {
-                    Visibility::Visible
-                } else {
-                    Visibility::Hidden
-                };
+            let a = primary_window.iter().collect::<Vec<_>>();
+            info!(?a, "Tray show");
+            if let Ok(mut window) = primary_window.single_mut() {
+                warn!(?window, "Hello");
+                window.visible = false;
+                // main_visible.0 = !main_visible.0;
+                // *visibility = if main_visible.0 {
+                //     Visibility::Visible
+                // } else {
+                //     Visibility::Hidden
+                // };
             }
         }
 
