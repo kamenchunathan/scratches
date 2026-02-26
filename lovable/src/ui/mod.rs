@@ -26,7 +26,7 @@ use crate::{
         settings_tab::spawn_settings_tab,
         state::{AppScreen, AppSettingsUiState, DirtyFlag, MainWindowVisible},
         systems::*,
-        tray::{SystemTray, create_tray, load_tray_assets},
+        tray::{build_platform_tray, create_tray, poll_menu_events},
         widgets::*,
     },
 };
@@ -41,12 +41,8 @@ impl Plugin for LovableUI {
             .insert_resource(MainWindowVisible(true))
             .insert_resource(NeedsRebuild::default())
             .add_systems(
-                Startup,
-                load_tray_assets.run_if(in_state(AppState::Loading)),
-            )
-            .add_systems(
                 OnEnter(AppState::Running),
-                ((build_app_screen_from_prefs, setup_ui).chain(),),
+                ((build_app_screen_from_prefs, setup_ui).chain(), create_tray),
             )
             // Running: input → update → render sync
             .add_systems(
@@ -58,6 +54,7 @@ impl Plugin for LovableUI {
                         dispatch_home_buttons,
                         dispatch_onboarding_buttons,
                         dispatch_system_buttons,
+                        poll_menu_events,
                     ),
                     update,
                     quit_on_esc,
@@ -82,10 +79,7 @@ impl Plugin for LovableUI {
             )
             .add_systems(
                 PostUpdate,
-                (
-                    create_tray,
-                    // update_tray.run_if(resource_changed::<Tray>),
-                ),
+                build_platform_tray.run_if(in_state(AppState::Running)),
             );
     }
 }
