@@ -435,17 +435,8 @@ fn handle_system_events(
         }
 
         SystemMsg::TrayShowHide => {
-            let a = primary_window.iter().collect::<Vec<_>>();
-            info!(?a, "Tray show");
             if let Ok(mut window) = primary_window.single_mut() {
-                warn!(?window, "Hello");
-                window.visible = false;
-                // main_visible.0 = !main_visible.0;
-                // *visibility = if main_visible.0 {
-                //     Visibility::Visible
-                // } else {
-                //     Visibility::Hidden
-                // };
+                window.visible = !window.visible;
             }
         }
 
