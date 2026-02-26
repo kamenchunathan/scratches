@@ -101,7 +101,7 @@ pub fn update(
     for msg in events.read() {
         match msg {
             Msg::Home(m) => {
-                handle_home(m, prefs);
+                handle_home(m, prefs, &mut rebuild);
                 dirty.dirty = true;
             }
             Msg::Critters(m) => {
@@ -140,16 +140,23 @@ pub fn update(
                     &mut main_visible,
                     &mut settings,
                     &mut dirty,
+                    &mut rebuild,
                 );
             }
         }
     }
 }
 
-fn handle_home(msg: &HomeMsg, prefs: &mut Preferences) {
+fn handle_home(msg: &HomeMsg, prefs: &mut Preferences, rebuild: &mut NeedsRebuild) {
     match msg {
-        HomeMsg::HideAll => prefs.critters.iter_mut().for_each(|c| c.is_visible = false),
-        HomeMsg::ShowAll => prefs.critters.iter_mut().for_each(|c| c.is_visible = true),
+        HomeMsg::HideAll => {
+            prefs.critters.iter_mut().for_each(|c| c.is_visible = false);
+            rebuild.tray = true;
+        }
+        HomeMsg::ShowAll => {
+            prefs.critters.iter_mut().for_each(|c| c.is_visible = true);
+            rebuild.tray = true;
+        }
     }
 }
 
@@ -179,6 +186,7 @@ fn handle_critters(
         CrittersMsg::ToggleVisibility(id) => {
             if let Some(c) = prefs.critters.iter_mut().find(|c| &c.id == id) {
                 c.is_visible = !c.is_visible;
+                rebuild.tray = true;
             }
         }
 
@@ -206,6 +214,7 @@ fn handle_critters(
             }
             rebuild.critters = true;
             rebuild.home = true;
+            rebuild.tray = true;
         }
 
         CrittersMsg::CancelDelete => {
@@ -241,6 +250,7 @@ fn handle_critters(
             });
             rebuild.critters = true;
             rebuild.home = true;
+            rebuild.tray = true;
         }
 
         CrittersMsg::AssignMonitor {
@@ -378,9 +388,9 @@ fn handle_onboarding(
                                 monitor_fingerprint: monitor_fp,
                                 interactible: true,
                             });
-                            // ← trigger UI rebuild so critters/home tabs update
                             rebuild.critters = true;
                             rebuild.home = true;
+                            rebuild.tray = true;
                         }
                     }
                 }
@@ -408,6 +418,7 @@ fn handle_system_events(
     main_visible: &mut MainWindowVisible,
     _settings: &mut AppSettingsUiState,
     dirty: &mut DirtyFlag,
+    rebuild: &mut NeedsRebuild,
 ) {
     match msg {
         SystemMsg::CheckForUpdates => {
@@ -449,6 +460,7 @@ fn handle_system_events(
             if let Some(c) = prefs.critters.iter_mut().find(|c| &c.id == id) {
                 c.is_visible = !c.is_visible;
                 dirty.dirty = true;
+                rebuild.tray = true;
             }
         }
 
@@ -461,12 +473,13 @@ fn handle_system_events(
     }
 }
 
-/// Set this resource's flags when the critter list or home tab needs a full
-/// spawn-and-replace rebuild. Systems that do the rebuild clear the flag.
+/// Set this resource's flags when the critter list, home tab, or tray menu
+/// needs a rebuild. Systems that handle each concern clear their own flag.
 #[derive(Resource, Default)]
 pub struct NeedsRebuild {
     pub critters: bool,
     pub home: bool,
+    pub tray: bool,
 }
 
 // Each system handles one logical group of buttons so no single system
@@ -823,7 +836,6 @@ pub fn sync_critter_expand(
     }
 
     for (mut node, panel) in &mut confirm_query {
-        // Always hide confirm panel when row is collapsed, even if state is Pending
         node.display = if Some(panel.0) == expanded_id && confirm_pending {
             Display::Flex
         } else {
@@ -833,7 +845,6 @@ pub fn sync_critter_expand(
 }
 
 /// Syncs toggle widget visuals after settings change.
-/// Also fixes `is_on` staleness by deriving the live value from `AppSettingsUiState`.
 pub fn sync_toggle_visuals(
     settings: Res<AppSettingsUiState>,
     mut query: Query<(&mut BackgroundColor, &mut Node, &mut ToggleWidget)>,
@@ -855,7 +866,6 @@ pub fn sync_toggle_visuals(
             SettingId::SoundEnabled => settings.sound_enabled,
             SettingId::AllowCritterRoaming => settings.allow_critter_roaming,
         };
-        // Keep the stored flag fresh so repeated presses always read the correct value
         toggle.is_on = is_on;
         *bg = if is_on {
             BackgroundColor(palette.primary)
@@ -921,8 +931,7 @@ pub fn sync_tab_button_visuals(
     }
 }
 
-/// Handles tab button presses directly — tab selection is navigation-only and
-/// does not need to go through the `Msg` event loop.
+/// Handles tab button presses directly.
 pub fn handle_tab_press(
     query: Query<(&Interaction, &TabButton), (Changed<Interaction>, With<Button>)>,
     mut screen: ResMut<AppScreen>,
@@ -936,8 +945,7 @@ pub fn handle_tab_press(
     }
 }
 
-/// Intercepts window close requests: when `close_to_tray` is set, hide the
-/// window instead of exiting.
+/// Intercepts window close requests.
 pub fn handle_window_close(
     mut close_events: EventReader<bevy::window::WindowCloseRequested>,
     settings: Res<AppSettingsUiState>,

@@ -1,7 +1,7 @@
 use bevy::{asset::uuid, ecs::system::SystemState, prelude::*};
 use tray_icon::{
     TrayIconBuilder,
-    menu::{Menu, MenuItem, PredefinedMenuItem},
+    menu::{MenuItem, PredefinedMenuItem},
 };
 
 use crate::{
@@ -34,13 +34,12 @@ pub enum TrayMenuItem {
     },
 }
 
-/// Wraps the `tray_icon::TrayIcon` handle which must be kept alive for the tray icon
-/// to remain on the system tray
+/// Wraps the `tray_icon::TrayIcon` handle which must be kept alive for the tray
+/// icon to remain on the system tray.
 /// Inserted as a nonsend bevy resource as `tray_icon::TrayIcon` is `!Send`
 pub struct PlatformTrayIcon(tray_icon::TrayIcon);
 
 impl PlatformTrayIcon {
-    // TODO: anyhow error?
     pub fn set_icon(&mut self, img: &Image) -> Result<(), String> {
         let rgba = img
             .clone()
@@ -87,6 +86,8 @@ pub fn create_tray(
     });
 }
 
+/// Builds the initial platform tray icon once the icon image asset is loaded.
+/// After the tray icon exists, `sync_tray_menu` handles all subsequent updates.
 pub fn build_platform_tray(world: &mut World) {
     let mut system_state: SystemState<(
         EventReader<AssetEvent<Image>>,
@@ -163,6 +164,39 @@ pub fn build_platform_tray(world: &mut World) {
     }
 }
 
+pub fn sync_tray_menu(
+    mut rebuild: ResMut<crate::ui::systems::NeedsRebuild>,
+    prefs_handle: Res<PreferencesHandle>,
+    prefs_store: Res<Assets<Preferences>>,
+    mut system_tray: ResMut<SystemTray>,
+    platform_icon: Option<NonSendMut<PlatformTrayIcon>>,
+) {
+    if !rebuild.tray {
+        return;
+    }
+    rebuild.tray = false;
+
+    let Some(prefs) = prefs_store.get(&prefs_handle.0) else {
+        return;
+    };
+
+    info!("Rebuilding tray menu");
+    let new_menu = populate_menu_from_prefs(prefs);
+    system_tray.menu = new_menu;
+
+    // Platform icon may not exist yet if the image asset is still loading;
+    // the correct menu is already stored in `system_tray` and will be used
+    // when `build_platform_tray` eventually constructs the icon.
+    let Some(mut icon) = platform_icon else {
+        return;
+    };
+
+    let platform_menu = build_platform_menu(&system_tray.menu);
+    if let Err(e) = icon.set_menu(platform_menu) {
+        error!("Failed to update tray menu: {e:?}");
+    }
+}
+
 fn build_platform_menu(menu: &TrayMenu) -> tray_icon::menu::Menu {
     let platform_menu = tray_icon::menu::Menu::new();
 
@@ -220,7 +254,10 @@ fn populate_menu_from_prefs(prefs: &Preferences) -> TrayMenu {
     TrayMenu(items)
 }
 
-pub fn poll_menu_events(mut writer: EventWriter<Msg>) {
+pub fn dispatch_tray_menu_events(
+    _: Option<NonSend<PlatformTrayIcon>>,
+    mut writer: EventWriter<Msg>,
+) {
     while let Ok(event) = tray_icon::menu::MenuEvent::receiver().try_recv() {
         match event.id.0.as_str() {
             menu_ids::SHOW_WINDOW => {
@@ -248,5 +285,3 @@ pub fn poll_menu_events(mut writer: EventWriter<Msg>) {
         }
     }
 }
-
-pub fn update_tray() {}

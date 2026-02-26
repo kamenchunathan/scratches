@@ -26,7 +26,7 @@ use crate::{
         settings_tab::spawn_settings_tab,
         state::{AppScreen, AppSettingsUiState, DirtyFlag, MainWindowVisible},
         systems::*,
-        tray::{build_platform_tray, create_tray, poll_menu_events},
+        tray::{build_platform_tray, create_tray, dispatch_tray_menu_events, sync_tray_menu},
         widgets::*,
     },
 };
@@ -54,7 +54,6 @@ impl Plugin for LovableUI {
                         dispatch_home_buttons,
                         dispatch_onboarding_buttons,
                         dispatch_system_buttons,
-                        poll_menu_events,
                     ),
                     update,
                     quit_on_esc,
@@ -79,7 +78,13 @@ impl Plugin for LovableUI {
             )
             .add_systems(
                 PostUpdate,
-                build_platform_tray.run_if(in_state(AppState::Running)),
+                (
+                    build_platform_tray,
+                    dispatch_tray_menu_events,
+                    sync_tray_menu,
+                )
+                    .chain()
+                    .run_if(in_state(AppState::Running)),
             );
     }
 }
@@ -439,11 +444,9 @@ pub fn rebuild_dynamic_tabs(
     let settings = settings.into_inner();
 
     if rebuild.home {
-        // Despawn existing home tab content
         for entity in &home_roots {
             commands.entity(entity).despawn();
         }
-        // Respawn into the tab area
         commands.entity(area_entity).with_children(|area| {
             spawn_home_tab(area, prefs, registry, &monitor_list, palette);
         });
@@ -451,11 +454,9 @@ pub fn rebuild_dynamic_tabs(
     }
 
     if rebuild.critters {
-        // Despawn existing critters tab content
         for entity in &critter_roots {
             commands.entity(entity).despawn();
         }
-        // Respawn into the tab area
         commands.entity(area_entity).with_children(|area| {
             spawn_critters_tab(area, screen, prefs, registry, &monitor_list, palette);
         });
