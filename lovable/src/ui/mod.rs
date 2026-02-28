@@ -13,22 +13,22 @@ pub mod widgets;
 use bevy::{prelude::*, window::Monitor};
 
 use crate::{
-    AppState,
     critter::CritterRegistry,
-    preferences::{Preferences, PreferencesHandle, RegistryHandle, generate_monitor_fingerprint},
+    preferences::{generate_monitor_fingerprint, Preferences, PreferencesHandle, RegistryHandle},
     ui::{
         about_tab::spawn_about_tab,
         critters_tab::spawn_critters_tab,
         home_tab::spawn_home_tab,
         messages::Msg,
         onboarding::spawn_onboarding,
-        palette::{GAMING_THEME, Palette},
+        palette::{Palette, GAMING_THEME},
         settings_tab::spawn_settings_tab,
         state::{AppScreen, AppSettingsUiState, DirtyFlag, MainWindowVisible},
         systems::*,
-        tray::{build_platform_tray, create_tray, dispatch_tray_menu_events, sync_tray_menu},
+        tray::{build_platform_tray, create_tray, poll_menu_events, sync_tray_menu},
         widgets::*,
     },
+    AppState,
 };
 
 pub struct LovableUI;
@@ -54,6 +54,7 @@ impl Plugin for LovableUI {
                         dispatch_home_buttons,
                         dispatch_onboarding_buttons,
                         dispatch_system_buttons,
+                        poll_menu_events,
                     ),
                     update,
                     quit_on_esc,
@@ -70,6 +71,7 @@ impl Plugin for LovableUI {
                         reset_scroll_on_tab_change,
                         handle_window_close,
                         periodic_save,
+                        sync_tray_menu,
                         rebuild_dynamic_tabs,
                     ),
                 )
@@ -78,13 +80,7 @@ impl Plugin for LovableUI {
             )
             .add_systems(
                 PostUpdate,
-                (
-                    build_platform_tray,
-                    dispatch_tray_menu_events,
-                    sync_tray_menu,
-                )
-                    .chain()
-                    .run_if(in_state(AppState::Running)),
+                build_platform_tray.run_if(in_state(AppState::Running)),
             );
     }
 }
@@ -403,8 +399,8 @@ fn spawn_footer(
         });
 }
 
-/// Re-spawns the critters and home tab content when `NeedsRebuild` flags are set.
-/// Despawns the old `TabContent` node and replaces it in-place.
+/// Re-spawns the home and critters tab content when `NeedsRebuild` is set.
+/// Despawns the old root nodes and replaces them in-place, then clears the flag.
 pub fn rebuild_dynamic_tabs(
     mut commands: Commands,
     mut rebuild: ResMut<NeedsRebuild>,
@@ -420,7 +416,7 @@ pub fn rebuild_dynamic_tabs(
     home_roots: Query<Entity, With<HomeTabRoot>>,
     critter_roots: Query<Entity, With<CrittersTabRoot>>,
 ) {
-    if !rebuild.critters && !rebuild.home {
+    if !rebuild.0 {
         return;
     }
 
@@ -443,25 +439,21 @@ pub fn rebuild_dynamic_tabs(
     let screen = screen.into_inner();
     let settings = settings.into_inner();
 
-    if rebuild.home {
-        for entity in &home_roots {
-            commands.entity(entity).despawn();
-        }
-        commands.entity(area_entity).with_children(|area| {
-            spawn_home_tab(area, prefs, registry, &monitor_list, palette);
-        });
-        rebuild.home = false;
+    for entity in &home_roots {
+        commands.entity(entity).despawn();
     }
+    commands.entity(area_entity).with_children(|area| {
+        spawn_home_tab(area, prefs, registry, &monitor_list, palette);
+    });
 
-    if rebuild.critters {
-        for entity in &critter_roots {
-            commands.entity(entity).despawn();
-        }
-        commands.entity(area_entity).with_children(|area| {
-            spawn_critters_tab(area, screen, prefs, registry, &monitor_list, palette);
-        });
-        rebuild.critters = false;
+    for entity in &critter_roots {
+        commands.entity(entity).despawn();
     }
+    commands.entity(area_entity).with_children(|area| {
+        spawn_critters_tab(area, screen, prefs, registry, &monitor_list, palette);
+    });
+
+    rebuild.0 = false;
 }
 
 fn spawn_window_control_button<M: Component>(

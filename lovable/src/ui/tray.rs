@@ -1,7 +1,7 @@
 use bevy::{asset::uuid, ecs::system::SystemState, prelude::*};
 use tray_icon::{
     TrayIconBuilder,
-    menu::{MenuItem, PredefinedMenuItem},
+    menu::{Menu, MenuItem, PredefinedMenuItem},
 };
 
 use crate::{
@@ -164,29 +164,30 @@ pub fn build_platform_tray(world: &mut World) {
     }
 }
 
+/// Rebuilds the tray menu whenever `NeedsRebuild` is set.
+/// Does not clear the flag — `rebuild_dynamic_tabs` is the sole owner of the
+/// flag lifecycle and clears it after all consumers have run.
 pub fn sync_tray_menu(
-    mut rebuild: ResMut<crate::ui::systems::NeedsRebuild>,
+    rebuild: Res<crate::ui::systems::NeedsRebuild>,
     prefs_handle: Res<PreferencesHandle>,
     prefs_store: Res<Assets<Preferences>>,
     mut system_tray: ResMut<SystemTray>,
     platform_icon: Option<NonSendMut<PlatformTrayIcon>>,
 ) {
-    if !rebuild.tray {
+    if !rebuild.0 {
         return;
     }
-    rebuild.tray = false;
 
     let Some(prefs) = prefs_store.get(&prefs_handle.0) else {
         return;
     };
 
-    info!("Rebuilding tray menu");
     let new_menu = populate_menu_from_prefs(prefs);
     system_tray.menu = new_menu;
 
     // Platform icon may not exist yet if the image asset is still loading;
-    // the correct menu is already stored in `system_tray` and will be used
-    // when `build_platform_tray` eventually constructs the icon.
+    // the correct menu is stored in `system_tray` and will be used when
+    // `build_platform_tray` eventually constructs the icon.
     let Some(mut icon) = platform_icon else {
         return;
     };
@@ -254,10 +255,7 @@ fn populate_menu_from_prefs(prefs: &Preferences) -> TrayMenu {
     TrayMenu(items)
 }
 
-pub fn dispatch_tray_menu_events(
-    _: Option<NonSend<PlatformTrayIcon>>,
-    mut writer: EventWriter<Msg>,
-) {
+pub fn poll_menu_events(mut writer: EventWriter<Msg>) {
     while let Ok(event) = tray_icon::menu::MenuEvent::receiver().try_recv() {
         match event.id.0.as_str() {
             menu_ids::SHOW_WINDOW => {

@@ -151,11 +151,11 @@ fn handle_home(msg: &HomeMsg, prefs: &mut Preferences, rebuild: &mut NeedsRebuil
     match msg {
         HomeMsg::HideAll => {
             prefs.critters.iter_mut().for_each(|c| c.is_visible = false);
-            rebuild.tray = true;
+            rebuild.0 = true;
         }
         HomeMsg::ShowAll => {
             prefs.critters.iter_mut().for_each(|c| c.is_visible = true);
-            rebuild.tray = true;
+            rebuild.0 = true;
         }
     }
 }
@@ -186,7 +186,7 @@ fn handle_critters(
         CrittersMsg::ToggleVisibility(id) => {
             if let Some(c) = prefs.critters.iter_mut().find(|c| &c.id == id) {
                 c.is_visible = !c.is_visible;
-                rebuild.tray = true;
+                rebuild.0 = true;
             }
         }
 
@@ -212,9 +212,7 @@ fn handle_critters(
             if let AppScreen::Main(main) = screen {
                 main.critters_tab = CrittersTabState::Collapsed;
             }
-            rebuild.critters = true;
-            rebuild.home = true;
-            rebuild.tray = true;
+            rebuild.0 = true;
         }
 
         CrittersMsg::CancelDelete => {
@@ -248,9 +246,7 @@ fn handle_critters(
                 monitor_fingerprint: monitor_fp,
                 interactible: true,
             });
-            rebuild.critters = true;
-            rebuild.home = true;
-            rebuild.tray = true;
+            rebuild.0 = true;
         }
 
         CrittersMsg::AssignMonitor {
@@ -388,9 +384,7 @@ fn handle_onboarding(
                                 monitor_fingerprint: monitor_fp,
                                 interactible: true,
                             });
-                            rebuild.critters = true;
-                            rebuild.home = true;
-                            rebuild.tray = true;
+                            rebuild.0 = true;
                         }
                     }
                 }
@@ -460,7 +454,7 @@ fn handle_system_events(
             if let Some(c) = prefs.critters.iter_mut().find(|c| &c.id == id) {
                 c.is_visible = !c.is_visible;
                 dirty.dirty = true;
-                rebuild.tray = true;
+                rebuild.0 = true;
             }
         }
 
@@ -473,14 +467,10 @@ fn handle_system_events(
     }
 }
 
-/// Set this resource's flags when the critter list, home tab, or tray menu
-/// needs a rebuild. Systems that handle each concern clear their own flag.
+/// Set to `true` whenever any state mutation requires the UI or tray to be
+/// re-synced. Every consumer clears the flag independently after acting on it.
 #[derive(Resource, Default)]
-pub struct NeedsRebuild {
-    pub critters: bool,
-    pub home: bool,
-    pub tray: bool,
-}
+pub struct NeedsRebuild(pub bool);
 
 // Each system handles one logical group of buttons so no single system
 // exceeds Bevy's system-parameter limit and the responsibilities stay clear.
