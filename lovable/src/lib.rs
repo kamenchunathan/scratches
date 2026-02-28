@@ -77,7 +77,11 @@ impl Plugin for Lovable {
             )
             .add_systems(
                 OnEnter(AppState::Running),
-                (configure_auto_launch, spawn_critter_windows).after(build_app_screen_from_prefs),
+                (
+                    spawn_main_window,
+                    configure_auto_launch,
+                    (spawn_critter_windows).after(build_app_screen_from_prefs),
+                ),
             )
             .add_systems(
                 Update,
@@ -91,6 +95,28 @@ impl Plugin for Lovable {
                     .run_if(in_state(AppState::Running)),
             );
     }
+}
+
+///
+fn spawn_main_window(
+    mut commands: Commands,
+    prefs_handle: Res<PreferencesHandle>,
+    prefs_store: Res<Assets<Preferences>>,
+) {
+    // let Some(prefs) = prefs_store.get(prefs_handle.0.id()) else {
+    //     return;
+    // };
+    //
+    // let should_be_visible = !prefs.app_settings.start_minimized;
+    //
+    // commands.spawn(Window {
+    //     title: String::from("Lovable"),
+    //     window_theme: Some(WindowTheme::Dark),
+    //     decorations: false,
+    //     position: WindowPosition::Centered(MonitorSelection::Primary),
+    //     visible: should_be_visible,
+    //     ..default()
+    // });
 }
 
 /// Configures autolaunch on system startup based on user preferences.
