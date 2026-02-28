@@ -11,7 +11,7 @@ pub enum AppScreen {
 
 impl AppScreen {
     pub fn from_preferences(prefs: &crate::preferences::Preferences) -> Self {
-        if prefs.first_start {
+        if prefs.auto_launch {
             AppScreen::Onboarding(OnboardingState::Welcome)
         } else {
             AppScreen::Main(MainState::default())

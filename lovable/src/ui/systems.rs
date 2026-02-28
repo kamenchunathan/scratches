@@ -46,7 +46,7 @@ pub fn save_prefs(mut prefs: Preferences, asset_server: &AssetServer) {
     use bevy::asset::AssetPath;
     use bevy::tasks::AsyncComputeTaskPool;
 
-    prefs.first_start = false;
+    prefs.auto_launch = false;
     let serialized = match bevy::scene::ron::ser::to_string_pretty(
         &prefs,
         bevy::scene::ron::ser::PrettyConfig::new(),
@@ -390,12 +390,12 @@ fn handle_onboarding(
                 }
             }
 
-            prefs.first_start = false;
+            prefs.auto_launch = false;
             *screen = AppScreen::Main(MainState::default());
         }
 
         (_, OnboardingMsg::Skip) => {
-            prefs.first_start = false;
+            prefs.auto_launch = false;
             *screen = AppScreen::Main(MainState::default());
         }
 

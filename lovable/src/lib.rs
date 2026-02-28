@@ -3,6 +3,8 @@ mod preferences;
 mod store;
 mod ui;
 
+use std::env;
+
 use bevy::{asset::io::AssetSourceId, prelude::*, window::WindowTheme};
 
 use crate::{
@@ -16,8 +18,9 @@ use crate::{
         },
     },
     preferences::{
-        Preferences, PreferencesLoader, check_loading_complete, create_default_prefs_on_fail,
-        query_monitor_info, save_preferences_on_exit, start_loading_assets,
+        Preferences, PreferencesHandle, PreferencesLoader, check_loading_complete,
+        create_default_prefs_on_fail, query_monitor_info, save_preferences_on_exit,
+        start_loading_assets,
     },
     ui::{LovableUI, build_app_screen_from_prefs},
 };
@@ -74,7 +77,7 @@ impl Plugin for Lovable {
             )
             .add_systems(
                 OnEnter(AppState::Running),
-                spawn_critter_windows.after(build_app_screen_from_prefs),
+                (configure_auto_launch, spawn_critter_windows).after(build_app_screen_from_prefs),
             )
             .add_systems(
                 Update,
@@ -88,4 +91,52 @@ impl Plugin for Lovable {
                     .run_if(in_state(AppState::Running)),
             );
     }
+}
+
+/// Configures autolaunch on system startup based on user preferences.
+fn configure_auto_launch(
+    prefs_handle: Res<PreferencesHandle>,
+    prefs_store: Res<Assets<Preferences>>,
+) {
+    let Some(prefs) = prefs_store.get(prefs_handle.0.id()) else {
+        warn!("Unable to get preferences for autolaunch configuration");
+        return;
+    };
+
+    let app_path = determine_app_path();
+
+    let Ok(auto_launch) = auto_launch::AutoLaunchBuilder::new()
+        .set_app_name("Lovable")
+        .set_app_path(&app_path)
+        .set_macos_launch_mode(auto_launch::MacOSLaunchMode::LaunchAgent)
+        .build()
+    else {
+        error!("Failed to initialize AutoLaunch builder");
+        return;
+    };
+
+    // Sync the system autolaunch state with the app preferences
+    if prefs.auto_launch {
+        if let Err(e) = auto_launch.enable() {
+            error!("Failed to enable autolaunch: {}", e);
+        } else {
+            info!("Autolaunch enabled successfully");
+        }
+    } else {
+        if let Err(e) = auto_launch.disable() {
+            error!("Failed to disable autolaunch: {}", e);
+        } else {
+            info!("Autolaunch disabled successfully");
+        }
+    }
+}
+
+/// Gets the absolute path to the current executable.
+fn determine_app_path() -> String {
+    env::current_exe()
+        .map(|path| path.to_string_lossy().into_owned())
+        .unwrap_or_else(|_| {
+            error!("Could not determine executable path, defaulting to 'lovable'");
+            "lovable".to_string()
+        })
 }

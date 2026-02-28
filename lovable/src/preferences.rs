@@ -34,7 +34,7 @@ pub struct Preferences {
     pub global_critter_settings: GlobalCritterSettings,
 
     /// True on first launch; triggers the onboarding flow.
-    pub first_start: bool,
+    pub auto_launch: bool,
 }
 
 impl Default for Preferences {
@@ -46,7 +46,7 @@ impl Default for Preferences {
             app_settings: Default::default(),
             critters: Default::default(),
             global_critter_settings: Default::default(),
-            first_start: true,
+            auto_launch: true,
         }
     }
 }
@@ -223,7 +223,7 @@ pub fn save_preferences_on_exit(
     if app_exit_events.read().next().is_some() {
         if let Some(prefs) = prefs_store.get(&prefs_handle.0) {
             let mut prefs = prefs.clone();
-            prefs.first_start = false;
+            prefs.auto_launch = false;
 
             AsyncComputeTaskPool::get()
                 .spawn({
