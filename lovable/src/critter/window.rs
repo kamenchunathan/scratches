@@ -6,8 +6,8 @@ use bevy::{
 };
 
 use crate::{
-    critter::{Critter, CritterId},
-    preferences::{Preferences, PreferencesHandle, generate_monitor_fingerprint},
+    critter::{Critter, CritterId, CritterRegistry},
+    preferences::{Preferences, PreferencesHandle, RegistryHandle, generate_monitor_fingerprint},
 };
 
 /// Marker attached to the Bevy `Window` entity that belongs to a critter.
@@ -96,18 +96,29 @@ fn resolve_monitor_origin(fingerprint: u64, monitors: &Query<&Monitor>) -> IVec2
 }
 
 /// Reacts to every `Added<CritterWindow>` — spawns a dedicated `Camera2d` that
-/// renders into that window and a coloured triangle as a placeholder shape.
-// TODO: Swap `Triangle2d` for a `SceneRoot` GLTF spawn when the animator is ready.
+/// renders into that window, then either:
+///   • a `Sprite` using the critter def's `background_image` if one is configured, or
+///   • a coloured `Triangle2d` mesh as a fallback.
 pub fn spawn_placeholder_geometry(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
+    asset_server: Res<AssetServer>,
+    prefs_handle: Res<PreferencesHandle>,
+    prefs_store: Res<Assets<Preferences>>,
+    registry_handle: Res<RegistryHandle>,
+    registry_store: Res<Assets<CritterRegistry>>,
     new_windows: Query<(Entity, &CritterWindow), Added<CritterWindow>>,
 ) {
-    for (window_entity, cw) in &new_windows {
-        let hue = (cw.critter_id.0.as_bytes()[0] as f32 / 255.0) * 360.0;
-        let color = Color::hsl(hue, 0.75, 0.55);
+    let Some(prefs) = prefs_store.get(&prefs_handle.0) else {
+        return;
+    };
+    let Some(registry) = registry_store.get(&registry_handle.0) else {
+        return;
+    };
 
+    for (window_entity, cw) in &new_windows {
+        // Spawn the dedicated camera for this window.
         commands.spawn((
             Camera2d,
             Camera {
@@ -120,18 +131,49 @@ pub fn spawn_placeholder_geometry(
             },
         ));
 
-        commands.spawn((
-            Mesh2d(meshes.add(Triangle2d::new(
-                Vec2::new(0.0, 46.0),
-                Vec2::new(-40.0, -30.0),
-                Vec2::new(40.0, -30.0),
-            ))),
-            MeshMaterial2d(materials.add(color)),
-            Transform::default(),
-            CritterRenderEntity {
-                critter_id: cw.critter_id,
-            },
-        ));
+        // Look up the def to check for a background image.
+        let def_id = prefs
+            .critters
+            .iter()
+            .find(|c| c.id == cw.critter_id)
+            .map(|c| c.def_id.as_str())
+            .unwrap_or("");
+
+        let background_image = registry
+            .find(def_id)
+            .and_then(|d| d.background_image.as_deref());
+
+        if let Some(image_path) = background_image {
+            // Sprite-based rendering: the image fills the window.
+            let texture: Handle<Image> = asset_server.load(image_path);
+            commands.spawn((
+                Sprite {
+                    image: texture,
+                    custom_size: Some(Vec2::splat(128.0)),
+                    ..default()
+                },
+                Transform::default(),
+                CritterRenderEntity {
+                    critter_id: cw.critter_id,
+                },
+            ));
+        } else {
+            // Fallback: coloured triangle derived from the critter UUID.
+            let hue = (cw.critter_id.0.as_bytes()[0] as f32 / 255.0) * 360.0;
+            let color = Color::hsl(hue, 0.75, 0.55);
+            commands.spawn((
+                Mesh2d(meshes.add(Triangle2d::new(
+                    Vec2::new(0.0, 46.0),
+                    Vec2::new(-40.0, -30.0),
+                    Vec2::new(40.0, -30.0),
+                ))),
+                MeshMaterial2d(materials.add(color)),
+                Transform::default(),
+                CritterRenderEntity {
+                    critter_id: cw.critter_id,
+                },
+            ));
+        }
     }
 }
 
