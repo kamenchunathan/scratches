@@ -7,6 +7,7 @@ use bevy::{
 use serde::{Deserialize, Serialize};
 
 mod animator;
+pub mod behavior;
 pub mod builtin;
 pub mod loader;
 pub mod window;
@@ -52,6 +53,12 @@ pub struct CritterDef {
     /// Path to the `.glb` file, relative to the asset root.
     // TODO: Figure out how to handle this for downloaded critters.
     pub gltf: String,
+
+    /// Optional path to a PNG/JPEG sprite shown in the critter's desktop window,
+    /// relative to the Bevy asset root (e.g. `"critters/wobble/wobble.png"`).
+    /// When absent the window falls back to a coloured triangle placeholder.
+    #[serde(default)]
+    pub background_image: Option<String>,
 
     pub ui_animations: UiAnimations,
 

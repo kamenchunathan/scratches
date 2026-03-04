@@ -4,6 +4,7 @@
             id: "wobble",
             name: "Wobble",
             gltf: "critters/wobble/wobble.glb",
+            background_image: Some("critters/wobble/wobble.png"),
             ui_animations: (
                 preview: 0,
                 celebrate: 1,
@@ -15,6 +16,7 @@
             id: "flop",
             name: "Flop",
             gltf: "critters/flop/flop.glb",
+            background_image: Some("critters/flop/flop.png"),
             ui_animations: (
                 preview: 0,
                 celebrate: 1,

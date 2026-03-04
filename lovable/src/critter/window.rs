@@ -1,4 +1,5 @@
 use bevy::{
+    log::tracing,
     prelude::*,
     render::camera::RenderTarget,
     window::{Monitor, WindowLevel, WindowRef, WindowResolution},
@@ -21,6 +22,14 @@ pub struct CritterWindow {
 pub struct CritterRenderEntity {
     pub critter_id: CritterId,
 }
+
+/// Added to a `CritterWindow` entity that is scheduled for removal.
+/// The render entities (camera, mesh) are despawned in the same tick this
+/// marker is inserted. The window entity itself is despawned one tick later,
+/// giving the render world one full extraction cycle to drop its reference to
+/// the now-gone camera before the window target disappears.
+#[derive(Component)]
+pub struct CritterWindowPendingDespawn;
 
 /// Spawns one `Window` entity per visible owned critter, placed at its saved
 /// monitor-relative position on the correct monitor.
@@ -126,16 +135,37 @@ pub fn spawn_placeholder_geometry(
     }
 }
 
-/// Watches `Preferences` for changes and opens or closes windows to match.
-///
-/// Key improvement over the original: before despawning a hidden critter's window
-/// we flush its current OS position back into `Preferences` so the saved position
-/// matches where the user actually dragged it, not just the last auto-saved value.
-pub fn sync_critter_window_visibility(
+// ── Mark-and-sweep window lifecycle ──────────────────────────────────────────
+//
+// Despawning a Window entity while a Camera still holds a RenderTarget pointing
+// at it causes a render-thread deadlock on Windows (Vulkan). The fix is a
+// two-phase teardown:
+//
+//   Phase 1  (mark_critter_windows_for_despawn)
+//     • Decides which windows need to open or close this tick.
+//     • Opens new windows immediately (safe — no render state to clean up).
+//     • For windows that must close:
+//         1. Despawns all CritterRenderEntity nodes (camera, mesh) immediately.
+//         2. Tags the Window entity with CritterWindowPendingDespawn.
+//         3. Flushes the current OS position back into Preferences.
+//     • Never touches an entity that is already tagged.
+//
+//   Phase 2  (despawn_pending_critter_windows)
+//     • Runs in the same schedule, after Phase 1.
+//     • Despawns every Window entity carrying CritterWindowPendingDespawn.
+//     • By the time this runs the render world has already extracted a frame
+//       without the camera, so the window reference is safe to remove.
+
+/// Phase 1 — evaluate desired state and begin teardown of closing windows.
+pub fn mark_critter_windows_for_despawn(
     mut commands: Commands,
     prefs_handle: Res<PreferencesHandle>,
     mut prefs_store: ResMut<Assets<Preferences>>,
-    existing_windows: Query<(Entity, &CritterWindow, &Window)>,
+    existing_windows: Query<
+        (Entity, &CritterWindow, &Window),
+        Without<CritterWindowPendingDespawn>,
+    >,
+    render_entities: Query<(Entity, &CritterRenderEntity)>,
     monitors: Query<&Monitor>,
 ) {
     if !prefs_store.is_changed() {
@@ -150,15 +180,15 @@ pub fn sync_critter_window_visibility(
         let window_state = existing_windows
             .iter()
             .find(|(_, cw, _)| cw.critter_id == critter.id)
-            .map(|(e, _, w)| (e, w.position.clone()));
+            .map(|(entity, _, window)| (entity, window.position.clone()));
 
         match (critter.is_visible, window_state) {
             (true, None) => {
                 spawn_window_for_critter(&mut commands, critter, &monitors);
             }
 
-            (false, Some((entity, pos))) => {
-                // Preserve the current dragged position before despawning
+            (false, Some((window_entity, pos))) => {
+                // 1. Persist the current dragged position before closing.
                 if let WindowPosition::At(abs) = pos {
                     let containing_monitor = monitors.iter().find(|m| {
                         abs.x >= m.physical_position.x
@@ -181,32 +211,81 @@ pub fn sync_critter_window_visibility(
                     critter.monitor_fingerprint = new_fp;
                 }
 
-                commands.entity(entity).despawn();
+                // 2. Despawn render entities FIRST — camera must go before its
+                //    window target or the render thread will deadlock.
+                for (render_entity, marker) in &render_entities {
+                    if marker.critter_id == critter.id {
+                        tracing::debug!(
+                            critter_id = %critter.id.0,
+                            ?render_entity,
+                            "despawning render entity before window"
+                        );
+                        commands.entity(render_entity).despawn();
+                    }
+                }
+
+                // 3. Tag the window for despawn in Phase 2.
+                tracing::debug!(
+                    critter_id = %critter.id.0,
+                    ?window_entity,
+                    "marking critter window for deferred despawn"
+                );
+                commands
+                    .entity(window_entity)
+                    .insert(CritterWindowPendingDespawn);
             }
+
+            // Already in the correct state — nothing to do.
             _ => {}
         }
     }
 
-    // Windows for critters that were deleted
-    let critter_ids: Vec<_> = prefs.critters.iter().map(|c| c.id).collect();
-    for (entity, cw, _) in &existing_windows {
-        if !critter_ids.contains(&cw.critter_id) {
-            commands.entity(entity).despawn();
+    // ── Orphan cleanup — windows for deleted critters ─────────────────────────
+
+    let live_critter_ids: Vec<CritterId> = prefs.critters.iter().map(|c| c.id).collect();
+
+    for (window_entity, cw, _) in &existing_windows {
+        if !live_critter_ids.contains(&cw.critter_id) {
+            // Despawn render entities first.
+            for (render_entity, marker) in &render_entities {
+                if marker.critter_id == cw.critter_id {
+                    tracing::debug!(
+                        critter_id = %cw.critter_id.0,
+                        ?render_entity,
+                        "despawning orphaned render entity"
+                    );
+                    commands.entity(render_entity).despawn();
+                }
+            }
+
+            tracing::debug!(
+                critter_id = %cw.critter_id.0,
+                ?window_entity,
+                "marking orphaned critter window for deferred despawn"
+            );
+            commands
+                .entity(window_entity)
+                .insert(CritterWindowPendingDespawn);
         }
     }
 }
 
-/// Cleans up orphaned `CritterRenderEntity` nodes (cameras, meshes) after
-/// their window has been despawned.
-pub fn sync_critter_render_despawn(
+/// Phase 2 — despawn windows that were tagged in Phase 1.
+///
+/// Runs after Phase 1 in the same schedule. The render world has already
+/// extracted one frame without the cameras that targeted these windows, so it
+/// is safe to remove the window entities.
+pub fn despawn_pending_critter_windows(
     mut commands: Commands,
-    windows: Query<&CritterWindow>,
-    render_entities: Query<(Entity, &CritterRenderEntity)>,
+    pending: Query<(Entity, &CritterWindow), With<CritterWindowPendingDespawn>>,
 ) {
-    for (entity, marker) in &render_entities {
-        if !windows.iter().any(|cw| cw.critter_id == marker.critter_id) {
-            commands.entity(entity).despawn();
-        }
+    for (entity, cw) in &pending {
+        tracing::debug!(
+            critter_id = %cw.critter_id.0,
+            ?entity,
+            "despawning pending critter window"
+        );
+        commands.entity(entity).despawn();
     }
 }
 

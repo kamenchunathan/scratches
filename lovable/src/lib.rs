@@ -10,11 +10,12 @@ use bevy::{asset::io::AssetSourceId, prelude::*, window::WindowTheme};
 use crate::{
     critter::{
         CritterDef, CritterRegistry,
+        behavior::{assign_critter_behaviors, tick_critter_behaviors},
         builtin::install_builtin_critters_if_needed,
         loader::CritterRegistryLoader,
         window::{
+            despawn_pending_critter_windows, mark_critter_windows_for_despawn,
             persist_critter_window_positions, spawn_critter_windows, spawn_placeholder_geometry,
-            sync_critter_render_despawn, sync_critter_window_visibility,
         },
     },
     preferences::{
@@ -87,10 +88,12 @@ impl Plugin for Lovable {
                 Update,
                 (
                     spawn_placeholder_geometry,
-                    sync_critter_window_visibility,
-                    sync_critter_render_despawn.after(sync_critter_window_visibility),
+                    mark_critter_windows_for_despawn,
+                    despawn_pending_critter_windows.after(mark_critter_windows_for_despawn),
                     persist_critter_window_positions,
                     save_preferences_on_exit,
+                    assign_critter_behaviors.after(spawn_placeholder_geometry),
+                    tick_critter_behaviors.after(assign_critter_behaviors),
                 )
                     .run_if(in_state(AppState::Running)),
             );
