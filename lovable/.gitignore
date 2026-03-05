@@ -1,3 +1,4 @@
 target
 .direnv
+.wrangler
 node_modules

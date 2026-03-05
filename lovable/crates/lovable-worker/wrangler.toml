@@ -16,5 +16,8 @@ binding = "DB"
 database_name = "lovable"
 database_id = "${D1_DATABASE_ID}"
 
+[assets]
+directory = "./static"
+
 [build]
 command = "cargo install -q worker-build && worker-build crates/lovable-worker --release"

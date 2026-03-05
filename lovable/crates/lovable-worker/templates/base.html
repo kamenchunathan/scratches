@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Lovable - Desktop Pets for Your Computer{% endblock %}</title>
+  <link rel="stylesheet" href="/css/style.css">
+  {% block head %}{% endblock %}
+</head>
+<body>
+  <header class="site-header">
+    <div class="container header-inner">
+      <a href="/" class="logo-link">
+        <img src="/img/icon.png" alt="Lovable" class="logo-icon" width="40" height="40">
+        <span class="logo-text">lovable</span>
+      </a>
+      <nav class="site-nav">
+        <a href="/downloads" class="nav-link">Download</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <span>© 2026 sandboxedideas. Made with care.</span>
+      <nav class="footer-nav">
+        <a href="#">Privacy</a>
+        <a href="#">GitHub</a>
+        <a href="#">Discord</a>
+      </nav>
+    </div>
+  </footer>
+
+  <div class="floating-pet" id="floating-pet" aria-hidden="true">🐱</div>
+
+  {% block scripts %}{% endblock %}
+</body>
+</html>

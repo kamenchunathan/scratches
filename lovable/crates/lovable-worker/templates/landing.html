@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+
+{% block content %}
+<!-- Hero -->
+<section class="hero">
+  <div class="particles" aria-hidden="true">
+    <span class="particle" style="top:8%;left:3%"></span>
+    <span class="particle particle--sm" style="top:20%;right:7%"></span>
+    <span class="particle particle--md" style="bottom:22%;left:22%"></span>
+    <span class="particle particle--sm" style="bottom:12%;right:28%"></span>
+  </div>
+
+  <div class="container hero-grid">
+    <div class="hero-copy">
+      <h1 class="hero-title">Lovable critters for your desktop</h1>
+      <p class="hero-desc">Adorable digital companions that live on your screen. Watch them grow, play, and steal your heart.</p>
+      <a href="/downloads" class="btn btn--primary btn--pill">Adopt now</a>
+    </div>
+    <div class="hero-visual" aria-hidden="true">
+      <div class="hero-bg-shape"></div>
+      <span class="hero-emoji">🐕</span>
+    </div>
+  </div>
+</section>
+
+<!-- Features -->
+<section class="features">
+  <div class="particles" aria-hidden="true">
+    <span class="particle particle--sm" style="top:5%;right:7%"></span>
+    <span class="particle" style="bottom:28%;left:3%"></span>
+    <span class="particle particle--md" style="top:45%;right:22%"></span>
+    <span class="particle particle--sm" style="top:18%;left:28%"></span>
+  </div>
+
+  <div class="container">
+    <h2 class="section-title">What's not to love?</h2>
+
+    <div class="feature-grid">
+      <!-- Feature 1: large -->
+      <div class="feature-card feature-card--large">
+        <div>
+          <h3 class="feature-heading">
+            <svg class="feature-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
+            Collect Companions
+          </h3>
+          <p class="feature-desc">Adopt different pets — cats, dogs, hamsters and more. Build your unique digital family.</p>
+        </div>
+        <div class="feature-preview" aria-hidden="true">🐱</div>
+      </div>
+
+      <!-- Feature 2 -->
+      <div class="feature-card feature-card--muted">
+        <h3 class="feature-heading">Customize Everything</h3>
+        <p class="feature-desc">Adjust size, opacity, and position. Make your pets truly yours with endless options.</p>
+        <div class="feature-emoji" aria-hidden="true">✨</div>
+      </div>
+
+      <!-- Feature 3 -->
+      <div class="feature-card feature-card--hover">
+        <div>
+          <h3 class="feature-heading">Always There</h3>
+          <p class="feature-desc">Your pets stay by your side. Launch on startup, minimize to tray, or keep them always visible.</p>
+        </div>
+        <div class="feature-emoji" aria-hidden="true">🎮</div>
+      </div>
+
+      <!-- Feature 4 -->
+      <div class="feature-card feature-card--secondary">
+        <div>
+          <h3 class="feature-heading">Watch Them Grow</h3>
+          <p class="feature-desc">Your pets develop personalities and behaviors over time.</p>
+        </div>
+        <div class="feature-emoji" aria-hidden="true">🌱</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Download CTA -->
+<section class="cta">
+  <div class="container cta-inner">
+    <h2 class="section-title">Ready to adopt?</h2>
+    <p class="cta-desc">Get lovable in seconds. It's free and always will be.</p>
+    <div class="cta-actions">
+      <a href="/downloads" class="btn btn--primary btn--pill btn--lg" id="platform-dl-btn">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Download for Windows
+      </a>
+      <a href="/downloads" class="cta-all-link">View all downloads and versions</a>
+    </div>
+    <p class="cta-footer">
+      Lovable is open source and community-driven<br>
+      <a href="#">View on GitHub →</a>
+    </p>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // Detect platform and update download button label
+  (function() {
+    var btn = document.getElementById('platform-dl-btn');
+    if (!btn) return;
+    var ua = navigator.userAgent.toLowerCase();
+    if (ua.includes('mac')) {
+      btn.childNodes[btn.childNodes.length - 1].textContent = ' Download for Mac';
+    } else if (ua.includes('linux')) {
+      btn.childNodes[btn.childNodes.length - 1].textContent = ' Download for Linux';
+    }
+  })();
+
+  // Floating pet speech bubble
+  (function() {
+    var messages = [
+      "hey there! 👋", "pet me please 🥺", "i'm so happy here ✨",
+      "adopt more friends! 🎉", "you're amazing 💕", "let's be friends! 🐾",
+      "this is the best place ever 🌟"
+    ];
+    var pet = document.getElementById('floating-pet');
+    if (!pet) return;
+
+    var bubble = document.createElement('div');
+    bubble.className = 'speech-bubble';
+    bubble.textContent = messages[0];
+    pet.appendChild(bubble);
+
+    var idx = 0;
+    setInterval(function() {
+      idx = (idx + 1) % messages.length;
+      bubble.textContent = messages[idx];
+    }, 4000);
+
+    pet.addEventListener('click', function() {
+      bubble.classList.toggle('speech-bubble--hidden');
+    });
+  })();
+</script>
+{% endblock %}

@@ -1,12 +1,76 @@
-<!DOCTYPE html>
-<html lang="en-US">
-  <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title></title>
-    <link href="css/style.css" rel="stylesheet">
-  </head>
-  <body>
- Hello world 
-  </body>
-</html>
+{% extends "base.html" %}
+
+{% block title %}Downloads — Lovable{% endblock %}
+
+{% block content %}
+<div class="container downloads-page">
+  <div class="page-header">
+    <h1 class="page-title">Downloads</h1>
+    <p class="page-desc">Get Lovable for your platform. We recommend the latest stable release.</p>
+  </div>
+
+  {% if !releases.is_empty() %}
+  <!-- Latest release highlight -->
+  {% let latest = &releases[0] %}
+  <div class="release-featured">
+    <div class="release-featured__header">
+      <svg class="release-featured__icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+      <div>
+        <h2 class="release-featured__title">Latest Release</h2>
+        <p class="release-featured__meta">Version {{ latest.version }} · {{ latest.channel }}</p>
+      </div>
+    </div>
+    <a href="/releases/{{ latest.version }}/{{ latest.platform }}" class="btn btn--primary btn--block" id="latest-dl-btn">
+      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Download for {{ latest.platform }}
+    </a>
+    <p class="release-featured__checksum">SHA-256: <code>{{ latest.sha256 }}</code></p>
+  </div>
+  {% endif %}
+
+  <!-- All versions -->
+  <h3 class="releases-heading">All versions</h3>
+
+  {% if releases.is_empty() %}
+  <p class="releases-empty">No releases available yet.</p>
+  {% else %}
+  <div class="releases-list">
+    {% for release in releases %}
+    <div class="release-card">
+      <div class="release-card__info">
+        <h4 class="release-card__version">Version {{ release.version }}</h4>
+        <span class="release-card__channel release-card__channel--{{ release.channel }}">{{ release.channel }}</span>
+      </div>
+      <div class="release-card__platform">{{ release.platform }}</div>
+      <a href="/releases/{{ release.version }}/{{ release.platform }}" class="btn btn--outline release-card__btn">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Download
+      </a>
+      <details class="release-card__details">
+        <summary>Checksum</summary>
+        <code class="release-card__sha">{{ release.sha256 }}</code>
+      </details>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <!-- Info box -->
+  <aside class="info-box">
+    <h4 class="info-box__heading">Before you download</h4>
+    <ul class="info-box__list">
+      <li>Lovable is free and open source</li>
+      <li>System requirements: Windows 10+, macOS 10.13+, or Ubuntu 18.04+</li>
+      <li>Installation is quick and easy — no registration needed</li>
+      <li>Check the <a href="#">documentation</a> for setup help</li>
+    </ul>
+  </aside>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // On the downloads page the floating pet doesn't need a bubble
+  document.getElementById('floating-pet').classList.add('floating-pet--simple');
+</script>
+{% endblock %}
