@@ -1,0 +1,7 @@
+[package]
+name = "lovable-server"
+description = "Lovable Server - project landing page + API"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true

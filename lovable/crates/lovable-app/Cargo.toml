@@ -1,0 +1,63 @@
+[package]
+name = "lovable"
+version = "0.1.0"
+edition = "2024"
+authors = ["Sandboxedideas <info@sandboxedideas.com>"]
+description = "Pets for your desktop"
+homepage = "https://lovable.sandboxedideas.com"
+repository = "https://github.com/kamenchunathan/scratches/tree/lovable"
+license = "MIT"
+
+
+[[bin]]
+name = "lovable"
+path = "src/main.rs"
+
+
+[package.metadata.packager]
+product-name = "Lovable"
+version = "0.1.0"
+identifier = "com.sandboxedideas.lovable"
+copyright = "Copyright © 2025 Sandboxedideas"
+homepage = "https://lovable.sandboxedideas.com"
+description = "Pets for your desktop"
+caregory = "game"
+license-file = "LICENSE"
+icons = [
+  "assets/icons/icon_32x32.png",
+  "assets/icons/icon_128x128.png",
+  "assets/icons/icon_256x256.png",
+  "assets/icons/icon_512x512.png",
+  "assets/icons/icon_1024x1024.png",
+  "assets/icons/icon.ico",
+  "assets/icons/icon.icns",
+]
+resources = [
+  { src = "assets/", target = "assets" },
+  { src = "LICENSE", target = "LICENSE" },
+]
+formats = ["all"]
+before-packaging-command = "cargo build --release"
+out-dir = "release"
+
+
+[package.metadata.packager.windows]
+languages = ["en-US"]
+allow-downgrades = true
+
+
+[package.metadata.packager.linux]
+generate-desktop-entry = true
+
+[package.metadata.packager.deb]
+depends = []
+section = "games"
+priority = "optional"
+maintainer = "Sandboxedideas <hello@sandboxedideas.com>"
+
+[dependencies]
+auto-launch = "0.6.0"
+bevy = "0.16.1"
+serde = { version = "1.0.219", features = ["derive"] }
+thiserror = "2.0.16"
+tray-icon = "0.21.3"
