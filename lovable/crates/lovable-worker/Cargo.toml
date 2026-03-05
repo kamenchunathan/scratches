@@ -1,0 +1,29 @@
+[package]
+name = "lovable-worker"
+description = "Lovable Server - project landing page + API"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+
+[dependencies]
+askama = "0.15.4"
+hex = { workspace = true }
+hmac = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+wasm-bindgen = "0.2.114"
+worker = { version = "0.7.5", features = ["http", "d1"] }
+
+
+[dev-dependencies]
+wasm-bindgen-test = "0.3"
+
+[profile.release]
+opt-level = "z"
+lto = true

@@ -30,11 +30,11 @@ Run with `nixVulkanIntel cargo r`
 **Priority:** High | **Estimated Time:** 2 weeks
 
 **Tasks:**
-- [ ] Implement multi-window system
-- [ ] Create window type enum and management
-- [ ] Set up transparent pet windows with click-through
-- [ ] Configure always-on-top for pet windows
-- [ ] Implement window positioning system
+- [x] Implement multi-window system
+- [x] Create window type enum and management
+- [x] Set up transparent pet windows with click-through
+- [x] Configure always-on-top for pet windows
+- [x] Implement window positioning system
 
 ### 1.3 Configuration System Enhancement
 **Priority:** Medium | **Estimated Time:** 1 week
@@ -45,7 +45,7 @@ Run with `nixVulkanIntel cargo r`
 - Missing validation and migration
 
 **Tasks:**
-- [ ] Expand `Preferences` struct to match UI requirements
+- [x] Expand `Preferences` struct to match UI requirements
 - [ ] Add configuration validation
 - [ ] Implement hot-reloading of preferences
 - [ ] Add configuration migration system

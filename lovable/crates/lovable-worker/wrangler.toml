@@ -1,0 +1,20 @@
+name = "lovable-worker"
+main = "build/worker/shim.mjs"
+compatibility_date = "2026-03-05"
+
+[[r2_buckets]]
+binding = "RELEASES"
+bucket_name = "lovable-releases"
+
+
+[[kv_namespaces]]
+binding = "RELEASE_CACHE"
+id = "${KV_RELEASE_CACHE_ID}"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "lovable"
+database_id = "${D1_DATABASE_ID}"
+
+[build]
+command = "cargo install -q worker-build && worker-build crates/lovable-worker --release"
