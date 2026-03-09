@@ -30,7 +30,7 @@ pub async fn downloads(_req: Request, ctx: RouteContext<()>) -> worker::Result<R
     let rows = query!(
         &db,
         "SELECT platform, channel, version, filename, sha256 \
-                  FROM releases ORDER BY created_at DESC LIMIT 20"
+            FROM releases ORDER BY created_at DESC LIMIT 20"
     )
     .all()
     .await?;
@@ -38,5 +38,6 @@ pub async fn downloads(_req: Request, ctx: RouteContext<()>) -> worker::Result<R
     let page = Downloads {
         releases: rows.results::<Release>()?,
     };
+
     Response::from_html(page.render().unwrap())
 }
