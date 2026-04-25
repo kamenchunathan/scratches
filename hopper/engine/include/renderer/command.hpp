@@ -4,6 +4,8 @@
 
 #include "renderer/encoder.hpp"
 
+#include "version.hpp"
+
 namespace renderer {
 
 class RenderCommand {
@@ -13,7 +15,7 @@ public:
     virtual ~RenderCommand() = default;
 };
 
-class RenderCommandPrev {
+class HOPPER_DEPRECATED(0, 2, "renderer::RenderCommand") RenderCommandPrev {
 public:
     virtual const std::string target_pass() const = 0;
     virtual void execute(RenderPassEncoderPrev&) = 0;

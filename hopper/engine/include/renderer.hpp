@@ -12,9 +12,11 @@
 #include "renderer/resource.hpp"
 #include "renderer/shader.hpp"
 
+#include "version.hpp"
+
 namespace renderer {
 
-class Renderer {
+class HOPPER_SINCE(0, 2) Renderer {
 public:
     ResourceRegistry resource_registry;
     RenderGraph render_graph;
@@ -41,7 +43,7 @@ private:
     void swap_buffers();
 };
 
-class RendererPrev {
+class HOPPER_DEPRECATED(0, 2, "renderer::Renderer") RendererPrev {
 public:
     // TODO: for testing
     PipelineRegistry pipeline_registry;

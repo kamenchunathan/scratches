@@ -11,6 +11,8 @@
 #include "renderer/resource.hpp"
 #include "renderer/shader.hpp"
 
+#include "version.hpp"
+
 namespace renderer {
 
 // TODO: Check if the type of frag_out is the type of the attachment and only one attachment buffer is provided before
@@ -69,7 +71,7 @@ private:
     ResourceRegistry& resource_registry_;
 };
 
-class RenderPassEncoderPrev {
+class HOPPER_DEPRECATED(0, 2, "renderer::RenderPassEncoder") RenderPassEncoderPrev {
 public:
     template<typename VertexIn, typename VertexOut, typename FragOut, typename... RequiredResources>
     void draw_prev(

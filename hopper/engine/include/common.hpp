@@ -1,3 +1,7 @@
+#pragma once
+
+#include "version.hpp"
+
 #ifdef __EMSCRIPTEN__
 
     #define PLATFORM_WASM 1

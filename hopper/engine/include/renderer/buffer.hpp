@@ -5,9 +5,11 @@
 #include <unordered_map>
 #include <vector>
 
+#include "version.hpp"
+
 namespace renderer {
 template<typename PixelType>
-class FrameBufferPrev {
+class HOPPER_DEPRECATED(0, 2, "renderer::FrameBuffer") FrameBufferPrev {
 public:
     FrameBufferPrev(std::uint32_t w, std::uint32_t h): width_(w), height_(h) {
         buf_.resize(width_ * height_);
@@ -42,7 +44,7 @@ private:
 class BufferRegistry;
 
 template<typename PixelType>
-class BufferHandlePrev {
+class HOPPER_DEPRECATED(0, 2, "renderer::BufferHandle") BufferHandlePrev {
 public:
     BufferHandlePrev(const BufferHandlePrev&) = default;
     BufferHandlePrev& operator=(const BufferHandlePrev&) = default;
@@ -59,7 +61,7 @@ private:
     int id_;
 };
 
-class BufferRegistry {
+class HOPPER_DEPRECATED(0, 2, "renderer::ResourceRegistry") BufferRegistry {
 public:
     template<typename PixelType>
     BufferHandlePrev<PixelType> create_buffer(std::uint32_t width, std::uint32_t height);

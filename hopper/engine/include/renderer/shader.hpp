@@ -9,6 +9,8 @@
 
 #include <Eigen/Dense>
 
+#include "version.hpp"
+
 namespace renderer {
 
 enum class Primitive { Lines, Triangles, Square };
@@ -215,7 +217,7 @@ private:
 
 template<typename VertexIn, typename VertexOut, typename FragOut, typename... Uniforms>
     requires HasPosition<VertexOut> && AggregateInterpolatable<VertexOut>
-class ShaderPrev {
+class HOPPER_DEPRECATED(0, 2, "renderer::Shader") ShaderPrev {
 public:
     virtual ~ShaderPrev() = default;
     virtual VertexOut vertex(const VertexIn&, const Uniforms&...) = 0;
@@ -248,7 +250,7 @@ private:
 };
 
 template<typename VertexIn, typename VertexOut, typename FragOut, typename... Uniforms>
-class PipelinePrev: public IPipeline {
+class HOPPER_DEPRECATED(0, 2, "renderer::Pipeline") PipelinePrev: public IPipeline {
 public:
     PipelinePrev(
         PipelineDescriptor,
