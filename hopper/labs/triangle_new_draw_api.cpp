@@ -134,22 +134,23 @@ public:
         auto presenter = term_layer_ptr->get()->terminal->presenter();
 #endif
 
-        auto renderer =
-            std::make_unique<renderer::Renderer>(char_width, char_height, std::move(presenter));
+        auto renderer
+            = std::make_unique<renderer::Renderer>(char_width, char_height, std::move(presenter));
 
         // Set up halfblock render graph
         auto color_texture_handle = renderer::halfblock::setup(*renderer, char_width, char_height);
 
         // Create pipeline
         auto color_shader = std::make_unique<ColorShader>();
-        auto pipeline_handle = renderer->resource_registry
-                                   .add_pipeline(
-                                       std::make_unique<ColorPipeline>(
-                                           renderer::PipelineDescriptor {},
-                                           std::move(color_shader)
-                                       )
-                                   )
-                                   .value();
+        auto pipeline_handle = //
+            renderer->resource_registry
+                .add_pipeline(
+                    std::make_unique<ColorPipeline>(
+                        renderer::PipelineDescriptor {},
+                        std::move(color_shader)
+                    )
+                )
+                .value();
 
         // Create vertex buffer
         auto vertex_buffer = renderer->resource_registry.add_buffer<ColorVertex>(3).value();
@@ -257,32 +258,31 @@ void render_system(ecs::World& world) {
 
     // Render triangles
     for (auto [entity, transform, triangle]: ecs::Query<Transform, Triangle>(&world)) {
-        std::vector<ColorVertex> vertices = {
-            {0.0f,
-             0.4f,
-             core::ColorRGBA32F::rgba(
-                 triangle.color1.r / 255.0f,
-                 triangle.color1.g / 255.0f,
-                 triangle.color1.b / 255.0f,
-                 1.0f
-             )},
-            {-0.4f,
-             -0.4f,
-             core::ColorRGBA32F::rgba(
-                 triangle.color2.r / 255.0f,
-                 triangle.color2.g / 255.0f,
-                 triangle.color2.b / 255.0f,
-                 1.0f
-             )},
-            {0.4f,
-             -0.4f,
-             core::ColorRGBA32F::rgba(
-                 triangle.color3.r / 255.0f,
-                 triangle.color3.g / 255.0f,
-                 triangle.color3.b / 255.0f,
-                 1.0f
-             )}
-        };
+        std::vector<ColorVertex> vertices
+            = {{0.0f,
+                0.4f,
+                core::ColorRGBA32F::rgba(
+                    triangle.color1.r / 255.0f,
+                    triangle.color1.g / 255.0f,
+                    triangle.color1.b / 255.0f,
+                    1.0f
+                )},
+               {-0.4f,
+                -0.4f,
+                core::ColorRGBA32F::rgba(
+                    triangle.color2.r / 255.0f,
+                    triangle.color2.g / 255.0f,
+                    triangle.color2.b / 255.0f,
+                    1.0f
+                )},
+               {0.4f,
+                -0.4f,
+                core::ColorRGBA32F::rgba(
+                    triangle.color3.r / 255.0f,
+                    triangle.color3.g / 255.0f,
+                    triangle.color3.b / 255.0f,
+                    1.0f
+                )}};
 
         // Update vertex buffer
         if (auto vb = renderer->resource_registry.get_buffer_mut(resources.vertex_buffer);
@@ -295,11 +295,13 @@ void render_system(ecs::World& world) {
         renderer::FrameBuffer<renderer::Attachment<core::ColorRGBA32F>> target {
             .attachments = {renderer::Attachment<core::ColorRGBA32F> {
                 .view =
-                    {.texture = resources.color_texture,
-                     .x = 0,
-                     .y = 0,
-                     .widht = renderer->viewport_width,
-                     .height = renderer->viewport_height * 2},
+                    {
+                        .texture = resources.color_texture,
+                        .x = 0,
+                        .y = 0,
+                        .width = renderer->viewport_width,
+                        .height = renderer->viewport_height * 2,
+                    },
                 .load = renderer::LoadOp::Load,
                 .store = renderer::StoreOp::Store
             }}

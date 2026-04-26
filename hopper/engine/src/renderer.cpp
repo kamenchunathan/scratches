@@ -14,42 +14,32 @@ Renderer::Renderer(std::uint32_t w, std::uint32_t h, std::unique_ptr<Presenter> 
     viewport_width(w),
     viewport_height(h),
     presenter_(std::move(presenter)) {
-    TextureHandle<CharacterPixel> char_texture_handle =
-        resource_registry.add_texture<CharacterPixel>(w, h).value();
+    TextureHandle<CharacterPixel> char_texture_handle
+        = resource_registry.add_texture<CharacterPixel>(w, h).value();
 
-    TextureHandle<CharacterPixel> back_char_texture_handle =
-        resource_registry.add_texture<CharacterPixel>(w, h).value();
+    TextureHandle<CharacterPixel> back_char_texture_handle
+        = resource_registry.add_texture<CharacterPixel>(w, h).value();
 
     front_buffer_ = FrameBuffer {
-        .attachments = std::make_tuple(Attachment {
-            .view =
-                TextureView {
-                    .texture = char_texture_handle,
-                    .x = 0,
-                    .y = 0,
-                    .widht = w,
-                    .height = h
-                },
-            .load = LoadOp::Load,
-            .store = StoreOp::Store,
-        }
+        .attachments = std::make_tuple(
+            Attachment {
+                .view
+                = TextureView {.texture = char_texture_handle, .x = 0, .y = 0, .width = w, .height = h},
+                .load = LoadOp::Load,
+                .store = StoreOp::Store,
+            }
 
         )
     };
 
     back_buffer_ = FrameBuffer {
-        .attachments = std::make_tuple(Attachment {
-            .view =
-                TextureView {
-                    .texture = back_char_texture_handle,
-                    .x = 0,
-                    .y = 0,
-                    .widht = w,
-                    .height = h
-                },
-            .load = LoadOp::Load,
-            .store = StoreOp::Store,
-        }
+        .attachments = std::make_tuple(
+            Attachment {
+                .view
+                = TextureView {.texture = back_char_texture_handle, .x = 0, .y = 0, .width = w, .height = h},
+                .load = LoadOp::Load,
+                .store = StoreOp::Store,
+            }
 
         )
     };
@@ -69,19 +59,15 @@ void Renderer::submit(std::unique_ptr<RenderCommand> command) {
 }
 
 void Renderer::present() {
-    const Texture2D<renderer::CharacterPixel>* fb =
-        resource_registry.get_texture(std::get<0>(front_buffer_.value().attachments).view.texture)
-            .value();
-    FrameBufferPrev<renderer::CharacterPixel> front_buf_prev(fb->width(), fb->height());
-    front_buf_prev.update_buffer(fb->data());
+    const Texture2D<renderer::CharacterPixel>* fb
+        = resource_registry.get_texture(std::get<0>(front_buffer_.value().attachments).view.texture)
+              .value();
 
-    const Texture2D<renderer::CharacterPixel>* bb =
-        resource_registry.get_texture(std::get<0>(front_buffer_.value().attachments).view.texture)
-            .value();
-    FrameBufferPrev<renderer::CharacterPixel> back_buf_prev(bb->width(), bb->height());
-    back_buf_prev.update_buffer(bb->data());
+    const Texture2D<renderer::CharacterPixel>* bb
+        = resource_registry.get_texture(std::get<0>(front_buffer_.value().attachments).view.texture)
+              .value();
 
-    presenter_->present(front_buf_prev, back_buf_prev);
+    presenter_->present(fb->data(), bb->data(), fb->width(), fb->height());
 }
 
 void Renderer::swap_buffers() {
@@ -136,7 +122,7 @@ void RendererPrev::submit(std::unique_ptr<RenderCommandPrev> command) {
 void RendererPrev::present() {
     auto* front = buffer_registry.get_buffer(front_buffer_handle_);
     auto* back = buffer_registry.get_buffer(back_buffer_handle_);
-    presenter_->present(*front, *back);
+    presenter_->present(front->data(), back->data(), front->width(), front->height());
 }
 
 void RendererPrev::swap_buffers() {

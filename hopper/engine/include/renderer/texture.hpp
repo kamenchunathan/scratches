@@ -3,8 +3,6 @@
 #include <algorithm>
 #include <cassert>
 #include <cstdint>
-#include <optional>
-#include <string>
 #include <vector>
 
 namespace renderer {
@@ -23,11 +21,11 @@ public:
         height_(height),
         texture_data_(std::move(data)) {}
 
-    [[nodiscard]] std::uint32_t width() const {
+    [[nodiscard]] std::size_t width() const {
         return width_;
     }
 
-    [[nodiscard]] std::uint32_t height() const {
+    [[nodiscard]] std::size_t height() const {
         return height_;
     }
 
@@ -40,7 +38,7 @@ public:
     }
 
 private:
-    std::uint32_t width_, height_;
+    std::size_t width_, height_;
     std::vector<PixelType> texture_data_;
 };
 

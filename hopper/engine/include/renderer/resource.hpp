@@ -54,7 +54,7 @@ struct PipelineTag {};
 template<typename Format>
 struct TextureView {
     ResourceHandle<Format, TextureTag> texture;
-    std::uint32_t x, y, widht, height;
+    std::uint32_t x, y, width, height;
 };
 
 template<typename Format>
@@ -221,7 +221,6 @@ private:
         }
     }
 
-private:
     template<typename T>
     struct Slot {
         std::uint32_t generation;

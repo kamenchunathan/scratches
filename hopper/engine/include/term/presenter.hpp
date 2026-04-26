@@ -26,8 +26,10 @@ public:
     ~TerminalPresenter() = default;
 
     void present(
-        const renderer::FrameBufferPrev<renderer::CharacterPixel>& front_buffer,
-        const renderer::FrameBufferPrev<renderer::CharacterPixel>& back_buffer
+        const std::span<const renderer::CharacterPixel> front_buffer,
+        const std::span<const renderer::CharacterPixel> back_buffer,
+        std::size_t width,
+        std::size_t height
     ) override;
 
     void init() override;
@@ -41,7 +43,11 @@ private:
     std::ostringstream buf_;
 
     void flush();
-    void render_full_frame(const renderer::FrameBufferPrev<renderer::CharacterPixel>& buffer);
+    void render_full_frame(
+        const std::span<const renderer::CharacterPixel> buffer,
+        std::size_t buffer_width,
+        std::size_t buffer_height
+    );
     void render_diff(
         const std::vector<renderer::CharacterPixel>& old_data,
         const std::vector<renderer::CharacterPixel>& new_data,

@@ -1,4 +1,4 @@
-#include <print>
+#include <cassert>
 #include <unistd.h>
 
 #include "term/ansi.hpp"
@@ -38,8 +38,11 @@ void TerminalPresenter::flush() {
 
     std::size_t total_written = 0;
     while (total_written < content.size()) {
-        ssize_t bytes_written =
-            write(fileno(output_), content.c_str() + total_written, content.size() - total_written);
+        ssize_t bytes_written = write(
+            fileno(output_),
+            content.c_str() + total_written,
+            content.size() - total_written
+        );
 
         if (bytes_written >= 0) {
             total_written += bytes_written;
@@ -65,13 +68,13 @@ void TerminalPresenter::flush() {
 }
 
 void TerminalPresenter::render_full_frame(
-    const renderer::FrameBufferPrev<renderer::CharacterPixel>& buffer
+    const std::span<const renderer::CharacterPixel> buffer,
+    std::size_t buffer_width,
+    std::size_t buffer_height
 ) {
     auto term_size_opt = size();
     const auto term_width = term_size_opt->first;
     const auto term_height = term_size_opt->second;
-    const auto buffer_width = buffer.width();
-    const auto buffer_height = buffer.height();
 
     std::uint32_t start_col = 1;
     std::uint32_t start_row = 1;
@@ -85,13 +88,9 @@ void TerminalPresenter::render_full_frame(
 
     ansi::cursor::to(buf_, start_row, start_col);
 
-    const auto& data = buffer.data();
-    const auto width = buffer.width();
-    const auto height = buffer.height();
-
-    for (std::uint32_t j = 0; j < height; ++j) {
-        for (std::uint32_t i = 0; i < width; ++i) {
-            const auto& pixel = data[j * width + i];
+    for (std::uint32_t j = 0; j < buffer_height; ++j) {
+        for (std::uint32_t i = 0; i < buffer_width; ++i) {
+            const auto& pixel = buffer[j * buffer_width + i];
 
             ansi::scoped(
                 buf_,
@@ -100,7 +99,7 @@ void TerminalPresenter::render_full_frame(
                 ansi::bg::scoped_color(pixel.bg_color)
             );
         }
-        if (j < height - 1) {
+        if (j < buffer_height - 1) {
             ansi::cursor::to(buf_, start_row + j + 1, start_col);
         }
     }
@@ -201,8 +200,8 @@ void TerminalPresenter::render_diff(
         Box box(0, 0, old_line.size(), new_line.size());
         differ.build_trace(box, snakes);
 
-        EditSequence<renderer::CharacterPixel> script =
-            build_edit_sequence(old_line, new_line, snakes);
+        EditSequence<renderer::CharacterPixel> script
+            = build_edit_sequence(old_line, new_line, snakes);
 
         const std::uint32_t line_row = start_row + y;
         generate_ansi_for_line(buf_, script, line_row, start_col);
@@ -212,8 +211,11 @@ void TerminalPresenter::render_diff(
 }
 
 void TerminalPresenter::present(
-    const renderer::FrameBufferPrev<renderer::CharacterPixel>& front_buffer,
-    const renderer::FrameBufferPrev<renderer::CharacterPixel>& back_buffer
+    const std::span<const renderer::CharacterPixel> front_buffer,
+    const std::span<const renderer::CharacterPixel> back_buffer,
+    std::size_t width,
+    std::size_t height
+
 ) {
     // const auto& front_buffer_data = front_buffer.data();
     // const auto& back_buffer_data = back_buffer.data();
@@ -224,6 +226,7 @@ void TerminalPresenter::present(
     // so it's not turned on for now
     // render_diff(front_buffer_data, back_buffer_data, width, height);
     // TODO: Set the render backend used as an option definable by arguments
-    render_full_frame(front_buffer);
+    assert(front_buffer.size() == width * height && front_buffer.size() == back_buffer.size());
+    render_full_frame(front_buffer, width, height);
     flush();
 }

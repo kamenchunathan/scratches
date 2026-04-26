@@ -145,12 +145,14 @@ void RenderPassEncoderPrev::draw_prev(
     v_out.reserve(actual_vertex_count);
 
     for (std::size_t i = 0; i < actual_vertex_count; ++i) {
-        v_out.push_back(std::apply(
-            [&](auto&&... args) {
-                return pipeline->shader->vertex(vertex_data[first_vertex + i], args...);
-            },
-            resources
-        ));
+        v_out.push_back(
+            std::apply(
+                [&](auto&&... args) {
+                    return pipeline->shader->vertex(vertex_data[first_vertex + i], args...);
+                },
+                resources
+            )
+        );
     }
 
     const std::uint32_t imageWidth = out_buffer->width();
@@ -343,12 +345,14 @@ void RenderPassEncoder::draw(
     v_out.reserve(actual_vertex_count);
 
     for (std::size_t i = 0; i < actual_vertex_count; ++i) {
-        v_out.push_back(std::apply(
-            [&](auto&&... args) {
-                return shader->vertex(vertex_buffer[first_vertex + i], args...);
-            },
-            uniforms
-        ));
+        v_out.push_back(
+            std::apply(
+                [&](auto&&... args) {
+                    return shader->vertex(vertex_buffer[first_vertex + i], args...);
+                },
+                uniforms
+            )
+        );
     }
 
     std::vector<float> z_buffer(imageWidth * imageHeight, std::numeric_limits<float>::infinity());
@@ -470,9 +474,11 @@ void RenderPassEncoder::draw(
                         );
 
                         auto frag_output_tuple = [&] {
-                            if constexpr (std::is_same_v<
-                                              std::tuple<typename Pipeline::frag_out>,
-                                              attachment_formats_t<Attachments...>>)
+                            if constexpr (
+                                std::is_same_v<
+                                    std::tuple<typename Pipeline::frag_out>,
+                                    attachment_formats_t<Attachments...>>
+                            )
                             {
                                 return std::make_tuple(frag_result);
                             } else {
