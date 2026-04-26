@@ -1,21 +1,4 @@
-version_array = meson.project_version().split('.')
-
-conf_data = configuration_data()
-conf_data.set('VERSION_MAJOR', version_array[0])
-conf_data.set('VERSION_MINOR', version_array[1])
-conf_data.set('VERSION_PATCH', version_array[2])
-
-configure_file(
-  input: 'include/version.hpp.in',
-  output: 'version.hpp',
-  configuration: conf_data
-)
-
-# Include both the source include directory and the build directory where version.hpp is generated
-engine_inc = [
-  include_directories('include'),
-  include_directories('.'), 
-]
+engine_inc = include_directories('include')
 
 engine_sources = [
   'src/application.cpp',

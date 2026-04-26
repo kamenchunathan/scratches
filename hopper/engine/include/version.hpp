@@ -1,9 +1,8 @@
 #pragma once
 
-// Pulled from meson.build project() version property
-#define HOPPER_VERSION_MAJOR @VERSION_MAJOR@
-#define HOPPER_VERSION_MINOR @VERSION_MINOR@
-#define HOPPER_VERSION_PATCH @VERSION_PATCH@
+// HOPPER_VERSION_MAJOR, MINOR, and PATCH are provided as compiler defines
+// via meson.build to ensure the LSP always finds this header while
+// keeping the version synchronized with the build system.
 
 // HOPPER_SINCE(major, minor)
 //
