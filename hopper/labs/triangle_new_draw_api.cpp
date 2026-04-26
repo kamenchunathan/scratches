@@ -1,5 +1,3 @@
-#include <cmath>
-#include <cstdlib>
 #include <format>
 #include <iterator>
 #include <memory>
@@ -8,7 +6,6 @@
 
 #include "application.hpp"
 #include "color.hpp"
-#include "common.hpp"
 #include "ecs/query.hpp"
 #include "ecs/system.hpp"
 #include "ecs/world.hpp"
@@ -146,24 +143,52 @@ public:
         // Create pipeline
         auto color_shader = std::make_unique<ColorShader>();
         auto pipeline_handle = renderer->resource_registry
-                                   .add_pipeline(std::make_unique<ColorPipeline>(
-                                       renderer::PipelineDescriptor {},
-                                       std::move(color_shader)
-                                   ))
+                                   .add_pipeline(
+                                       std::make_unique<ColorPipeline>(
+                                           renderer::PipelineDescriptor {},
+                                           std::move(color_shader)
+                                       )
+                                   )
                                    .value();
 
         // Create vertex buffer
         auto vertex_buffer = renderer->resource_registry.add_buffer<ColorVertex>(3).value();
 
         // Store resources
-        app->world.insert_resource(RenderResources {
-            .vertex_buffer = vertex_buffer,
-            .color_texture = color_texture_handle,
-            .char_texture = std::get<0>(renderer->render_target().attachments).view.texture,
-            .pipeline = pipeline_handle
-        });
+        app->world.insert_resource(
+            RenderResources {
+                .vertex_buffer = vertex_buffer,
+                .color_texture = color_texture_handle,
+                .char_texture = std::get<0>(renderer->render_target().attachments).view.texture,
+                .pipeline = pipeline_handle
+            }
+        );
 
         app->world.insert_resource(std::move(renderer));
+
+        app->scheduler.add_system(
+            ecs::SystemStage::Update,
+            [](ecs::World& world) {
+                auto renderer_ptr = world.get_resource<std::unique_ptr<renderer::Renderer>>();
+                if (!renderer_ptr)
+                    return;
+                auto renderer = renderer_ptr->get().get();
+
+                auto resources_opt = world.get_resource<RenderResources>();
+                if (!resources_opt)
+                    return;
+                auto resources = resources_opt->get();
+
+                renderer->submit(
+                    std::make_unique<renderer::halfblock::HalfBlockConversionCommand>(
+                        &renderer->resource_registry,
+                        resources.color_texture,
+                        std::get<0>(renderer->render_target().attachments).view.texture
+                    )
+                );
+            }
+
+        );
     }
 };
 
@@ -222,11 +247,13 @@ void render_system(ecs::World& world) {
     auto resources = resources_opt->get();
 
     // Submit clear command
-    renderer->submit(std::make_unique<renderer::halfblock::ClearColorCommand>(
-        &renderer->resource_registry,
-        resources.color_texture,
-        core::ColorRGBA32F::BLACK
-    ));
+    renderer->submit(
+        std::make_unique<renderer::halfblock::ClearColorCommand>(
+            &renderer->resource_registry,
+            resources.color_texture,
+            core::ColorRGBA32F::BLACK
+        )
+    );
 
     // Render triangles
     for (auto [entity, transform, triangle]: ecs::Query<Transform, Triangle>(&world)) {
@@ -278,13 +305,15 @@ void render_system(ecs::World& world) {
             }}
         };
 
-        renderer->submit(std::make_unique<ColorPassCommand>(
-            resources.pipeline,
-            target,
-            resources.vertex_buffer,
-            Eigen::Vector2f(transform.x, transform.y),
-            vertices.size()
-        ));
+        renderer->submit(
+            std::make_unique<ColorPassCommand>(
+                resources.pipeline,
+                target,
+                resources.vertex_buffer,
+                Eigen::Vector2f(transform.x, transform.y),
+                vertices.size()
+            )
+        );
     }
 
     renderer->render_frame();
