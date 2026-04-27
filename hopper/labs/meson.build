@@ -69,3 +69,10 @@ executable(
   install: false,
   dependencies: [engine_dep],
 )
+
+executable(
+  'lua_isolated',
+  'lua_isolated.cpp',
+  install: false,
+  dependencies: [engine_dep],
+)
