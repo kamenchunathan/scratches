@@ -147,7 +147,7 @@ T& Archetype::get_component(std::uint32_t index) {
 
 template<typename T>
 TypedComponentColumn<T>* Archetype::get_component_column() {
-    auto component_id = ComponentIds::get_id<T>();
+    auto component_id = ComponentRegistry::get_id<T>();
     auto it = components_.find(component_id);
     assert(it != components_.end() && "Component not found in archetype");
     return static_cast<TypedComponentColumn<T>*>(it->second.get());
@@ -155,7 +155,7 @@ TypedComponentColumn<T>* Archetype::get_component_column() {
 
 template<typename T>
 const TypedComponentColumn<T>* Archetype::get_component_column() const {
-    auto component_id = ComponentIds::get_id<T>();
+    auto component_id = ComponentRegistry::get_id<T>();
     auto it = components_.find(component_id);
     assert(it != components_.end() && "Component not found in archetype");
     return static_cast<const TypedComponentColumn<T>*>(it->second.get());
@@ -163,7 +163,7 @@ const TypedComponentColumn<T>* Archetype::get_component_column() const {
 
 template<typename T>
 void Archetype::add_component_to_column(T&& component) {
-    auto component_id = ComponentIds::get_id<T>();
+    auto component_id = ComponentRegistry::get_id<T>();
     auto it = components_.find(component_id);
 
     if (it == components_.end()) {

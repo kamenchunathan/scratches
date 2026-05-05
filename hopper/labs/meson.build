@@ -69,3 +69,18 @@ executable(
   install: false,
   dependencies: [engine_dep],
 )
+
+executable(
+  'triangle_instanced',
+  'triangle_instanced.cpp',
+  install: false,
+  dependencies: [engine_dep],
+)
+
+executable(
+  'physics',
+  'physics.cpp',
+  install: false,
+  dependencies: [engine_dep],
+)
+

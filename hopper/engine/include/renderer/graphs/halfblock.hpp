@@ -59,7 +59,7 @@ namespace halfblock {
     class HalfBlockConversionCommand: public RenderCommand {
     public:
         HalfBlockConversionCommand(
-            ResourceRegistry* registry,
+            ResourceRegistry& registry,
             TextureHandle<core::ColorRGBA32F> color_texture,
             TextureHandle<CharacterPixel> char_texture
         ):
@@ -72,8 +72,8 @@ namespace halfblock {
         }
 
         void execute(RenderPassEncoder&) override {
-            auto color_tex = registry_->get_texture(color_texture_);
-            auto char_tex = registry_->get_texture_mut(char_texture_);
+            auto color_tex = registry_.get_texture(color_texture_);
+            auto char_tex = registry_.get_texture_mut(char_texture_);
 
             if (!color_tex || !char_tex)
                 return;
@@ -100,10 +100,10 @@ namespace halfblock {
                     std::uint32_t color_y_top = std::min(char_y * 2, color_height - 1);
                     std::uint32_t color_y_bottom = std::min(color_y_top + 1, color_height - 1);
 
-                    core::ColorRGBA32F top =
-                        color_data->data()[color_y_top * color_width + color_x];
-                    core::ColorRGBA32F bottom =
-                        color_data->data()[color_y_bottom * color_width + color_x];
+                    core::ColorRGBA32F top
+                        = color_data->data()[color_y_top * color_width + color_x];
+                    core::ColorRGBA32F bottom
+                        = color_data->data()[color_y_bottom * color_width + color_x];
 
                     char_data->data_mut()[char_y * char_width + char_x] = CharacterPixel {
                         .codepoint = U'▀',
@@ -115,7 +115,7 @@ namespace halfblock {
         }
 
     private:
-        ResourceRegistry* registry_;
+        ResourceRegistry& registry_;
         TextureHandle<core::ColorRGBA32F> color_texture_;
         TextureHandle<CharacterPixel> char_texture_;
     };
@@ -130,9 +130,9 @@ namespace halfblock {
         const std::uint32_t pixel_width = char_width;
         const std::uint32_t pixel_height = char_height * 2;
 
-        auto color_texture =
-            renderer.resource_registry.add_texture<core::ColorRGBA32F>(pixel_width, pixel_height)
-                .value();
+        auto color_texture
+            = renderer.resource_registry.add_texture<core::ColorRGBA32F>(pixel_width, pixel_height)
+                  .value();
 
         // Set up the rendergraph
         renderer.render_graph.add_pass(std::make_unique<RenderPass>(halfblock::CLEAR_PASS));

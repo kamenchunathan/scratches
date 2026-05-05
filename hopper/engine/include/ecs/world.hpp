@@ -100,7 +100,7 @@ Entity World::spawn(Components&&... components) {
     Entity entity = next_entity_id_++;
 
     Signature signature;
-    (signature.mask.set(ComponentIds::get_id<Components>()), ...);
+    (signature.mask.set(ComponentRegistry::get_id<Components>()), ...);
 
     auto* archetype = find_or_create_archetype(signature);
     std::uint32_t index = archetype->add_entity(entity, std::forward<Components>(components)...);
@@ -140,8 +140,8 @@ void World::insert_resource(ResourceType&& res) {
     }
 
     // Create a new holder with the resource (supports both copy and move)
-    resources_[id] =
-        std::make_unique<detail::ResourceStore<StoredType>>(std::forward<ResourceType>(res));
+    resources_[id]
+        = std::make_unique<detail::ResourceStore<StoredType>>(std::forward<ResourceType>(res));
 }
 
 template<typename ResourceType>
@@ -170,8 +170,8 @@ auto World::get_resource() const -> std::optional<std::reference_wrapper<const R
         return std::nullopt;
     }
 
-    const auto* store =
-        dynamic_cast<const detail::ResourceStore<StoredType>*>(resources_[id].get());
+    const auto* store
+        = dynamic_cast<const detail::ResourceStore<StoredType>*>(resources_[id].get());
     if (store) {
         return store->get();
     }

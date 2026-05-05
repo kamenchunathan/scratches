@@ -370,6 +370,13 @@ void render_system(ecs::World& world) {
     auto& color_buffer_res = color_buffer_res_opt->get();
     auto& vertex_buffer_res = vertex_buffer_res_opt->get();
 
+    // Get color buffer dimensions for pixel snapping
+    auto* color_buffer = renderer.buffer_registry.get_buffer(color_buffer_res.handle);
+    if (!color_buffer)
+        return;
+    const float screen_w = static_cast<float>(color_buffer->width());
+    const float screen_h = static_cast<float>(color_buffer->height());
+
     renderer.submit(
         std::make_unique<ClearCommand>(color_buffer_res.handle, &renderer.buffer_registry)
     );
@@ -403,17 +410,33 @@ void render_system(ecs::World& world) {
     for (auto [entity, transform, sprite]:
          ecs::Query<Transform, SpriteComponent>(&world).without<BackgroundTag>())
     {
-        const float half_width = 0.5f * transform.scale;
-        const float half_height = 0.5f * transform.scale;
+        // To handle pixel perfect movement and avoid jitter, we snap the position and size to the pixel grid.
+        // 1. Determine the size in pixels. For "pixel perfection", one could also round the scale to integers.
+        const float tw = static_cast<float>(sprite.texture->width());
+        const float th = static_cast<float>(sprite.texture->height());
+        const float sw = std::round(tw * transform.scale);
+        const float sh = std::round(th * transform.scale);
+
+        // 2. Map NDC position to pixel coordinates and snap to the nearest pixel center.
+        float px = (transform.x + 1.0f) * 0.5f * screen_w;
+        float py = (1.0f - transform.y) * 0.5f * screen_h; // NDC Y is up, screen Y is down.
+        const float snapped_cx = std::round(px);
+        const float snapped_cy = std::round(py);
+
+        // 3. Convert snapped pixel coordinates back to NDC for the renderer.
+        const float ndc_x = (snapped_cx / screen_w) * 2.0f - 1.0f;
+        const float ndc_y = 1.0f - (snapped_cy / screen_h) * 2.0f;
+        const float half_width = sw / screen_w;
+        const float half_height = sh / screen_h;
 
         std::vector<TexturedVertex> vertices = {
-            {transform.x - half_width, transform.y - half_height, 0.0f, 1.0f}, // bottom-left
-            {transform.x + half_width, transform.y - half_height, 1.0f, 1.0f}, // bottom-right
-            {transform.x - half_width, transform.y + half_height, 0.0f, 0.0f}, // top-left
+            {ndc_x - half_width, ndc_y - half_height, 0.0f, 1.0f}, // bottom-left
+            {ndc_x + half_width, ndc_y - half_height, 1.0f, 1.0f}, // bottom-right
+            {ndc_x - half_width, ndc_y + half_height, 0.0f, 0.0f}, // top-left
 
-            {transform.x + half_width, transform.y - half_height, 1.0f, 1.0f}, // bottom-right
-            {transform.x + half_width, transform.y + half_height, 1.0f, 0.0f}, // top-right
-            {transform.x - half_width, transform.y + half_height, 0.0f, 0.0f}, // top-left
+            {ndc_x + half_width, ndc_y - half_height, 1.0f, 1.0f}, // bottom-right
+            {ndc_x + half_width, ndc_y + half_height, 1.0f, 0.0f}, // top-right
+            {ndc_x - half_width, ndc_y + half_height, 0.0f, 0.0f}, // top-left
         };
 
         renderer.submit(std::make_unique<ColorPassCommand>(
@@ -455,8 +478,8 @@ int main() {
     auto tex = std::make_shared<renderer::Texture2D<core::ColorRGBA8>>(std::move(*tex_opt));
     app->world.spawn(Transform {0.0f, 0.0f, 0.0f, 0.5f}, SpriteComponent {tex});
 
-    app->scheduler.add_system(ecs::SystemStage::Update, input_system);
-    app->scheduler.add_system(ecs::SystemStage::Update, render_system);
+    app->scheduler.add_system(ecs::Stage::PreUpdate, input_system);
+    app->scheduler.add_system(ecs::Stage::PostUpdate, render_system);
 
     app->run();
     return 0;

@@ -129,8 +129,8 @@ int main() {
 
     app->world.insert_resource(Animation {});
 
-    app->scheduler.add_system(ecs::SystemStage::Update, animation_system);
-    app->scheduler.add_system(ecs::SystemStage::Update, render_system);
+    app->scheduler.add_system(ecs::Stage::Update, animation_system);
+    app->scheduler.add_system(ecs::Stage::PostUpdate, render_system);
 
     app->run();
 }

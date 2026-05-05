@@ -1,4 +1,3 @@
-#include <cmath>
 #include <format>
 #include <iterator>
 #include <memory>
@@ -167,8 +166,8 @@ public:
 
                 // Get the two pixels
                 core::ColorRGBA32F top_color = color_data[color_y_top * color_width + color_x];
-                core::ColorRGBA32F bottom_color =
-                    color_data[color_y_bottom * color_width + color_x];
+                core::ColorRGBA32F bottom_color
+                    = color_data[color_y_bottom * color_width + color_x];
 
                 // Create half-block character with appropriate colors
                 char_data[char_y * char_width + char_x] = renderer::CharacterPixel {
@@ -218,10 +217,12 @@ public:
         );
 
         // Create buffers
-        auto color_buffer =
-            renderer->buffer_registry.create_buffer<core::ColorRGBA32F>(pixel_width, pixel_height);
-        auto vertex_buffer =
-            renderer->buffer_registry.create_buffer<ColorVertex>(pixel_width, pixel_height);
+        auto color_buffer = renderer->buffer_registry.create_buffer<core::ColorRGBA32F>(
+            pixel_width,
+            pixel_height
+        );
+        auto vertex_buffer
+            = renderer->buffer_registry.create_buffer<ColorVertex>(pixel_width, pixel_height);
         auto char_buffer = renderer->render_target_handle();
 
         // Setup render graph
@@ -302,32 +303,31 @@ void render_system(ecs::World& world) {
 
     // Update triangle vertices based on transform
     for (auto [entity, transform, triangle]: ecs::Query<Transform, Triangle>(&world)) {
-        std::vector<ColorVertex> vertices = {
-            {transform.x + 0.0f,
-             transform.y + 0.4f,
-             core::ColorRGBA32F::rgba(
-                 triangle.color1.r / 255.0f,
-                 triangle.color1.g / 255.0f,
-                 triangle.color1.b / 255.0f,
-                 1.0f
-             )},
-            {transform.x - 0.4f,
-             transform.y - 0.4f,
-             core::ColorRGBA32F::rgba(
-                 triangle.color2.r / 255.0f,
-                 triangle.color2.g / 255.0f,
-                 triangle.color2.b / 255.0f,
-                 1.0f
-             )},
-            {transform.x + 0.4f,
-             transform.y - 0.4f,
-             core::ColorRGBA32F::rgba(
-                 triangle.color3.r / 255.0f,
-                 triangle.color3.g / 255.0f,
-                 triangle.color3.b / 255.0f,
-                 1.0f
-             )}
-        };
+        std::vector<ColorVertex> vertices
+            = {{transform.x + 0.0f,
+                transform.y + 0.4f,
+                core::ColorRGBA32F::rgba(
+                    triangle.color1.r / 255.0f,
+                    triangle.color1.g / 255.0f,
+                    triangle.color1.b / 255.0f,
+                    1.0f
+                )},
+               {transform.x - 0.4f,
+                transform.y - 0.4f,
+                core::ColorRGBA32F::rgba(
+                    triangle.color2.r / 255.0f,
+                    triangle.color2.g / 255.0f,
+                    triangle.color2.b / 255.0f,
+                    1.0f
+                )},
+               {transform.x + 0.4f,
+                transform.y - 0.4f,
+                core::ColorRGBA32F::rgba(
+                    triangle.color3.r / 255.0f,
+                    triangle.color3.g / 255.0f,
+                    triangle.color3.b / 255.0f,
+                    1.0f
+                )}};
 
         if (auto* vb = renderer->buffer_registry.get_buffer(vertex_buffer_res.handle)) {
             vb->update_buffer(vertices);
@@ -354,7 +354,7 @@ int main() {
     auto app = std::make_shared<core::Application>();
 
     app->add_layer(core::input::InputLayer {});
-    TerminalLayer term_layer {.frame_rate = 60, .terminal = std::make_unique<Terminal>()};
+    auto term_layer = TerminalLayer(std::make_unique<Terminal>(), 60);
     // NOTE: Workaround to allow the input system to send, the should_exist flag on the
     // application. Other fixes include writing an event system and using a resource,
     // will remove if I decide to do an event bus
@@ -372,8 +372,8 @@ int main() {
         }
     );
 
-    app->scheduler.add_system(ecs::SystemStage::Update, input_system);
-    app->scheduler.add_system(ecs::SystemStage::Update, render_system);
+    app->scheduler.add_system(ecs::Stage::PreUpdate, input_system);
+    app->scheduler.add_system(ecs::Stage::PostUpdate, render_system);
 
     app->run();
     return 0;

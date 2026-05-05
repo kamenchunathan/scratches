@@ -18,7 +18,7 @@ concept Layer = requires(T t, std::shared_ptr<Application> app) {
 class Application: public std::enable_shared_from_this<Application> {
 public:
     ecs::World world;
-    ecs::SystemScheduler scheduler;
+    ecs::Scheduler scheduler;
 
     Application() = default;
     ~Application() = default;

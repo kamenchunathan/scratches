@@ -168,7 +168,7 @@ public:
         app->world.insert_resource(std::move(renderer));
 
         app->scheduler.add_system(
-            ecs::SystemStage::Update,
+            ecs::Stage::Update,
             [](ecs::World& world) {
                 auto renderer_ptr = world.get_resource<std::unique_ptr<renderer::Renderer>>();
                 if (!renderer_ptr)
@@ -182,7 +182,7 @@ public:
 
                 renderer->submit(
                     std::make_unique<renderer::halfblock::HalfBlockConversionCommand>(
-                        &renderer->resource_registry,
+                        renderer->resource_registry,
                         resources.color_texture,
                         std::get<0>(renderer->render_target().attachments).view.texture
                     )
@@ -202,7 +202,10 @@ void input_system(ecs::World& world) {
 
     const float move_speed = 0.02f;
 
-    for (auto [entity, transform]: ecs::Query<Transform>(&world)) {
+    auto query = ecs::Query<Transform>(&world);
+    auto it = query.begin();
+    if (it != query.end()) {
+        auto [entity, transform] = *it;
         if (input_state->get().is_button_down(core::input::KeyCode::W)
             || input_state->get().is_button_down(core::input::KeyCode::Up))
         {
@@ -256,8 +259,11 @@ void render_system(ecs::World& world) {
         )
     );
 
-    // Render triangles
-    for (auto [entity, transform, triangle]: ecs::Query<Transform, Triangle>(&world)) {
+    // Render triangle
+    auto query = ecs::Query<Transform, Triangle>(&world);
+    auto it = query.begin();
+    if (it != query.end()) {
+        auto [entity, transform, triangle] = *it;
         std::vector<ColorVertex> vertices
             = {{0.0f,
                 0.4f,
@@ -346,8 +352,8 @@ int main() {
         }
     );
 
-    app->scheduler.add_system(ecs::SystemStage::Update, input_system);
-    app->scheduler.add_system(ecs::SystemStage::Update, render_system);
+    app->scheduler.add_system(ecs::Stage::PreUpdate, input_system);
+    app->scheduler.add_system(ecs::Stage::PostUpdate, render_system);
 
     app->run();
     return 0;
