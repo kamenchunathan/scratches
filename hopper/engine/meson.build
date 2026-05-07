@@ -4,6 +4,7 @@ engine_sources = [
   'src/application.cpp',
   'src/input.cpp',
   'src/renderer.cpp',
+  'src/transform.cpp',
   'src/ecs/archetype.cpp',
   'src/ecs/world.cpp',
   'src/physics/components.cpp',
