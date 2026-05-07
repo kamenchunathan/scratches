@@ -18,9 +18,9 @@ The presentation step which outputs to the terminal and in future to a DOM, then
   - [x] Support multi-pass execution
   - [x] Allow dynamic registration of passes at runtime
 - [ ] **Framebuffer Management**
-  - [ ] Define `Framebuffer` abstraction (attachments, formats, size)
+  - [x] Define `Framebuffer` abstraction (attachments, formats, size)
   - [ ] Implement creation of framebuffers for different passes (G-buffer, lighting, presentation)
-  - [ ] Add resize support (e.g. when terminal resolution changes)
+  - [ ] Add resize support (e.g. when terminal resolution changes) - Requires event system
 - [ ] **Resource Binding**
   - [ ] Define binding model for:
     - [ ] Textures
@@ -29,9 +29,9 @@ The presentation step which outputs to the terminal and in future to a DOM, then
   - [ ] Implement per-pass binding logic (inputs/outputs)
 - [ ] **Shader Program Abstraction**
 
-  - [ ] Define shader stages (vertex-like, fragment-like, compute-like)
-  - [ ] Support compile-time type-checking of shader interfaces
-  - [ ] Implement a runtime registry for shader programs
+  - [x] Define shader stages (vertex-like, fragment-like, compute-like) - Partial (compute unhandled)
+  - [x] Support compile-time type-checking of shader interfaces
+  - [x] Implement a runtime registry for shader programs
   - [ ] Add system for hot-reloading shaders (optional, debugging feature)
 
 ## 2. Rasterization & Primitive Handling

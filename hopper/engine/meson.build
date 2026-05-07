@@ -6,6 +6,9 @@ engine_sources = [
   'src/renderer.cpp',
   'src/ecs/archetype.cpp',
   'src/ecs/world.cpp',
+  'src/physics/components.cpp',
+  'src/physics/layer.cpp',
+  'src/physics/systems.cpp',
   'src/renderer/graph.cpp',
   'src/term/layer.cpp',
   'src/term/presenter.cpp',
@@ -61,3 +64,15 @@ diff_test_exe = executable(
 )
 
 test('Diff tests', diff_test_exe)
+
+application_test_exe = executable(
+  'application_test',
+  'test/application.cpp',
+  dependencies: [
+    engine_dep,
+    dependency('gtest', main: false, fallback: ['gtest', 'gtest_dep']),
+  ],
+  install: false,
+)
+
+test('Application tests', application_test_exe)
