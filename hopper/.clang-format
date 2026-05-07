@@ -4,7 +4,7 @@
 AccessModifierOffset: -4
 AlignAfterOpenBracket: BlockIndent
 AlignConsecutiveMacros: false
-AlignConsecutiveAssignments: false
+AlignConsecutiveAssignments: true
 AlignConsecutiveDeclarations: false
 AlignEscapedNewlines: DontAlign
 AlignOperands: false
@@ -23,7 +23,7 @@ AlwaysBreakBeforeMultilineStrings: true
 AlwaysBreakTemplateDeclarations: Yes
 BinPackArguments: false
 BinPackParameters: false
-BreakBeforeBinaryOperators: NonAssignment
+BreakBeforeBinaryOperators: All
 BreakBeforeBraces: Custom
 BreakBeforeTernaryOperators: true
 BraceWrapping:
@@ -73,4 +73,5 @@ SpacesInParentheses: false
 SpacesInSquareBrackets: false
 Standard: Cpp11
 UseTab: Never
+PenaltyBreakAssignment: 10
 
