@@ -6,6 +6,7 @@
 #include "ecs/query.hpp"
 #include "physics/components.hpp"
 #include "physics/layer.hpp"
+#include "physics/resources.hpp"
 #include "physics/shape.hpp"
 #include "time.hpp"
 
@@ -127,12 +128,16 @@ auto resolve_pair(
 }
 
 void detect_and_resolve(ecs::World& world) {
-    auto config = world.get_resource<PhysicsConfig>()->get();
+    auto config         = world.get_resource<PhysicsConfig>()->get();
+    auto collisions_res = world.get_resource<Collisions>()->get();
+
+    collisions_res.events.clear();
 
     auto query = ecs::Query<core::Transform, Rigidbody, Collider>(&world);
 
     // Pre-calculate AABBs to avoid O(N^2) conversions and redundant calculations
     struct ColliderData {
+        ecs::Entity entity;
         Aabb aabb;
         core::Transform& transform;
         Collider& collider;
@@ -147,6 +152,7 @@ void detect_and_resolve(ecs::World& world) {
 
     for (auto [entity, transform, rb, col]: query) {
         colliders.push_back({
+            .entity    = entity,
             .aabb      = Aabb::from_shape(transform, col),
             .transform = transform,
             .collider  = col,
@@ -188,9 +194,11 @@ void detect_and_resolve(ecs::World& world) {
             continue;
         }
 
-        // Early break for triggers
+        if (auto collisions_res = world.get_resource<Collisions>()) {
+            collisions_res->get().events.push_back({a.entity, b.entity});
+        }
+
         if (a.collider.is_trigger || b.collider.is_trigger) {
-            // TODO: Fire events
             continue;
         }
 

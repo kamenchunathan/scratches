@@ -1,5 +1,6 @@
 #include "physics/layer.hpp"
 #include "ecs/system.hpp"
+#include "physics/resources.hpp"
 #include "physics/systems.hpp"
 
 namespace physics {
@@ -13,6 +14,9 @@ struct CleanupSet {};
 auto PhysicsLayer::build(std::shared_ptr<core::Application> app) -> void {
     if (!app->world.has_resource<PhysicsConfig>()) {
         app->world.insert_resource(PhysicsConfig {});
+    }
+    if (!app->world.has_resource<Collisions>()) {
+        app->world.insert_resource(Collisions {});
     }
 
     app->scheduler.configure_set<IntegrateSet>(ecs::Stage::FixedUpdate);
