@@ -41,7 +41,6 @@ void integrate(ecs::World& world) {
 
 struct CollisionPair {
     std::size_t a, b;
-    std::float_t overlap_x, overlap_y;
 };
 
 struct ContactManifold {
@@ -109,7 +108,7 @@ auto resolve_pair(
     if (vel_along_normal > 0.f)
         return;
 
-    const float e = std::min(ra.restitution, rb.restitution);
+    const float e = std::max(ra.restitution, rb.restitution);
 
     float j = -(1.f + e) * vel_along_normal;
     j /= total_inv_mass;
@@ -158,27 +157,15 @@ void detect_and_resolve(ecs::World& world) {
     for (std::size_t i = 0; i < colliders.size(); ++i) {
         const auto& a = colliders[i];
 
-        for (std::uint32_t j = i + 1; j < colliders.size(); ++j) {
+        for (std::size_t j = i + 1; j < colliders.size(); ++j) {
             const auto& b = colliders[j];
 
             // Filter collisions
             if ((a.collider.filter.mask_bits & b.collider.filter.category_bits) != 0
                 && (b.collider.filter.mask_bits & a.collider.filter.category_bits) != 0)
             {
-                // AABBs overlap only if they overlap on ALL axes
-
-                auto overlap_x = (a.aabb.half_extents.x() + b.aabb.half_extents.x())
-                    - std::abs(a.aabb.center.x() - b.aabb.center.x());
-                auto overlap_y = (a.aabb.half_extents.y() + b.aabb.half_extents.y())
-                    - std::abs(a.aabb.center.y() - b.aabb.center.y());
-
-                if (overlap_x > 0 && overlap_y > 0) {
-                    collision_pairs.push_back({
-                        .a         = i,
-                        .b         = j,
-                        .overlap_x = overlap_x,
-                        .overlap_y = overlap_y,
-                    });
+                if (a.aabb.intersects(b.aabb)) {
+                    collision_pairs.push_back({.a = i, .b = j});
                 }
             }
         }
@@ -188,14 +175,26 @@ void detect_and_resolve(ecs::World& world) {
         auto& a = colliders[pair.a];
         auto& b = colliders[pair.b];
 
+        // Re-calculate AABBs to use latest transform state (handles multiple collisions/frame)
+        Aabb a_aabb = Aabb::from_shape(a.transform, a.collider);
+        Aabb b_aabb = Aabb::from_shape(b.transform, b.collider);
+
+        auto overlap_x = (a_aabb.half_extents.x() + b_aabb.half_extents.x())
+            - std::abs(a_aabb.center.x() - b_aabb.center.x());
+        auto overlap_y = (a_aabb.half_extents.y() + b_aabb.half_extents.y())
+            - std::abs(a_aabb.center.y() - b_aabb.center.y());
+
+        if (overlap_x <= 0 || overlap_y <= 0) {
+            continue;
+        }
+
         // Early break for triggers
         if (a.collider.is_trigger || b.collider.is_trigger) {
             // TODO: Fire events
             continue;
         }
 
-        ContactManifold manifold
-            = compute_contact_manifold(a.aabb, b.aabb, pair.overlap_x, pair.overlap_y);
+        ContactManifold manifold = compute_contact_manifold(a_aabb, b_aabb, overlap_x, overlap_y);
 
         resolve_pair(
             a.body,

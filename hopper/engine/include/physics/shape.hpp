@@ -4,7 +4,7 @@
 
 #include <Eigen/Dense>
 
-#include "types.hpp"
+#include "transform.hpp"
 
 namespace physics {
 
@@ -28,6 +28,11 @@ struct Aabb {
     }
     [[nodiscard]] Eigen::Vector2f max() const noexcept {
         return center + half_extents;
+    }
+
+    [[nodiscard]] bool intersects(const Aabb& other) const noexcept {
+        return (min().x() <= other.max().x() && max().x() >= other.min().x())
+            && (min().y() <= other.max().y() && max().y() >= other.min().y());
     }
 
     [[nodiscard]] static auto from_shape(core::Transform transform, Collider collider) -> Aabb;
