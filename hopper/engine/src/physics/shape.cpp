@@ -13,6 +13,10 @@ namespace physics {
         collider.shape
     );
 
+    // Apply transform scale to half-extents
+    half_extents.x() *= transform.scale.x();
+    half_extents.y() *= transform.scale.y();
+
     return Aabb {
         .center       = transform.translation_xy(),
         .half_extents = half_extents,
