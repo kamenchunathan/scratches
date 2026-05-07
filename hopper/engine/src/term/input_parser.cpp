@@ -14,7 +14,7 @@ void InputParser::advance(uint32_t n) {
 
 std::vector<Event> InputParser::parse() {
     cursor_ = 0;
-    mode_ = Mode::Normal;
+    mode_   = Mode::Normal;
     input_events_.clear();
 
     while (cursor_ < input_.size()) {
@@ -23,7 +23,9 @@ std::vector<Event> InputParser::parse() {
         } else { // Mode::Escape
             auto result = parse_escape_code();
             if (!result) {
-                // Incomplete or malformed escape code, stop parsing to prevent errors.
+                if (result.error() == ParseError::Incomplete) {
+                    input_events_.push_back(KeyEvent {KeyCode::Escape});
+                }
                 break;
             }
             mode_ = Mode::Normal;
@@ -154,12 +156,14 @@ void InputParser::parse_char() {
             key_code = KeyCode::Space;
             break;
         case '\n':
+        case '\r':
             key_code = KeyCode::Enter;
             break;
         case '\t':
             key_code = KeyCode::Tab;
             break;
         case '\b':
+        case '\x7f':
             key_code = KeyCode::Backspace;
             break;
         default:
@@ -179,13 +183,15 @@ std::expected<void, InputParser::ParseError> InputParser::parse_escape_code() {
 
     // Only CSI sequences (starting with '[') are handled for now.
     if (input_[cursor_] != '[') {
-        advance(); // Skip the character after ESC.
+        input_events_.push_back(KeyEvent {KeyCode::Escape});
+        // We don't advance() here because the character at cursor_ might be a valid key
+        // after the ESC (though for standalone ESC it would usually be empty or a timeout)
         return {};
     }
     advance(); // Skip '['.
 
     size_t seq_start = cursor_;
-    char terminator = 0;
+    char terminator  = 0;
     while (cursor_ < input_.size()) {
         char c = input_[cursor_];
         // Valid terminating character in the range'@' (0x40)  through  '~' (0x7E)
@@ -207,9 +213,9 @@ std::expected<void, InputParser::ParseError> InputParser::parse_escape_code() {
     auto parse_params = [](std::string_view sv) {
         std::vector<uint32_t> params;
         while (!sv.empty()) {
-            size_t delimiter_pos = sv.find(';');
+            size_t delimiter_pos     = sv.find(';');
             std::string_view num_str = sv.substr(0, delimiter_pos);
-            uint32_t val = 0;
+            uint32_t val             = 0;
             if (std::from_chars(num_str.data(), num_str.data() + num_str.size(), val).ec
                 == std::errc())
             {
@@ -232,8 +238,8 @@ std::expected<void, InputParser::ParseError> InputParser::parse_escape_code() {
             if (cb & 32) {
                 action = MouseEvent::Action::Move;
             } else {
-                action =
-                    (terminator == 'M') ? MouseEvent::Action::Press : MouseEvent::Action::Release;
+                action = (terminator == 'M') ? MouseEvent::Action::Press
+                                             : MouseEvent::Action::Release;
             }
 
             std::optional<MouseButton> btn;
@@ -251,22 +257,24 @@ std::expected<void, InputParser::ParseError> InputParser::parse_escape_code() {
                     break;
             }
 
-            input_events_.push_back(MouseEvent {
-                .action = action,
-                .row = nums[2], // SGR is col, then row
-                .col = nums[1],
-                .button = btn,
-                .shift = (bool)(cb & 4),
-                .ctrl = (bool)(cb & 16),
-                .alt = (bool)(cb & 8),
-            });
+            input_events_.push_back(
+                MouseEvent {
+                    .action = action,
+                    .row    = nums[2], // SGR is col, then row
+                    .col    = nums[1],
+                    .button = btn,
+                    .shift  = (bool)(cb & 4),
+                    .ctrl   = (bool)(cb & 16),
+                    .alt    = (bool)(cb & 8),
+                }
+            );
         }
     } else {
         // Key press events  - Function keys, direction buttons etc.
         std::optional<KeyCode> key_code;
         bool shift = false, alt = false, ctrl = false;
 
-        auto params = parse_params(seq);
+        auto params  = parse_params(seq);
         int modifier = 0;
         if (params.size() > 1) {
             modifier = params[1];
@@ -274,8 +282,8 @@ std::expected<void, InputParser::ParseError> InputParser::parse_escape_code() {
 
         if (modifier > 0) {
             shift = (modifier - 1) & 1;
-            alt = (modifier - 1) & 2;
-            ctrl = (modifier - 1) & 4;
+            alt   = (modifier - 1) & 2;
+            ctrl  = (modifier - 1) & 4;
         }
 
         switch (terminator) {
