@@ -44,13 +44,13 @@ namespace detail {
 
 class World {
 public:
-    World() = default;
+    World()  = default;
     ~World() = default;
 
-    World(const World&) = delete;
+    World(const World&)            = delete;
     World& operator=(const World&) = delete;
-    World(World&&) = default;
-    World& operator=(World&&) = default;
+    World(World&&)                 = default;
+    World& operator=(World&&)      = default;
 
     template<typename... Components>
     Entity spawn(Components&&... components);
@@ -58,22 +58,33 @@ public:
     template<typename... Components>
     void destroy(Entity entity);
 
-    bool is_entity_valid(Entity entity) const;
+    [[nodiscard]] bool is_entity_valid(Entity entity) const;
 
     template<typename ResourceType>
     void insert_resource(ResourceType&& res);
 
     template<typename ResourceType>
-    auto get_resource() -> std::optional<std::reference_wrapper<ResourceType>>;
+    [[nodiscard]] auto get_resource() -> std::optional<std::reference_wrapper<ResourceType>>;
 
     template<typename ResourceType>
-    auto get_resource() const -> std::optional<std::reference_wrapper<const ResourceType>>;
+    [[nodiscard]] auto get_resource() const
+        -> std::optional<std::reference_wrapper<const ResourceType>>;
 
     template<typename ResourceType>
-    bool has_resource() const;
+    [[nodiscard]] auto has_resource() const -> bool;
 
     template<typename ResourceType>
     auto remove_resource() -> std::optional<std::remove_cvref_t<ResourceType>>;
+
+    template<typename T>
+    [[nodiscard]] auto has_component(Entity entity) const -> bool;
+
+    template<typename T>
+    [[nodiscard]] auto get_component(Entity entity) -> std::optional<std::reference_wrapper<T>>;
+
+    template<typename T>
+    [[nodiscard]] auto get_component(Entity entity) const
+        -> std::optional<std::reference_wrapper<const T>>;
 
     std::vector<Archetype*>
     get_matching_archetypes(ComponentMask required, ComponentMask disallowed);
@@ -102,7 +113,7 @@ Entity World::spawn(Components&&... components) {
     Signature signature;
     (signature.mask.set(ComponentRegistry::get_id<Components>()), ...);
 
-    auto* archetype = find_or_create_archetype(signature);
+    auto* archetype     = find_or_create_archetype(signature);
     std::uint32_t index = archetype->add_entity(entity, std::forward<Components>(components)...);
 
     entity_map_[entity] = std::make_pair(archetype, index);
@@ -122,7 +133,7 @@ void World::destroy(Entity entity) {
 
     // If not the last entity in archetype, update the moved entity's mapping
     if (index < archetype->size() - 1) {
-        Entity moved_entity = archetype->get_entities().back();
+        Entity moved_entity              = archetype->get_entities().back();
         entity_map_[moved_entity].second = index;
     }
 
@@ -133,7 +144,7 @@ void World::destroy(Entity entity) {
 template<typename ResourceType>
 void World::insert_resource(ResourceType&& res) {
     using StoredType = std::remove_cvref_t<ResourceType>;
-    ResourceId id = ResourceIds::get_id<StoredType>();
+    ResourceId id    = ResourceIds::get_id<StoredType>();
 
     if (id >= resources_.size()) {
         resources_.resize(id + 1);
@@ -147,7 +158,7 @@ void World::insert_resource(ResourceType&& res) {
 template<typename ResourceType>
 auto World::get_resource() -> std::optional<std::reference_wrapper<ResourceType>> {
     using StoredType = std::remove_cvref_t<ResourceType>;
-    ResourceId id = ResourceIds::get_id<StoredType>();
+    ResourceId id    = ResourceIds::get_id<StoredType>();
 
     if (id >= resources_.size() || !resources_[id]) {
         return std::nullopt;
@@ -164,7 +175,7 @@ auto World::get_resource() -> std::optional<std::reference_wrapper<ResourceType>
 template<typename ResourceType>
 auto World::get_resource() const -> std::optional<std::reference_wrapper<const ResourceType>> {
     using StoredType = std::remove_cvref_t<ResourceType>;
-    ResourceId id = ResourceIds::get_id<StoredType>();
+    ResourceId id    = ResourceIds::get_id<StoredType>();
 
     if (id >= resources_.size() || !resources_[id]) {
         return std::nullopt;
@@ -181,7 +192,7 @@ auto World::get_resource() const -> std::optional<std::reference_wrapper<const R
 template<typename ResourceType>
 bool World::has_resource() const {
     using StoredType = std::remove_cvref_t<ResourceType>;
-    ResourceId id = ResourceIds::get_id<StoredType>();
+    ResourceId id    = ResourceIds::get_id<StoredType>();
 
     if (id >= resources_.size() || !resources_[id]) {
         return false;
@@ -193,7 +204,7 @@ bool World::has_resource() const {
 template<typename ResourceType>
 auto World::remove_resource() -> std::optional<std::remove_cvref_t<ResourceType>> {
     using StoredType = std::remove_cvref_t<ResourceType>;
-    ResourceId id = ResourceIds::get_id<StoredType>();
+    ResourceId id    = ResourceIds::get_id<StoredType>();
 
     if (id >= resources_.size() || !resources_[id]) {
         return std::nullopt;
@@ -213,6 +224,45 @@ auto World::remove_resource() -> std::optional<std::remove_cvref_t<ResourceType>
     // Move the resource out of the holder.
     StoredType resource = std::move(store->get());
     return resource;
+}
+
+template<typename T>
+bool World::has_component(Entity entity) const {
+    auto it = entity_map_.find(entity);
+    if (it == entity_map_.end()) {
+        return false;
+    }
+    return it->second.first->get_signature().mask.test(ComponentRegistry::get_id<T>());
+}
+
+template<typename T>
+auto World::get_component(Entity entity) -> std::optional<std::reference_wrapper<T>> {
+    auto it = entity_map_.find(entity);
+    if (it == entity_map_.end()) {
+        return std::nullopt;
+    }
+
+    auto [archetype, index] = it->second;
+    if (!archetype->get_signature().mask.test(ComponentRegistry::get_id<T>())) {
+        return std::nullopt;
+    }
+
+    return archetype->get_component<T>(index);
+}
+
+template<typename T>
+auto World::get_component(Entity entity) const -> std::optional<std::reference_wrapper<const T>> {
+    auto it = entity_map_.find(entity);
+    if (it == entity_map_.end()) {
+        return std::nullopt;
+    }
+
+    auto [archetype, index] = it->second;
+    if (!archetype->get_signature().mask.test(ComponentRegistry::get_id<T>())) {
+        return std::nullopt;
+    }
+
+    return archetype->get_component<T>(index);
 }
 
 } // namespace ecs
