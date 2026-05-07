@@ -24,8 +24,6 @@ auto PhysicsLayer::build(std::shared_ptr<core::Application> app) -> void {
     sched.add_system(ecs::Stage::FixedUpdate, systems::integrate).in_set<IntegrateSet>();
     sched.add_system(ecs::Stage::FixedUpdate, systems::detect_and_resolve)
         .in_set<CollisionResolveSet>();
-    sched.add_system(ecs::Stage::FixedUpdate, systems::emit_events).in_set<CollisionResolveSet>();
-    sched.add_system(ecs::Stage::FixedUpdate, systems::clear_forces).in_set<CleanupSet>();
 }
 
 } // namespace physics

@@ -1,17 +1,14 @@
 #include "physics/systems.hpp"
 
 #include <cmath>
-#include <tuple>
 #include <vector>
 
-#include "ecs/entity.hpp"
 #include "ecs/query.hpp"
 #include "physics/components.hpp"
 #include "physics/layer.hpp"
 #include "physics/shape.hpp"
 #include "time.hpp"
 #include "types.hpp"
-#include "util.hpp"
 
 namespace physics {
 
@@ -44,41 +41,122 @@ void integrate(ecs::World& world) {
 }
 
 struct CollisionPair {
-    ecs::Entity a, b;
+    std::size_t a, b;
+    std::float_t overlap_x, overlap_y;
 };
 
-/// Converts a collider shape to AABB for broad phase.
-/// Currently only AABB collider shapes are supported so it is trivial. Will be extended later
-auto shape_to_aabb(core::Transform transform, Collider collider) -> Aabb {
-    Eigen::Vector2f half_extents = std::visit(
-        util::overload {[](AabbShape shape) { return shape.half_extents; }},
-        collider.shape
-    );
+struct ContactManifold {
+    /// unit vector from B toward A
+    Eigen::Vector2f normal;
+    /// penetration depth (positive when overlapping)
+    float depth;
+    /// approximate world-space contact point
+    // Not necessary at this point
+    // Eigen::Vector2f point;
+};
 
-    return Aabb {
-        .center       = transform.translation_xy(),
-        .half_extents = half_extents,
-    };
+auto compute_contact_manifold(
+    const Aabb& a,
+    const Aabb& b,
+    std::float_t overlap_x,
+    std::float_t overlap_y
+) -> ContactManifold {
+    ContactManifold manifold;
+
+    if (overlap_x < overlap_y) {
+        manifold.depth = overlap_x;
+        // Normal from B to A
+        if (a.center.x() < b.center.x()) {
+            manifold.normal = {-1, 0};
+        } else {
+            manifold.normal = {1, 0};
+        }
+    } else {
+        manifold.depth = overlap_y;
+        // Normal from B to A
+        if (a.center.y() < b.center.y()) {
+            manifold.normal = {0, -1};
+        } else {
+            manifold.normal = {0, 1};
+        }
+    }
+
+    return manifold;
+}
+
+auto resolve_pair(
+    Rigidbody& ra,
+    Rigidbody& rb,
+    core::Transform& ta,
+    core::Transform& tb,
+    const ContactManifold& manifold,
+    float slop
+) -> void {
+    const float inv_ma         = ra.inv_mass();
+    const float inv_mb         = rb.inv_mass();
+    const float total_inv_mass = inv_ma + inv_mb;
+
+    // Both immovable, return
+    if (total_inv_mass == 0.f)
+        return;
+
+    const Eigen::Vector2f& n = manifold.normal;
+
+    // 1. Velocity Resolution (Impulse)
+    const Eigen::Vector2f rel_vel = ra.linear_velocity - rb.linear_velocity;
+    const float vel_along_normal  = rel_vel.dot(n);
+
+    // Do not resolve if velocities are separating
+    if (vel_along_normal > 0.f)
+        return;
+
+    const float e = std::min(ra.restitution, rb.restitution);
+
+    float j = -(1.f + e) * vel_along_normal;
+    j /= total_inv_mass;
+
+    const Eigen::Vector2f impulse = j * n;
+    ra.linear_velocity += inv_ma * impulse;
+    rb.linear_velocity -= inv_mb * impulse;
+
+    // 2. Position Correction (Linear Projection)
+    const float percent = 0.2f; // penetration percentage to correct
+    const Eigen::Vector2f correction
+        = (std::max(manifold.depth - slop, 0.0f) / total_inv_mass) * percent * n;
+
+    ta.set_translation_xy(ta.translation_xy() + inv_ma * correction);
+    tb.set_translation_xy(tb.translation_xy() - inv_mb * correction);
 }
 
 void detect_and_resolve(ecs::World& world) {
-    auto query = ecs::Query<core::Transform, Collider>(&world);
+    auto config = world.get_resource<PhysicsConfig>()->get();
+
+    auto query = ecs::Query<core::Transform, Rigidbody, Collider>(&world);
 
     // Pre-calculate AABBs to avoid O(N^2) conversions and redundant calculations
     struct ColliderData {
-        ecs::Entity entity;
-        Collider collider;
         Aabb aabb;
+        core::Transform& transform;
+        Collider& collider;
+        Rigidbody& body;
     };
 
     std::vector<ColliderData> colliders;
-    for (auto [entity, transform, col]: query) {
-        colliders.push_back({entity, col, shape_to_aabb(transform, col)});
-    }
-
     std::vector<CollisionPair> collision_pairs;
 
-    for (std::uint32_t i = 0; i < colliders.size(); ++i) {
+    colliders.clear();
+    collision_pairs.clear();
+
+    for (auto [entity, transform, rb, col]: query) {
+        colliders.push_back({
+            .aabb      = Aabb::from_shape(transform, col),
+            .transform = transform,
+            .collider  = col,
+            .body      = rb,
+        });
+    }
+
+    for (std::size_t i = 0; i < colliders.size(); ++i) {
         const auto& a = colliders[i];
 
         for (std::uint32_t j = i + 1; j < colliders.size(); ++j) {
@@ -89,15 +167,45 @@ void detect_and_resolve(ecs::World& world) {
                 && (b.collider.filter.mask_bits & a.collider.filter.category_bits) != 0)
             {
                 // AABBs overlap only if they overlap on ALL axes
-                if ((std::abs(a.aabb.center.x() - b.aabb.center.x())
-                     < (a.aabb.half_extents.x() + b.aabb.half_extents.x()))
-                    && (std::abs(a.aabb.center.y() - b.aabb.center.y())
-                        < (a.aabb.half_extents.y() + b.aabb.half_extents.y())))
-                {
-                    collision_pairs.push_back(CollisionPair {a.entity, b.entity});
+
+                auto overlap_x = (a.aabb.half_extents.x() + b.aabb.half_extents.x())
+                    - std::abs(a.aabb.center.x() - b.aabb.center.x());
+                auto overlap_y = (a.aabb.half_extents.y() + b.aabb.half_extents.y())
+                    - std::abs(a.aabb.center.y() - b.aabb.center.y());
+
+                if (overlap_x > 0 && overlap_y > 0) {
+                    collision_pairs.push_back({
+                        .a         = i,
+                        .b         = j,
+                        .overlap_x = overlap_x,
+                        .overlap_y = overlap_y,
+                    });
                 }
             }
         }
+    }
+
+    for (const auto& pair: collision_pairs) {
+        auto& a = colliders[pair.a];
+        auto& b = colliders[pair.b];
+
+        // Early break for triggers
+        if (a.collider.is_trigger || b.collider.is_trigger) {
+            // TODO: Fire events
+            continue;
+        }
+
+        ContactManifold manifold
+            = compute_contact_manifold(a.aabb, b.aabb, pair.overlap_x, pair.overlap_y);
+
+        resolve_pair(
+            a.body,
+            b.body,
+            a.transform,
+            b.transform,
+            manifold,
+            config.position_correction_slop
+        );
     }
 }
 

@@ -33,7 +33,8 @@ struct Rigidbody {
     float restitution               = 0.3f;
     RigidbodyType body_type         = RigidbodyType::Dynamic;
 
-    [[nodiscard]] auto accumulated_force() const -> Eigen::Vector2f const;
+    [[nodiscard]] auto accumulated_force() const -> Eigen::Vector2f;
+    [[nodiscard]] auto inv_mass() const -> float;
     auto apply_impulse(Eigen::Vector2f) -> void;
     auto apply_force(Eigen::Vector2f) -> void;
 

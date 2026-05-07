@@ -4,7 +4,11 @@
 
 #include <Eigen/Dense>
 
+#include "types.hpp"
+
 namespace physics {
+
+struct Collider;
 
 struct AabbShape {
     Eigen::Vector2f half_extents;
@@ -25,6 +29,8 @@ struct Aabb {
     [[nodiscard]] Eigen::Vector2f max() const noexcept {
         return center + half_extents;
     }
+
+    [[nodiscard]] static auto from_shape(core::Transform transform, Collider collider) -> Aabb;
 };
 
 } // namespace physics

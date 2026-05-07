@@ -14,12 +14,4 @@ void integrate(ecs::World& world);
 /// Writes results into per-frame contact sets stored on the ContactCache resource.
 void detect_and_resolve(ecs::World& world);
 
-/// Diff the ContactCache against the contacts computed this tick.
-/// Fires CollisionStarted/Persisted/Ended and SensorEntered/Exited events.
-/// Updates the cache for next tick.
-void emit_events(ecs::World& world);
-
-/// Zero all ForceAccumulators so forces don't carry over between ticks.
-void clear_forces(ecs::World& world);
-
 } // namespace physics::systems
