@@ -12,31 +12,31 @@ void InputLayer::build(std::shared_ptr<core::Application> app) {
     app->world.insert_resource(InputState {});
 }
 
-bool InputState::just_pressed(KeyCode key) {
+bool InputState::just_pressed(KeyCode key) const {
     return keys_current[static_cast<std::size_t>(key)]
         && !keys_previous[static_cast<std::size_t>(key)];
 }
 
-bool InputState::just_pressed(MouseButton btn) {
+bool InputState::just_pressed(MouseButton btn) const {
     return mouse_button_current[static_cast<std::size_t>(btn)]
         && !mouse_button_previous[static_cast<std::size_t>(btn)];
 }
 
-bool InputState::just_released(KeyCode key) {
+bool InputState::just_released(KeyCode key) const {
     return !keys_current[static_cast<std::size_t>(key)]
         && keys_previous[static_cast<std::size_t>(key)];
 }
 
-bool InputState::just_released(MouseButton btn) {
+bool InputState::just_released(MouseButton btn) const {
     return !mouse_button_current[static_cast<std::size_t>(btn)]
         && mouse_button_previous[static_cast<std::size_t>(btn)];
 }
 
-bool InputState::is_button_down(KeyCode key) {
+bool InputState::is_button_down(KeyCode key) const {
     return keys_current[static_cast<std::size_t>(key)];
 }
 
-bool InputState::is_button_down(MouseButton btn) {
+bool InputState::is_button_down(MouseButton btn) const {
     return mouse_button_current[static_cast<std::size_t>(btn)];
 }
 

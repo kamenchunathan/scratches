@@ -80,8 +80,8 @@ struct KeyEvent {
     KeyCode code;
     // TODO: Better modifier handling
     bool shift = false;
-    bool ctrl = false;
-    bool alt = false;
+    bool ctrl  = false;
+    bool alt   = false;
 };
 
 enum class MouseButton {
@@ -101,8 +101,8 @@ struct MouseEvent {
     std::uint32_t row, col;
     std::optional<MouseButton> button;
     bool shift = false;
-    bool ctrl = false;
-    bool alt = false;
+    bool ctrl  = false;
+    bool alt   = false;
 };
 
 struct ResizeEvent {
@@ -121,14 +121,14 @@ public:
 
     std::pair<std::uint32_t, std::uint32_t> mouse_pos;
 
-    bool just_pressed(KeyCode);
-    bool just_pressed(MouseButton);
+    [[nodiscard]] bool just_pressed(KeyCode) const;
+    [[nodiscard]] bool just_pressed(MouseButton) const;
 
-    bool just_released(KeyCode);
-    bool just_released(MouseButton);
+    [[nodiscard]] bool just_released(KeyCode) const;
+    [[nodiscard]] bool just_released(MouseButton) const;
 
-    bool is_button_down(KeyCode);
-    bool is_button_down(MouseButton);
+    [[nodiscard]] bool is_button_down(KeyCode) const;
+    [[nodiscard]] bool is_button_down(MouseButton) const;
 
     void process_events(std::vector<Event>);
 };
@@ -390,8 +390,8 @@ struct std::formatter<core::input::MouseButton>: std::formatter<std::string_view
 template<>
 struct std::formatter<core::input::MouseEvent>: std::formatter<std::string_view> {
     auto format(core::input::MouseEvent e, std::format_context& ctx) const {
-        auto base_format =
-            std::format("MouseEvent {{ action: {}, row: {}, col: {}", e.action, e.row, e.col);
+        auto base_format
+            = std::format("MouseEvent {{ action: {}, row: {}, col: {}", e.action, e.row, e.col);
 
         if (e.button) {
             base_format += std::format(", button: {}", *e.button);
