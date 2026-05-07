@@ -1,23 +1,16 @@
+#include "input.hpp"
+
 #include <cstddef>
-#include <optional>
 #include <utility>
 #include <variant>
 
-#include "input.hpp"
+#include "util.hpp"
 
 namespace core::input {
 
 void InputLayer::build(std::shared_ptr<core::Application> app) {
     app->world.insert_resource(InputState {});
 }
-
-template<class... Ts>
-struct overload: Ts... {
-    using Ts::operator()...;
-};
-
-template<class... Ts>
-overload(Ts...) -> overload<Ts...>;
 
 bool InputState::just_pressed(KeyCode key) {
     return keys_current[static_cast<std::size_t>(key)]
@@ -57,7 +50,7 @@ void InputState::process_events(std::vector<Event> events) {
 
     for (auto event: events) {
         std::visit(
-            overload {
+            util::overload {
                 [this](core::input::KeyEvent key) {
                     keys_current[static_cast<std::size_t>(key.code)] = true;
                 },
@@ -65,8 +58,8 @@ void InputState::process_events(std::vector<Event> events) {
                     switch (ev.action) {
                         case MouseEvent::Action::Press:
                             // Mouse button is guaranteed to be present on press
-                            mouse_button_current[static_cast<std::size_t>(ev.button.value())] =
-                                true;
+                            mouse_button_current[static_cast<std::size_t>(ev.button.value())]
+                                = true;
                             mouse_pos = std::make_pair(ev.row, ev.col);
                             break;
 
@@ -75,8 +68,8 @@ void InputState::process_events(std::vector<Event> events) {
                             break;
 
                         case MouseEvent::Action::Release:
-                            mouse_button_current[static_cast<std::size_t>(ev.button.value())] =
-                                false;
+                            mouse_button_current[static_cast<std::size_t>(ev.button.value())]
+                                = false;
                             mouse_pos = std::make_pair(ev.row, ev.col);
                             break;
                     }
