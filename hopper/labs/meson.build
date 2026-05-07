@@ -84,3 +84,10 @@ executable(
   dependencies: [engine_dep],
 )
 
+executable(
+  'block_breaker',
+  'block_breaker.cpp',
+  install: false,
+  dependencies: [engine_dep],
+)
+
