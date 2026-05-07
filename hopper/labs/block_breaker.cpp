@@ -32,6 +32,67 @@
     #include "term/layer.hpp"
 #endif
 
+#include <random>
+
+// --- Themes ---
+
+struct GameTheme {
+    std::string name;
+    core::ColorRGBA32F background;
+    core::ColorRGB8 ui_background;
+    core::ColorRGB8 contrast_background;
+    core::ColorRGBA32F paddle;
+    core::ColorRGBA32F ball;
+    core::ColorRGBA32F walls;
+    std::vector<core::ColorRGBA32F> block_rows;
+    core::ColorRGB8 title_color;
+};
+
+const std::vector<GameTheme> THEMES = {
+    {"Nord",
+     core::ColorRGBA32F::rgba(0.18f, 0.20f, 0.25f, 1.0f), // nord0
+     {46, 52, 64},                                       // nord0
+     {59, 66, 82},                                       // nord1
+     core::ColorRGBA32F::rgba(0.53f, 0.75f, 0.82f, 1.0f), // nord8 (Blue)
+     core::ColorRGBA32F::rgba(0.93f, 0.94f, 0.96f, 1.0f), // nord4
+     core::ColorRGBA32F::rgba(0.85f, 0.87f, 0.91f, 1.0f), // nord5
+     {
+         core::ColorRGBA32F::rgba(0.75f, 0.38f, 0.42f, 1.0f), // nord11 (Red)
+         core::ColorRGBA32F::rgba(0.82f, 0.53f, 0.44f, 1.0f), // nord12 (Orange)
+         core::ColorRGBA32F::rgba(0.92f, 0.79f, 0.55f, 1.0f), // nord13 (Yellow)
+         core::ColorRGBA32F::rgba(0.64f, 0.75f, 0.55f, 1.0f)  // nord14 (Green)
+     },
+     {136, 192, 208}}, // nord8
+    {"Catppuccin",
+     core::ColorRGBA32F::rgba(0.11f, 0.11f, 0.18f, 1.0f), // crust
+     {30, 30, 46},                                       // base
+     {17, 17, 27},                                       // mantle
+     core::ColorRGBA32F::rgba(0.99f, 0.70f, 0.84f, 1.0f), // pink
+     core::ColorRGBA32F::rgba(0.80f, 0.95f, 0.95f, 1.0f), // sky
+     core::ColorRGBA32F::rgba(0.71f, 0.76f, 0.94f, 1.0f), // lavender
+     {
+         core::ColorRGBA32F::rgba(0.96f, 0.63f, 0.69f, 1.0f), // red
+         core::ColorRGBA32F::rgba(1.00f, 0.78f, 0.60f, 1.0f), // peach
+         core::ColorRGBA32F::rgba(0.98f, 0.89f, 0.70f, 1.0f), // yellow
+         core::ColorRGBA32F::rgba(0.65f, 0.89f, 0.63f, 1.0f)  // green
+     },
+     {203, 166, 247}}, // mauve
+    {"Cyberpunk",
+     core::ColorRGBA32F::rgba(0.05f, 0.05f, 0.10f, 1.0f), // Deep Black/Purple
+     {10, 10, 20},                                       // Dark UI
+     {30, 0, 40},                                        // Neon Purple contrast
+     core::ColorRGBA32F::rgba(0.0f, 1.0f, 1.0f, 1.0f),    // Cyan Paddle
+     core::ColorRGBA32F::rgba(1.0f, 1.0f, 0.0f, 1.0f),    // Yellow Ball
+     core::ColorRGBA32F::rgba(1.0f, 0.0f, 1.0f, 1.0f),    // Magenta Walls
+     {
+         core::ColorRGBA32F::rgba(1.0f, 0.0f, 0.5f, 1.0f), // Hot Pink
+         core::ColorRGBA32F::rgba(0.5f, 0.0f, 1.0f, 1.0f), // Purple
+         core::ColorRGBA32F::rgba(0.0f, 0.5f, 1.0f, 1.0f), // Blue
+         core::ColorRGBA32F::rgba(0.0f, 1.0f, 0.5f, 1.0f)  // Green
+     },
+     {0, 255, 255}} // Cyan
+};
+
 // --- Game State & Components ---
 
 enum class GameState { StartScreen, Playing, GameOver, GameWon, HighScoreInput, HighScoreScreen };
@@ -230,16 +291,14 @@ void spawn_blocks(ecs::World& world) {
     for (auto e: to_delete)
         world.destroy(e);
 
-    // Livelier neon palette for the blocks
-    core::ColorRGBA32F row_colors[4] = {
-        core::ColorRGBA32F::rgba(0.95f, 0.2f, 0.4f, 1.0f), // Vibrant Pink/Red
-        core::ColorRGBA32F::rgba(0.95f, 0.5f, 0.1f, 1.0f), // Vibrant Orange
-        core::ColorRGBA32F::rgba(0.6f, 0.85f, 0.1f, 1.0f), // Vibrant Lime
-        core::ColorRGBA32F::rgba(0.1f, 0.75f, 0.95f, 1.0f) // Vibrant Cyan
-    };
+    auto theme_opt = world.get_resource<GameTheme>();
+    if (!theme_opt)
+        return;
+    const auto& theme = theme_opt->get();
 
     // Adjusted play area size so blocks comfortably fit inside the new visible walls
     for (int y = 0; y < 4; ++y) {
+        core::ColorRGBA32F color = (y < theme.block_rows.size()) ? theme.block_rows[y] : core::ColorRGBA32F::WHITE;
         for (int x = -6; x <= 6; ++x) {
             world.spawn(
                 core::Transform::from_pos_rot_scale(
@@ -257,7 +316,7 @@ void spawn_blocks(ecs::World& world) {
                     .filter     = {},
                     .is_trigger = false
                 },
-                RenderColor {row_colors[y]},
+                RenderColor {color},
                 BlockTag {}
             );
         }
@@ -265,6 +324,17 @@ void spawn_blocks(ecs::World& world) {
 }
 
 void spawn_ball(ecs::World& world) {
+    // Clear existing balls
+    std::vector<ecs::Entity> to_delete;
+    for (auto [e, t]: ecs::Query<BallTag>(&world)) {
+        to_delete.push_back(e);
+    }
+    for (auto e: to_delete)
+        world.destroy(e);
+
+    auto theme_opt = world.get_resource<GameTheme>();
+    core::ColorRGBA32F ball_color = theme_opt ? theme_opt->get().ball : core::ColorRGBA32F::WHITE;
+
     world.spawn(
         core::Transform::from_pos_rot_scale(
             {0.0f, 0.0f, 0.0f},
@@ -274,7 +344,7 @@ void spawn_ball(ecs::World& world) {
         physics::Rigidbody {
             .linear_velocity = {35.0f, 40.0f},
             .mass            = 1.0f,
-            .restitution     = 1.0f,
+            .restitution     = 1.1f, // Slight boost for liveliness
             .body_type       = physics::RigidbodyType::Dynamic
         },
         physics::Collider {
@@ -282,7 +352,7 @@ void spawn_ball(ecs::World& world) {
             .filter     = {},
             .is_trigger = false
         },
-        RenderColor {core::ColorRGBA32F::WHITE},
+        RenderColor {ball_color},
         BallTag {}
     );
 }
@@ -316,30 +386,38 @@ void game_flow_system(ecs::World& world) {
     auto& status = status_opt->get();
     auto& input  = input_opt->get();
 
-    // App Quit
+    // App Quit / Back to Menu
     if (input.just_pressed(core::input::KeyCode::Escape)
         || input.just_pressed(core::input::KeyCode::Q))
     {
-        if (status.state == GameState::HighScoreScreen) {
+        if (status.state == GameState::HighScoreScreen || status.state == GameState::HighScoreInput)
+        {
             status.state = GameState::StartScreen; // Back to start
+            if (auto hs_opt = world.get_resource<HighScores>())
+                hs_opt->get().current_input = "";
         } else if (auto app = world.get_resource<core::Application*>()) {
             app->get()->set_should_exit(true);
         }
     }
 
     if (status.state == GameState::StartScreen) {
-        if (input.just_pressed(core::input::KeyCode::Space)) {
+        if (input.just_pressed(core::input::KeyCode::Space) || input.just_pressed(core::input::KeyCode::Enter)) {
             status.state                              = GameState::Playing;
             world.get_resource<Score>()->get().value  = 0;
             world.get_resource<Lives>()->get().value  = 5;
             world.get_resource<Streak>()->get().chain = 0;
             spawn_blocks(world);
             spawn_ball(world);
+
+            // Reset Paddle Position
+            for (auto [e, transform]: ecs::Query<core::Transform>(&world).with<PaddleTag>()) {
+                transform.translation = {0.0f, -40.0f, 0.0f};
+            }
         } else if (input.just_pressed(core::input::KeyCode::H)) {
             status.state = GameState::HighScoreScreen;
         }
     } else if (status.state == GameState::GameOver || status.state == GameState::GameWon) {
-        if (input.just_pressed(core::input::KeyCode::Space)) {
+        if (input.just_pressed(core::input::KeyCode::Space) || input.just_pressed(core::input::KeyCode::Enter)) {
             status.state = GameState::StartScreen; // Return to title screen
         }
     } else if (status.state == GameState::HighScoreInput) {
@@ -352,7 +430,10 @@ void game_flow_system(ecs::World& world) {
         if (c != 0 && hs.current_input.length() < 3) {
             hs.current_input += c;
         }
-        if (input.just_pressed(core::input::KeyCode::Backspace) && !hs.current_input.empty()) {
+        if ((input.just_pressed(core::input::KeyCode::Backspace)
+             || input.just_pressed(core::input::KeyCode::Delete))
+            && !hs.current_input.empty())
+        {
             hs.current_input.pop_back();
         }
         if (input.just_pressed(core::input::KeyCode::Enter) && hs.current_input.length() == 3) {
@@ -369,6 +450,7 @@ void game_flow_system(ecs::World& world) {
         }
     }
 }
+
 
 void streak_timer_system(ecs::World& world) {
     auto status = world.get_resource<GameStatus>();
@@ -524,7 +606,7 @@ void paddle_system(ecs::World& world) {
     for (auto [entity, transform, rb]:
          ecs::Query<core::Transform, physics::Rigidbody>(&world).with<PaddleTag>())
     {
-        rb.linear_velocity.x() = move * 80.0f;
+        rb.linear_velocity.x() = move * 120.0f;
 
         // Shrink the clamping zone to account for the newly visible walls (walls are at +/-76.0f inner boundary)
         if (transform.translation.x() < -61.0f && rb.linear_velocity.x() < 0)
@@ -538,17 +620,18 @@ void render_system(ecs::World& world) {
     auto renderer_ptr = world.get_resource<std::unique_ptr<renderer::Renderer>>();
     auto game_res_opt = world.get_resource<GameResources>();
     auto status_opt   = world.get_resource<GameStatus>();
-    if (!renderer_ptr || !game_res_opt || !status_opt)
+    auto theme_opt    = world.get_resource<GameTheme>();
+    if (!renderer_ptr || !game_res_opt || !status_opt || !theme_opt)
         return;
 
     auto& renderer = *renderer_ptr->get();
     auto& game_res = game_res_opt->get();
     auto state     = status_opt->get().state;
+    const auto& theme = theme_opt->get();
 
-    core::ColorRGBA32F bg_color = core::ColorRGBA32F::rgba(0.08f, 0.12f, 0.2f, 1.0f);
-    core::ColorRGB8 ui_bg_color
-        = {20, 31, 51}; // Match bg_color exactly for seamless text integration
-    core::ColorRGB8 contrast_bg = {10, 15, 30}; // Darker background for UI elements
+    core::ColorRGBA32F bg_color = theme.background;
+    core::ColorRGB8 ui_bg_color = theme.ui_background;
+    core::ColorRGB8 contrast_bg = theme.contrast_background;
 
     renderer.submit(
         std::make_unique<renderer::halfblock::ClearColorCommand>(
@@ -624,13 +707,20 @@ void render_system(ecs::World& world) {
             title,
             (game_res.screen_width / 2) - (title.length() / 2),
             20,
-            core::ColorRGB8::CYAN,
+            theme.title_color,
+            ui_bg_color
+        );
+        render_text(
+            to_u32(std::format("Theme: {}", theme.name)),
+            (game_res.screen_width / 2) - (theme.name.length() + 7) / 2,
+            22,
+            core::ColorRGB8::WHITE,
             ui_bg_color
         );
         render_text(
             U"Press SPACE to Start",
             (game_res.screen_width / 2) - 10,
-            24,
+            26,
             core::ColorRGB8::YELLOW,
             ui_bg_color
         );
@@ -687,10 +777,21 @@ void render_system(ecs::World& world) {
         render_text(
             U" NEW HIGH SCORE! ",
             (game_res.screen_width / 2) - 8,
-            20,
+            18,
             core::ColorRGB8::GREEN,
             ui_bg_color
         );
+
+        auto score_val = world.get_resource<Score>()->get().value;
+        auto score_str = to_u32(std::format("SCORE: {:05}", score_val));
+        render_text(
+            score_str,
+            (game_res.screen_width / 2) - (score_str.length() / 2),
+            20,
+            core::ColorRGB8::YELLOW,
+            ui_bg_color
+        );
+
         render_text(
             U"Enter 3 Initials: ",
             (game_res.screen_width / 2) - 9,
@@ -705,7 +806,7 @@ void render_system(ecs::World& world) {
             input_str,
             (game_res.screen_width / 2) - 1,
             26,
-            core::ColorRGB8::YELLOW,
+            core::ColorRGB8::CYAN,
             ui_bg_color
         );
     } else if (
@@ -841,6 +942,13 @@ int main() {
 
     app->world.insert_resource(Streak {0, 0});
 
+    // Random Theme Selection
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_int_distribution<> dis(0, THEMES.size() - 1);
+    const GameTheme& selected_theme = THEMES[dis(gen)];
+    app->world.insert_resource(selected_theme);
+
     HighScores initial_hs;
     load_high_scores(initial_hs);
     app->world.insert_resource(initial_hs);
@@ -848,9 +956,9 @@ int main() {
     app->world.insert_resource(app.get());
     app->world.insert_resource(Score {0});
     app->world.insert_resource(Lives {5});
-    app->world.insert_resource(GameStatus {GameState::Playing});
+    app->world.insert_resource(GameStatus {GameState::StartScreen});
 
-    // Spawn Player Paddle (Brighter Neon Green/Yellow)
+    // Spawn Player Paddle
     app->world.spawn(
         core::Transform::from_pos_rot_scale(
             {0.0f, -40.0f, 0.0f},
@@ -868,14 +976,13 @@ int main() {
             .filter     = {},
             .is_trigger = false
         },
-        RenderColor {core::ColorRGBA32F::rgba(0.7f, 1.0f, 0.2f, 1.0f)},
+        RenderColor {selected_theme.paddle},
         PaddleTag {}
     );
 
-    spawn_ball(app->world);
-    spawn_blocks(app->world);
+    // Note: Ball and Blocks are spawned by game_flow_system when transitioning to Playing state
 
-    // Shrink the walls so they fit perfectly in the -80 to 80 viewport (-78 with an extent of 2 places their outer edge directly on 80)
+    // Walls
     auto spawn_wall = [&](Eigen::Vector3f pos, Eigen::Vector2f extents) {
         app->world.spawn(
             core::Transform::from_pos_rot_scale(
@@ -893,8 +1000,7 @@ int main() {
                 .filter     = {},
                 .is_trigger = false
             },
-            RenderColor {core::ColorRGBA32F::rgba(0.85f, 0.9f, 0.9f, 1.0f)}
-            // Bright Off-White/Light Cyan Walls
+            RenderColor {selected_theme.walls}
         );
     };
 
