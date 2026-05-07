@@ -33,15 +33,15 @@ struct Rigidbody {
     float restitution               = 0.3f;
     RigidbodyType body_type         = RigidbodyType::Dynamic;
 
+    /// Accumulates forces applied between ticks. Editted by a public method to apply forces
+    /// Cleared every fixed update
+    Eigen::Vector2f accumulated_force_ = Eigen::Vector2f::Zero();
+
     [[nodiscard]] auto accumulated_force() const -> Eigen::Vector2f;
     [[nodiscard]] auto inv_mass() const -> float;
     auto apply_impulse(Eigen::Vector2f) -> void;
     auto apply_force(Eigen::Vector2f) -> void;
-
-private:
-    /// Accumulates forces applied between ticks. Editted by a public method to apply forces
-    /// Cleared every fixed update
-    Eigen::Vector2f accumulated_force_ = Eigen::Vector2f::Zero();
+    auto clear_accumulated_forces() -> void;
 };
 
 struct Collider {

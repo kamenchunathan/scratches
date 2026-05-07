@@ -10,6 +10,7 @@ engine_sources = [
   'src/physics/components.cpp',
   'src/physics/layer.cpp',
   'src/physics/systems.cpp',
+  'src/physics/shape.cpp',
   'src/renderer/graph.cpp',
   'src/term/layer.cpp',
   'src/term/presenter.cpp',

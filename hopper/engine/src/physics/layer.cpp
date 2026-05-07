@@ -15,15 +15,15 @@ auto PhysicsLayer::build(std::shared_ptr<core::Application> app) -> void {
         app->world.insert_resource(PhysicsConfig {});
     }
 
-    auto sched = app->scheduler;
+    app->scheduler.configure_set<IntegrateSet>(ecs::Stage::FixedUpdate);
+    app->scheduler.configure_set<CollisionResolveSet>(ecs::Stage::FixedUpdate)
+        .after<IntegrateSet>();
+    app->scheduler.configure_set<CleanupSet>(ecs::Stage::FixedUpdate).after<CollisionResolveSet>();
 
-    sched.configure_set<IntegrateSet>(ecs::Stage::FixedUpdate);
-    sched.configure_set<CollisionResolveSet>(ecs::Stage::FixedUpdate).after<IntegrateSet>();
-    sched.configure_set<CleanupSet>(ecs::Stage::FixedUpdate).after<CollisionResolveSet>();
-
-    sched.add_system(ecs::Stage::FixedUpdate, systems::integrate).in_set<IntegrateSet>();
-    sched.add_system(ecs::Stage::FixedUpdate, systems::detect_and_resolve)
+    app->scheduler.add_system(ecs::Stage::FixedUpdate, integrate).in_set<IntegrateSet>();
+    app->scheduler.add_system(ecs::Stage::FixedUpdate, detect_and_resolve)
         .in_set<CollisionResolveSet>();
+    app->scheduler.add_system(ecs::Stage::FixedUpdate, clear_forces).in_set<CleanupSet>();
 }
 
 } // namespace physics

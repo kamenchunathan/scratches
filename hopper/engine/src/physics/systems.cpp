@@ -8,7 +8,6 @@
 #include "physics/layer.hpp"
 #include "physics/shape.hpp"
 #include "time.hpp"
-#include "types.hpp"
 
 namespace physics {
 
@@ -206,6 +205,12 @@ void detect_and_resolve(ecs::World& world) {
             manifold,
             config.position_correction_slop
         );
+    }
+}
+
+auto clear_forces(ecs::World& world) -> void {
+    for (auto [_, rb]: ecs::Query<Rigidbody>(&world)) {
+        rb.clear_accumulated_forces();
     }
 }
 

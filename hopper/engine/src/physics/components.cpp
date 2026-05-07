@@ -21,4 +21,8 @@ auto Rigidbody::inv_mass() const -> float {
     return 0.f;
 }
 
+auto Rigidbody::clear_accumulated_forces() -> void {
+    accumulated_force_ = Eigen::Vector2f::Zero();
+}
+
 } // namespace physics

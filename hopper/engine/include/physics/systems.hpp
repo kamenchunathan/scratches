@@ -2,7 +2,7 @@
 
 #include "ecs/world.hpp"
 
-namespace physics::systems {
+namespace physics {
 
 /// Integrate forces, gravity, damping → update velocity → update Transform position/yaw.
 /// Runs first in FixedUpdate so positions are correct before detection.
@@ -14,4 +14,7 @@ void integrate(ecs::World& world);
 /// Writes results into per-frame contact sets stored on the ContactCache resource.
 void detect_and_resolve(ecs::World& world);
 
-} // namespace physics::systems
+/// Zero all ForceAccumulators so forces don't carry over between ticks.
+void clear_forces(ecs::World& world);
+
+} // namespace physics
