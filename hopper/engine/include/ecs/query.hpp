@@ -1,12 +1,14 @@
 #pragma once
 
-#include "ecs/archetype.hpp"
-#include "ecs/component.hpp"
-#include "ecs/world.hpp"
 #include <algorithm>
 #include <iterator>
 #include <tuple>
 #include <vector>
+
+
+#include "ecs/archetype.hpp"
+#include "ecs/component.hpp"
+#include "ecs/world.hpp"
 
 namespace ecs {
 

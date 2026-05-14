@@ -1,4 +1,5 @@
 #include <cassert>
+#include <span>
 #include <unistd.h>
 
 #include "term/ansi.hpp"
@@ -72,8 +73,8 @@ void TerminalPresenter::render_full_frame(
     std::size_t buffer_width,
     std::size_t buffer_height
 ) {
-    auto term_size_opt = size();
-    const auto term_width = term_size_opt->first;
+    auto term_size_opt     = size();
+    const auto term_width  = term_size_opt->first;
     const auto term_height = term_size_opt->second;
 
     std::uint32_t start_col = 1;
@@ -155,8 +156,8 @@ void TerminalPresenter::render_diff(
     std::uint32_t width,
     std::uint32_t height
 ) {
-    auto term_size_opt = size();
-    const auto term_width = term_size_opt->first;
+    auto term_size_opt     = size();
+    const auto term_width  = term_size_opt->first;
     const auto term_height = term_size_opt->second;
 
     std::uint32_t start_col = 1;

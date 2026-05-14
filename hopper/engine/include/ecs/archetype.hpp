@@ -1,22 +1,23 @@
 #pragma once
 
-#include "component.hpp"
-#include "entity.hpp"
 #include <cassert>
 #include <memory>
 #include <unordered_map>
 #include <vector>
+
+#include "ecs/component.hpp"
+#include "ecs/entity.hpp"
 
 namespace ecs {
 
 /* A type erased component column */
 class ComponentColumn {
 public:
-    virtual ~ComponentColumn() = default;
-    virtual void* get_component_ptr(std::uint32_t index) = 0;
+    virtual ~ComponentColumn()                                       = default;
+    virtual void* get_component_ptr(std::uint32_t index)             = 0;
     virtual const void* get_component_ptr(std::uint32_t index) const = 0;
-    virtual void remove_component(std::uint32_t index) = 0;
-    virtual void reserve(std::size_t capacity) = 0;
+    virtual void remove_component(std::uint32_t index)               = 0;
+    virtual void reserve(std::size_t capacity)                       = 0;
 };
 
 template<typename T>
@@ -76,10 +77,10 @@ public:
     ~Archetype() = default;
 
     // Non-copyable, movable
-    Archetype(const Archetype&) = delete;
+    Archetype(const Archetype&)            = delete;
     Archetype& operator=(const Archetype&) = delete;
-    Archetype(Archetype&&) = default;
-    Archetype& operator=(Archetype&&) = default;
+    Archetype(Archetype&&)                 = default;
+    Archetype& operator=(Archetype&&)      = default;
 
     template<typename T>
     T& get_component(std::uint32_t index);
@@ -148,7 +149,7 @@ T& Archetype::get_component(std::uint32_t index) {
 template<typename T>
 TypedComponentColumn<T>* Archetype::get_component_column() {
     auto component_id = ComponentRegistry::get_id<T>();
-    auto it = components_.find(component_id);
+    auto it           = components_.find(component_id);
     assert(it != components_.end() && "Component not found in archetype");
     return static_cast<TypedComponentColumn<T>*>(it->second.get());
 }
@@ -156,7 +157,7 @@ TypedComponentColumn<T>* Archetype::get_component_column() {
 template<typename T>
 const TypedComponentColumn<T>* Archetype::get_component_column() const {
     auto component_id = ComponentRegistry::get_id<T>();
-    auto it = components_.find(component_id);
+    auto it           = components_.find(component_id);
     assert(it != components_.end() && "Component not found in archetype");
     return static_cast<const TypedComponentColumn<T>*>(it->second.get());
 }
@@ -164,7 +165,7 @@ const TypedComponentColumn<T>* Archetype::get_component_column() const {
 template<typename T>
 void Archetype::add_component_to_column(T&& component) {
     auto component_id = ComponentRegistry::get_id<T>();
-    auto it = components_.find(component_id);
+    auto it           = components_.find(component_id);
 
     if (it == components_.end()) {
         auto column = std::make_unique<TypedComponentColumn<T>>();

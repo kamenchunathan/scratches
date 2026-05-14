@@ -16,7 +16,7 @@ struct ComponentRegistryTag {};
 constexpr std::uint32_t MAX_COMPONENTS = 128;
 
 using ComponentMask = std::bitset<MAX_COMPONENTS>;
-using ComponentId = std::uint32_t;
+using ComponentId   = std::uint32_t;
 
 struct Signature {
     std::bitset<MAX_COMPONENTS> mask;

@@ -6,10 +6,10 @@
 #include <unordered_map>
 #include <vector>
 
-#include "archetype.hpp"
-#include "component.hpp"
-#include "entity.hpp"
-#include "resource.hpp"
+#include "ecs/archetype.hpp"
+#include "ecs/component.hpp"
+#include "ecs/entity.hpp"
+#include "ecs/resource.hpp"
 
 namespace ecs {
 
