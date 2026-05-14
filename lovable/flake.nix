@@ -57,7 +57,12 @@
 
             # Game dev deps
             alsa-lib
+            alsa-plugins
             systemd
+            glib
+            gtk3
+            # System tray
+            libayatana-appindicator
 
             vulkan-loader
             vulkan-tools
@@ -67,6 +72,7 @@
             xorg.libXi
             xorg.libXrandr
             libxkbcommon
+            xdotool
 
             nixgl.nixVulkanIntel
           ];
@@ -90,6 +96,10 @@
               xorg.libXi
               xorg.libXcursor
               libxkbcommon
+              glib
+              gtk3
+              xdotool
+              libayatana-appindicator
             ];
           };
         };
