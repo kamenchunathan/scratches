@@ -148,6 +148,9 @@ pub fn build_platform_tray(world: &mut World) {
 
     let menu = build_platform_menu(&tray.menu);
 
+    // Required by libappindicator (Linux) — safe to call multiple times
+    let _ = gtk::init();
+
     match TrayIconBuilder::new()
         .with_title("Lovable")
         .with_icon(icon)
