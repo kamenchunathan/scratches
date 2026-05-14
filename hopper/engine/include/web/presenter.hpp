@@ -12,8 +12,10 @@ public:
     void init() override;
     void deinit() override;
     void present(
-        const renderer::FrameBufferPrev<renderer::CharacterPixel>& front_buffer,
-        const renderer::FrameBufferPrev<renderer::CharacterPixel>& back_buffer
+        const std::span<const renderer::CharacterPixel> front_buffer,
+        const std::span<const renderer::CharacterPixel> back_buffer,
+        std::size_t width,
+        std::size_t height
     ) override;
 };
 

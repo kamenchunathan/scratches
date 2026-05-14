@@ -3,6 +3,7 @@
 #include <cassert>
 #include <cstdio>
 #include <optional>
+#include <span>
 #include <sstream>
 #include <sys/ioctl.h>
 #include <termios.h>

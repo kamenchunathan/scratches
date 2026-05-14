@@ -1,14 +1,16 @@
 #pragma once
 
-#include "renderer/types.hpp"
 #include <cstddef>
+#include <span>
+
+#include "renderer/types.hpp"
 
 namespace renderer {
 
 class Presenter {
 public:
-    virtual ~Presenter() = default;
-    virtual void init() = 0;
+    virtual ~Presenter()  = default;
+    virtual void init()   = 0;
     virtual void deinit() = 0;
     virtual void present(
         const std::span<const renderer::CharacterPixel> front_buffer,

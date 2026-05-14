@@ -5,6 +5,7 @@
     #include <cstdint>
     #include <emscripten.h>
     #include <emscripten/html5.h>
+    #include <span>
 
     #include "web/presenter.hpp"
 
@@ -37,10 +38,12 @@ void BrowserPresenter::init() {
 void BrowserPresenter::deinit() {}
 
 void BrowserPresenter::present(
-    const renderer::FrameBufferPrev<renderer::CharacterPixel>& front_buffer,
-    const renderer::FrameBufferPrev<renderer::CharacterPixel>&
+    const std::span<const renderer::CharacterPixel> front_buffer,
+    const std::span<const renderer::CharacterPixel>,
+    std::size_t width,
+    std::size_t height
 ) {
-    render_to_dom(front_buffer.data().data(), front_buffer.width(), front_buffer.height());
+    render_to_dom(front_buffer.data(), width, height);
 }
 
 } // namespace web
