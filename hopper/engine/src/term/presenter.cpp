@@ -2,6 +2,8 @@
 #include <span>
 #include <unistd.h>
 
+#include "profile.hpp"
+
 #include "term/ansi.hpp"
 #include "term/presenter.hpp"
 #include "util/text.hpp"
@@ -32,6 +34,7 @@ void TerminalPresenter::deinit() {
 }
 
 void TerminalPresenter::flush() {
+    HOPPER_ZONE_NAMED("TerminalPresenter::flush");
     const std::string content = buf_.str();
     if (content.empty()) {
         return;
@@ -73,6 +76,7 @@ void TerminalPresenter::render_full_frame(
     std::size_t buffer_width,
     std::size_t buffer_height
 ) {
+    HOPPER_ZONE_NAMED("render_full_frame");
     auto term_size_opt     = size();
     const auto term_width  = term_size_opt->first;
     const auto term_height = term_size_opt->second;
@@ -218,6 +222,7 @@ void TerminalPresenter::present(
     std::size_t height
 
 ) {
+    HOPPER_ZONE_NAMED("TerminalPresenter::present");
     // const auto& front_buffer_data = front_buffer.data();
     // const auto& back_buffer_data = back_buffer.data();
     // const auto width = front_buffer.width();

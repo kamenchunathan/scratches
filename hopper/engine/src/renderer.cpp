@@ -1,7 +1,8 @@
 #include <cassert>
 #include <memory>
-#include <print>
-#include <tuple>
+
+#include "log.hpp"
+#include "profile.hpp"
 
 #include "renderer.hpp"
 #include "renderer/buffer.hpp"
@@ -25,7 +26,7 @@ Renderer::Renderer(std::uint32_t w, std::uint32_t h, std::unique_ptr<Presenter> 
             Attachment {
                 .view
                 = TextureView {.texture = char_texture_handle, .x = 0, .y = 0, .width = w, .height = h},
-                .load = LoadOp::Load,
+                .load  = LoadOp::Load,
                 .store = StoreOp::Store,
             }
 
@@ -37,7 +38,7 @@ Renderer::Renderer(std::uint32_t w, std::uint32_t h, std::unique_ptr<Presenter> 
             Attachment {
                 .view
                 = TextureView {.texture = back_char_texture_handle, .x = 0, .y = 0, .width = w, .height = h},
-                .load = LoadOp::Load,
+                .load  = LoadOp::Load,
                 .store = StoreOp::Store,
             }
 
@@ -59,6 +60,7 @@ void Renderer::submit(std::unique_ptr<RenderCommand> command) {
 }
 
 void Renderer::present() {
+    HOPPER_ZONE_NAMED("Renderer::present");
     const Texture2D<renderer::CharacterPixel>* fb
         = resource_registry.get_texture(std::get<0>(front_buffer_.value().attachments).view.texture)
               .value();
@@ -71,14 +73,17 @@ void Renderer::present() {
 }
 
 void Renderer::swap_buffers() {
+    HOPPER_ZONE_NAMED("Renderer::swap_buffers");
     // BUG:  New Renderer Implementation does not swap buffers.
     // Shouldn't matter since presenter only ever presents the front buffer anyway
 }
 
 void Renderer::render_frame() {
+    HOPPER_ZONE_NAMED("Renderer::render_frame");
     RenderPassEncoder encoder(resource_registry);
     const std::vector<RenderPass*>& passes = render_graph.compile();
     for (auto pass: passes) {
+        HOPPER_ZONE_DYNAMIC(pass->name().c_str(), pass->name().size());
         auto it = command_queues_.find(pass->name());
         if (it == command_queues_.end()) {
             continue;
@@ -120,25 +125,32 @@ void RendererPrev::submit(std::unique_ptr<RenderCommandPrev> command) {
 }
 
 void RendererPrev::present() {
+    HOPPER_ZONE_NAMED("RendererPrev::present");
     auto* front = buffer_registry.get_buffer(front_buffer_handle_);
-    auto* back = buffer_registry.get_buffer(back_buffer_handle_);
+    auto* back  = buffer_registry.get_buffer(back_buffer_handle_);
     presenter_->present(front->data(), back->data(), front->width(), front->height());
 }
 
 void RendererPrev::swap_buffers() {
+    HOPPER_ZONE_NAMED("RendererPrev::swap_buffers");
     auto* front = buffer_registry.get_buffer(front_buffer_handle_);
-    auto* back = buffer_registry.get_buffer(back_buffer_handle_);
+    auto* back  = buffer_registry.get_buffer(back_buffer_handle_);
 
     std::swap(front->data(), back->data());
 }
 
 void RendererPrev::render_frame() {
+    HOPPER_ZONE_NAMED("RendererPrev::render_frame");
     RenderPassEncoderPrev encoder(pipeline_registry, buffer_registry, shader_resource_registry);
     const std::vector<RenderPass*>& passes = render_graph.compile();
     for (auto pass: passes) {
+        HOPPER_ZONE_DYNAMIC(pass->name().c_str(), pass->name().size());
         auto it = command_queues_.find(pass->name());
         if (it == command_queues_.end()) {
-            std::println("Command submitted with a target renderpass that is not set up");
+            HOPPER_ERROR(
+                "renderer",
+                "Command submitted with a target renderpass that is not set up"
+            );
             continue;
         }
         std::vector<std::unique_ptr<renderer::RenderCommandPrev>>& commands = it->second;

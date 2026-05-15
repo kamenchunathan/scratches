@@ -19,9 +19,9 @@ namespace renderer {
  */
 namespace halfblock {
 
-    inline constexpr const char* CLEAR_PASS = "clear_pass";
-    inline constexpr const char* COLOR_PASS_BG = "color_pass_bg";
-    inline constexpr const char* COLOR_PASS_FG = "color_pass_fg";
+    inline constexpr const char* CLEAR_PASS     = "clear_pass";
+    inline constexpr const char* COLOR_PASS_BG  = "color_pass_bg";
+    inline constexpr const char* COLOR_PASS_FG  = "color_pass_fg";
     inline constexpr const char* HALFBLOCK_PASS = "halfblock_pass";
 
     // Implementation of clear command
@@ -73,18 +73,18 @@ namespace halfblock {
 
         void execute(RenderPassEncoder&) override {
             auto color_tex = registry_.get_texture(color_texture_);
-            auto char_tex = registry_.get_texture_mut(char_texture_);
+            auto char_tex  = registry_.get_texture_mut(char_texture_);
 
             if (!color_tex || !char_tex)
                 return;
 
             const auto* color_data = color_tex.value();
-            auto* char_data = char_tex.value();
+            auto* char_data        = char_tex.value();
 
-            const std::uint32_t color_width = color_data->width();
+            const std::uint32_t color_width  = color_data->width();
             const std::uint32_t color_height = color_data->height();
-            const std::uint32_t char_width = char_data->width();
-            const std::uint32_t char_height = char_data->height();
+            const std::uint32_t char_width   = char_data->width();
+            const std::uint32_t char_height  = char_data->height();
 
             auto to_rgb8 = [](const core::ColorRGBA32F& c) {
                 return core::ColorRGB8::rgb(
@@ -96,8 +96,8 @@ namespace halfblock {
 
             for (std::uint32_t char_y = 0; char_y < char_height; ++char_y) {
                 for (std::uint32_t char_x = 0; char_x < char_width; ++char_x) {
-                    std::uint32_t color_x = std::min(char_x, color_width - 1);
-                    std::uint32_t color_y_top = std::min(char_y * 2, color_height - 1);
+                    std::uint32_t color_x        = std::min(char_x, color_width - 1);
+                    std::uint32_t color_y_top    = std::min(char_y * 2, color_height - 1);
                     std::uint32_t color_y_bottom = std::min(color_y_top + 1, color_height - 1);
 
                     core::ColorRGBA32F top
@@ -107,8 +107,8 @@ namespace halfblock {
 
                     char_data->data_mut()[char_y * char_width + char_x] = CharacterPixel {
                         .codepoint = U'▀',
-                        .fg_color = to_rgb8(top),
-                        .bg_color = to_rgb8(bottom)
+                        .fg_color  = to_rgb8(top),
+                        .bg_color  = to_rgb8(bottom)
                     };
                 }
             }
@@ -127,7 +127,7 @@ namespace halfblock {
         std::uint32_t char_width,
         std::uint32_t char_height
     ) {
-        const std::uint32_t pixel_width = char_width;
+        const std::uint32_t pixel_width  = char_width;
         const std::uint32_t pixel_height = char_height * 2;
 
         auto color_texture

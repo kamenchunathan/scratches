@@ -7,6 +7,8 @@
 
 #include <Eigen/Dense>
 
+#include "profile.hpp"
+
 #include "renderer/buffer.hpp"
 #include "renderer/resource.hpp"
 #include "renderer/shader.hpp"
@@ -84,7 +86,7 @@ public:
     void draw_indexed(
         const std::vector<uint32_t>& indices,
         uint32_t first_index = 0,
-        uint32_t count = 0
+        uint32_t count       = 0
     );
 
 private:
@@ -119,16 +121,17 @@ void RenderPassEncoderPrev::draw_prev(
     std::uint32_t vertex_count,
     std::uint32_t first_vertex
 ) {
+    HOPPER_ZONE_NAMED("RenderPassEncoderPrev::draw");
     // TODO: Better error handling
-    PipelinePrev<VertexIn, VertexOut, FragOut, RequiredResources...>* pipeline =
-        pipeline_registry_
-            .get_pipeline<PipelinePrev<VertexIn, VertexOut, FragOut, RequiredResources...>>();
+    PipelinePrev<VertexIn, VertexOut, FragOut, RequiredResources...>* pipeline
+        = pipeline_registry_
+              .get_pipeline<PipelinePrev<VertexIn, VertexOut, FragOut, RequiredResources...>>();
 
     if (!pipeline) {
         return;
     }
 
-    FrameBufferPrev<VertexIn>* vb = buffer_registry_.get_buffer(vertex_buffer_handle);
+    FrameBufferPrev<VertexIn>* vb        = buffer_registry_.get_buffer(vertex_buffer_handle);
     FrameBufferPrev<FragOut>* out_buffer = buffer_registry_.get_buffer(output_buffer_handle);
     auto resources = shader_resource_registry_.extract<RequiredResources...>();
 
@@ -136,8 +139,8 @@ void RenderPassEncoderPrev::draw_prev(
     if (first_vertex >= vertex_data.size()) {
         return;
     }
-    std::uint32_t end_vertex =
-        std::min(first_vertex + vertex_count, static_cast<std::uint32_t>(vertex_data.size()));
+    std::uint32_t end_vertex
+        = std::min(first_vertex + vertex_count, static_cast<std::uint32_t>(vertex_data.size()));
     std::uint32_t actual_vertex_count = end_vertex - first_vertex;
 
     assert(actual_vertex_count % 3 == 0 && "Vertices must be a multiple of 3");
@@ -155,7 +158,7 @@ void RenderPassEncoderPrev::draw_prev(
         );
     }
 
-    const std::uint32_t imageWidth = out_buffer->width();
+    const std::uint32_t imageWidth  = out_buffer->width();
     const std::uint32_t imageHeight = out_buffer->height();
 
     std::vector<FragOut>& new_frame_buffer_data = out_buffer->data();
@@ -172,18 +175,15 @@ void RenderPassEncoderPrev::draw_prev(
         Eigen::Vector3f v2_ndc = v2_clip.position.template head<3>() / v2_clip.position.w();
 
         // Viewport transform
-        Eigen::Vector2f v0_screen = {
-            (v0_ndc.x() + 1.0f) * 0.5f * imageWidth,
-            (1.0f - (v0_ndc.y() + 1.0f) * 0.5f) * imageHeight
-        };
-        Eigen::Vector2f v1_screen = {
-            (v1_ndc.x() + 1.0f) * 0.5f * imageWidth,
-            (1.0f - (v1_ndc.y() + 1.0f) * 0.5f) * imageHeight
-        };
-        Eigen::Vector2f v2_screen = {
-            (v2_ndc.x() + 1.0f) * 0.5f * imageWidth,
-            (1.0f - (v2_ndc.y() + 1.0f) * 0.5f) * imageHeight
-        };
+        Eigen::Vector2f v0_screen
+            = {(v0_ndc.x() + 1.0f) * 0.5f * imageWidth,
+               (1.0f - (v0_ndc.y() + 1.0f) * 0.5f) * imageHeight};
+        Eigen::Vector2f v1_screen
+            = {(v1_ndc.x() + 1.0f) * 0.5f * imageWidth,
+               (1.0f - (v1_ndc.y() + 1.0f) * 0.5f) * imageHeight};
+        Eigen::Vector2f v2_screen
+            = {(v2_ndc.x() + 1.0f) * 0.5f * imageWidth,
+               (1.0f - (v2_ndc.y() + 1.0f) * 0.5f) * imageHeight};
 
         // Bounding box of the triangle
         int xmin = std::max(
@@ -218,12 +218,12 @@ void RenderPassEncoderPrev::draw_prev(
                 Eigen::Vector2f edge2 = v1_screen - v0_screen;
 
                 bool overlaps = true;
-                overlaps &=
-                    (w0 == 0 ? ((edge0.y() == 0 && edge0.x() > 0) || edge0.y() > 0) : (w0 > 0));
-                overlaps &=
-                    (w1 == 0 ? ((edge1.y() == 0 && edge1.x() > 0) || edge1.y() > 0) : (w1 > 0));
-                overlaps &=
-                    (w2 == 0 ? ((edge2.y() == 0 && edge2.x() > 0) || edge2.y() > 0) : (w2 > 0));
+                overlaps
+                    &= (w0 == 0 ? ((edge0.y() == 0 && edge0.x() > 0) || edge0.y() > 0) : (w0 > 0));
+                overlaps
+                    &= (w1 == 0 ? ((edge1.y() == 0 && edge1.x() > 0) || edge1.y() > 0) : (w1 > 0));
+                overlaps
+                    &= (w2 == 0 ? ((edge2.y() == 0 && edge2.x() > 0) || edge2.y() > 0) : (w2 > 0));
 
                 if (overlaps) {
                     float bc0 = w0 / area;
@@ -237,8 +237,8 @@ void RenderPassEncoderPrev::draw_prev(
                         float one_over_w1 = 1.0f / v1_clip.position.w();
                         float one_over_w2 = 1.0f / v2_clip.position.w();
 
-                        float w_interp_reciprocal =
-                            1.0f / (bc0 * one_over_w0 + bc1 * one_over_w1 + bc2 * one_over_w2);
+                        float w_interp_reciprocal
+                            = 1.0f / (bc0 * one_over_w0 + bc1 * one_over_w1 + bc2 * one_over_w2);
 
                         auto bc0_persp = bc0 * one_over_w0 * w_interp_reciprocal;
                         auto bc1_persp = bc1 * one_over_w1 * w_interp_reciprocal;
@@ -270,10 +270,11 @@ void RenderPassEncoderPrev::draw_prev(
                             t0
                         );
 
-                        VertexOut interpolated_v =
-                            detail::construct_from_tuple<VertexOut>(std::move(interpolated_tuple));
+                        VertexOut interpolated_v = detail::construct_from_tuple<VertexOut>(
+                            std::move(interpolated_tuple)
+                        );
 
-                        z_buffer[y * imageWidth + x] = z_interpolated;
+                        z_buffer[y * imageWidth + x]              = z_interpolated;
                         new_frame_buffer_data[y * imageWidth + x] = std::apply(
                             [&](auto&&... args) {
                                 return pipeline->shader->fragment(interpolated_v, args...);
@@ -297,22 +298,23 @@ void RenderPassEncoder::draw(
     std::uint32_t vertex_count,
     std::uint32_t first_vertex
 ) {
-    std::expected<const Pipeline*, ResourceError> p =
-        resource_registry_.get_pipeline(pipeline_handle);
+    HOPPER_ZONE_NAMED("RenderPassEncoder::draw");
+    std::expected<const Pipeline*, ResourceError> p
+        = resource_registry_.get_pipeline(pipeline_handle);
     if (!p)
         return;
     const Pipeline* pipeline = p.value();
 
-    std::expected<std::span<const typename Pipeline::vertex_in>, ResourceError> vertex_buffer_res =
-        resource_registry_.get_buffer(vertex_buffer_handle);
+    std::expected<std::span<const typename Pipeline::vertex_in>, ResourceError> vertex_buffer_res
+        = resource_registry_.get_buffer(vertex_buffer_handle);
     if (!vertex_buffer_res)
         return;
     std::span<const typename Pipeline::vertex_in> vertex_buffer = vertex_buffer_res.value();
 
     auto get_texture_from_attachment = [&](const auto& attachment) {
         using AttachmentType = std::remove_cvref_t<decltype(attachment)>;
-        using PixelType = typename attachment_format<AttachmentType>::type;
-        auto texture_res = resource_registry_.get_texture_mut(attachment.view.texture);
+        using PixelType      = typename attachment_format<AttachmentType>::type;
+        auto texture_res     = resource_registry_.get_texture_mut(attachment.view.texture);
         if (!texture_res)
             return (Texture2D<PixelType>*)nullptr;
         return texture_res.value();
@@ -328,14 +330,14 @@ void RenderPassEncoder::draw(
     const auto* first_texture = std::get<0>(attachment_textures);
     if (!first_texture)
         return;
-    const std::uint32_t imageWidth = first_texture->width();
+    const std::uint32_t imageWidth  = first_texture->width();
     const std::uint32_t imageHeight = first_texture->height();
 
     if (first_vertex >= vertex_buffer.size()) {
         return;
     }
-    std::uint32_t end_vertex =
-        std::min(first_vertex + vertex_count, static_cast<std::uint32_t>(vertex_buffer.size()));
+    std::uint32_t end_vertex
+        = std::min(first_vertex + vertex_count, static_cast<std::uint32_t>(vertex_buffer.size()));
     std::uint32_t actual_vertex_count = end_vertex - first_vertex;
 
     auto* shader = pipeline->shader.get();
@@ -366,18 +368,15 @@ void RenderPassEncoder::draw(
         Eigen::Vector3f v1_ndc = v1_clip.position.template head<3>() / v1_clip.position.w();
         Eigen::Vector3f v2_ndc = v2_clip.position.template head<3>() / v2_clip.position.w();
 
-        Eigen::Vector2f v0_screen = {
-            (v0_ndc.x() + 1.0f) * 0.5f * imageWidth,
-            (1.0f - (v0_ndc.y() + 1.0f) * 0.5f) * imageHeight
-        };
-        Eigen::Vector2f v1_screen = {
-            (v1_ndc.x() + 1.0f) * 0.5f * imageWidth,
-            (1.0f - (v1_ndc.y() + 1.0f) * 0.5f) * imageHeight
-        };
-        Eigen::Vector2f v2_screen = {
-            (v2_ndc.x() + 1.0f) * 0.5f * imageWidth,
-            (1.0f - (v2_ndc.y() + 1.0f) * 0.5f) * imageHeight
-        };
+        Eigen::Vector2f v0_screen
+            = {(v0_ndc.x() + 1.0f) * 0.5f * imageWidth,
+               (1.0f - (v0_ndc.y() + 1.0f) * 0.5f) * imageHeight};
+        Eigen::Vector2f v1_screen
+            = {(v1_ndc.x() + 1.0f) * 0.5f * imageWidth,
+               (1.0f - (v1_ndc.y() + 1.0f) * 0.5f) * imageHeight};
+        Eigen::Vector2f v2_screen
+            = {(v2_ndc.x() + 1.0f) * 0.5f * imageWidth,
+               (1.0f - (v2_ndc.y() + 1.0f) * 0.5f) * imageHeight};
 
         int xmin = std::max(
             0,
@@ -411,12 +410,12 @@ void RenderPassEncoder::draw(
                 Eigen::Vector2f edge2 = v1_screen - v0_screen;
 
                 bool overlaps = true;
-                overlaps &=
-                    (w0 == 0 ? ((edge0.y() == 0 && edge0.x() > 0) || edge0.y() > 0) : (w0 > 0));
-                overlaps &=
-                    (w1 == 0 ? ((edge1.y() == 0 && edge1.x() > 0) || edge1.y() > 0) : (w1 > 0));
-                overlaps &=
-                    (w2 == 0 ? ((edge2.y() == 0 && edge2.x() > 0) || edge2.y() > 0) : (w2 > 0));
+                overlaps
+                    &= (w0 == 0 ? ((edge0.y() == 0 && edge0.x() > 0) || edge0.y() > 0) : (w0 > 0));
+                overlaps
+                    &= (w1 == 0 ? ((edge1.y() == 0 && edge1.x() > 0) || edge1.y() > 0) : (w1 > 0));
+                overlaps
+                    &= (w2 == 0 ? ((edge2.y() == 0 && edge2.x() > 0) || edge2.y() > 0) : (w2 > 0));
 
                 if (overlaps) {
                     float bc0 = w0 / area;
@@ -430,8 +429,8 @@ void RenderPassEncoder::draw(
                         float one_over_w1 = 1.0f / v1_clip.position.w();
                         float one_over_w2 = 1.0f / v2_clip.position.w();
 
-                        float w_interp_reciprocal =
-                            1.0f / (bc0 * one_over_w0 + bc1 * one_over_w1 + bc2 * one_over_w2);
+                        float w_interp_reciprocal
+                            = 1.0f / (bc0 * one_over_w0 + bc1 * one_over_w1 + bc2 * one_over_w2);
 
                         auto bc0_persp = bc0 * one_over_w0 * w_interp_reciprocal;
                         auto bc1_persp = bc1 * one_over_w1 * w_interp_reciprocal;
@@ -461,8 +460,8 @@ void RenderPassEncoder::draw(
                             t0
                         );
 
-                        typename Pipeline::vertex_out interpolated_v =
-                            detail::construct_from_tuple<typename Pipeline::vertex_out>(
+                        typename Pipeline::vertex_out interpolated_v
+                            = detail::construct_from_tuple<typename Pipeline::vertex_out>(
                                 std::move(interpolated_tuple)
                             );
 
@@ -492,8 +491,8 @@ void RenderPassEncoder::draw(
                             (([&] {
                                  auto* tex = std::get<Is>(attachment_textures);
                                  if (tex) {
-                                     tex->data_mut()[y * imageWidth + x] =
-                                         std::get<Is>(frag_output_tuple);
+                                     tex->data_mut()[y * imageWidth + x]
+                                         = std::get<Is>(frag_output_tuple);
                                  }
                              }()),
                              ...);
