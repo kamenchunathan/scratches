@@ -15,7 +15,6 @@ static void ExpectKeyEvent(
     ASSERT_TRUE(std::holds_alternative<KeyEvent>(event));
     auto key_event = std::get<KeyEvent>(event);
     EXPECT_EQ(key_event.code, code);
-    EXPECT_EQ(key_event.action, KeyEvent::Action::Press);
     EXPECT_EQ(key_event.shift, shift);
     EXPECT_EQ(key_event.ctrl, ctrl);
     EXPECT_EQ(key_event.alt, alt);

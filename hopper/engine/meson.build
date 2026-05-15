@@ -57,6 +57,7 @@ if get_option('hopper_tracy')
     add_project_arguments('-DHOPPER_TRACY', language: 'cpp')
 
     engine_lib_deps += tracy_dep
+    engine_dep_deps += tracy_dep
   else
     warning(
       'hopper_tracy is not supported on WASM/emscripten targets; option ignored',
@@ -88,26 +89,11 @@ engine_dep = declare_dependency(
   link_args: emscripten_link_args,
 )
 
-diff_test_exe = executable(
-  'diff_test',
-  'test/diff.cpp',
-  dependencies: [
-    engine_dep,
-    dependency('gtest', main: true, fallback: ['gtest', 'gtest_dep']),
-  ],
-  install: false,
-)
+gtest_subp = subproject('gtest', default_options: ['default_library=static'])
+gtest_dep = gtest_subp.get_variable('gtest_dep')
 
-test('Diff tests', diff_test_exe)
-
-application_test_exe = executable(
-  'application_test',
-  'test/application.cpp',
-  dependencies: [
-    engine_dep,
-    dependency('gtest', main: false, fallback: ['gtest', 'gtest_dep']),
-  ],
-  install: false,
-)
-
-test('Application tests', application_test_exe)
+test('diff tests', executable('diff_test', 'test/diff.cpp', dependencies: [engine_dep, gtest_dep], install: false))
+test('application tests', executable('application_test', 'test/application.cpp', dependencies: [engine_dep, gtest_dep], install: false))
+test('color tests', executable('color_test', 'test/color.cpp', dependencies: [engine_dep, gtest_dep], install: false))
+test('input parser tests', executable('input_parser_test', 'test/input_parser.cpp', dependencies: [engine_dep, gtest_dep], install: false))
+test('renderer tests', executable('renderer_test', 'test/renderer.cpp', dependencies: [engine_dep, gtest_dep], install: false))

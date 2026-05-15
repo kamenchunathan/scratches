@@ -37,6 +37,7 @@
                     openssl
                     protobuf
                     spdlog
+                    gtest
                   
                     clang-tools
                     llvmPackages_22.libcxxClang

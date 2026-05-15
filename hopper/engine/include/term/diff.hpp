@@ -97,8 +97,10 @@ public:
 
     void build_trace(const Box& box, std::vector<Snake>& out);
 
-private:
+protected:
     Snake find_middle_snake(const Box&);
+
+private:
 
     std::vector<std::int32_t> forward_v_;
     std::vector<std::int32_t> reverse_v_;
