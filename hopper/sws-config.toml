@@ -1,0 +1,12 @@
+[general]
+
+port = 8000
+log-level = "info"
+
+[advanced]
+
+# Apply COOP and COEP headers to all routes
+[[advanced.headers]]
+source = "**/*"
+headers = { Cross-Origin-Opener-Policy = "same-origin", Cross-Origin-Embedder-Policy = "credentialless" }
+

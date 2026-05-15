@@ -49,8 +49,7 @@ serve binary_name:
     echo "Starting server at http://localhost:8080"
     
     # Assumes static-web-server is installed 
-    static-web-server -g debug --port 8000 -d public
-    
+    static-web-server --config-file sws-config.toml
 
 watch_lab binary_name:
     #!/bin/bash
