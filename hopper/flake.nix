@@ -34,8 +34,12 @@
                 packages =
                   with pkgs;
                   [
+                    openssl
+                    protobuf
+                    spdlog
+                  
                     clang-tools
-                    llvmPackages_21.libcxxClang
+                    llvmPackages_22.libcxxClang
                     emscripten
                     cmake
                     cppcheck
@@ -46,11 +50,11 @@
                     ninja
                     just
 
-                    openssl
-                    protobuf
-
+                    static-web-server
                   ]
-                  ++ (if system == "aarch64-darwin" then [ ] else [ gdb ]);
+                  ++ (if stdenv.hostPlatform.system == "aarch64-darwin" then [ ] else [ gdb ]);
+                  
+                  LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath [pkgs.llvmPackages_22.libcxxClang.cc.lib];
               };
         }
       );

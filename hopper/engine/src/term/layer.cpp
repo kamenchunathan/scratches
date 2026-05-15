@@ -1,4 +1,3 @@
-#include <cerrno>
 #include <chrono>
 #include <csignal>
 #include <cstdio>
@@ -110,13 +109,13 @@ void TerminalLayer::build(std::shared_ptr<core::Application> app) {
 }
 
 void TerminalLayer::run(std::shared_ptr<core::Application> app) {
-    auto last_time = std::chrono::high_resolution_clock::now();
+    auto last_time                   = std::chrono::high_resolution_clock::now();
     const auto target_frame_duration = std::chrono::milliseconds(1000 / frame_rate);
 
     while (!app->should_exit()) {
         auto frame_start_time = std::chrono::high_resolution_clock::now();
-        auto delta_time = frame_start_time - last_time;
-        last_time = frame_start_time;
+        auto delta_time       = frame_start_time - last_time;
+        last_time             = frame_start_time;
 
         // Update the InputState resource
         auto events = terminal->poll_input();

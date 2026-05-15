@@ -1,4 +1,5 @@
 #include "application.hpp"
+#include "log.hpp"
 
 #include "ecs/system.hpp"
 #include "time.hpp"
@@ -10,6 +11,7 @@ void Application::set_runner(Runner runner) {
 }
 
 void Application::run() {
+    HOPPER_INFO("Starting application");
     scheduler.run_stage(ecs::Stage::Startup, world);
     if (runner_) {
         runner_(shared_from_this());

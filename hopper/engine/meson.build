@@ -7,6 +7,7 @@ engine_sources = [
   'src/transform.cpp',
   'src/ecs/archetype.cpp',
   'src/ecs/world.cpp',
+  'src/log/layer.cpp',
   'src/physics/components.cpp',
   'src/physics/layer.cpp',
   'src/physics/systems.cpp',
@@ -29,12 +30,40 @@ engine_dep_deps = [
   dependency('eigen3', version: '>=3.4'),
 ]
 
+if get_option('hopper_logging')
+  spdlog_dep = subproject(
+    'spdlog',
+    default_options: ['default_library=static'],
+  ).get_variable('spdlog_dep')
+
+  engine_lib_deps += spdlog_dep
+  engine_dep_deps += spdlog_dep
+  add_project_arguments('-DHOPPER_LOGGING', language: 'cpp')
+endif
+
+if get_option('hopper_metrics')
+  add_project_arguments('-DHOPPER_METRICS', language: 'cpp')
+endif
+
+if get_option('hopper_tracy')
+  tracy_dep = dependency(
+    'tracy',
+    fallback: ['tracy', 'tracy_dep'],
+    default_options: ['tracy_enable=true', 'tracy_on_demand=true'],
+  )
+  add_project_arguments('-DHOPPER_TRACY', language: 'cpp')
+else
+  tracy_dep = dependency(
+    'tracy',
+    fallback: ['tracy', 'tracy_dep'],
+    default_options: ['tracy_enable=false'],
+  )
+endif
+
 emscripten_link_args = []
 
 if host_machine.system() == 'emscripten'
-  emscripten_link_args += [
-    '--js-library=' + meson.current_source_dir() / 'web_presenter.js'
-  ]
+  emscripten_link_args += ['--js-library=' + meson.current_source_dir() / 'web_presenter.js']
 else
   engine_lib_deps += dependency('libpng', static: true)
   engine_dep_deps += dependency('libpng', static: true)

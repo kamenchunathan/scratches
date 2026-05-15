@@ -1,4 +1,11 @@
 executable(
+  'hello_world',
+  'hello_world.cpp',
+  install: false,
+  dependencies: [engine_dep],
+)
+
+executable(
   'iterators',
   'iterators.cpp',
   install: false,

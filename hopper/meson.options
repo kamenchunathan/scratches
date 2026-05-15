@@ -1,0 +1,24 @@
+option(
+  'hopper_logging',
+  type: 'boolean',
+  value: true,
+  description: 'Enable engine logging',
+)
+option(
+  'hopper_tracy',
+  type: 'boolean',
+  value: false,
+  description: 'Enable Tracy profiling',
+)
+option(
+  'hopper_metrics',
+  type: 'boolean',
+  value: false,
+  description: 'Enable runtime metrics reporting',
+)
+option(
+  'hopper_crash_reporter',
+  type: 'boolean',
+  value: true,
+  description: 'Enable crash handler and stack trace capture',
+)

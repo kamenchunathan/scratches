@@ -5,10 +5,11 @@
     #include <emscripten.h>
     #include <emscripten/html5.h>
 
-    #include "application.hpp"
-    #include "web/layer.hpp"
+    #include <memory>
 
-EM_JS(void, my_log, (const char* msg), { console.log('BrowserLayer: ' + UTF8ToString(msg)); });
+    #include "application.hpp"
+    #include "log.hpp"
+    #include "web/layer.hpp"
 
 extern "C" {
 EMSCRIPTEN_KEEPALIVE
@@ -21,7 +22,7 @@ bool main_loop_callback(double time, void* user_data) {
         state->app->tick(delta_ms);
         return !state->app->should_exit();
     } catch (const std::exception& e) {
-        my_log(e.what());
+        HOPPER_ERROR("{}", e.what());
         return false;
     }
 }
@@ -30,10 +31,9 @@ bool main_loop_callback(double time, void* user_data) {
 namespace web {
 
 void run(std::shared_ptr<core::Application> app) {
-    my_log("Hello world");
     auto opt_state = app->world.get_resource<web::BrowserLayer::State>();
     if (!opt_state) {
-        my_log("State not found");
+        HOPPER_ERROR("State not found");
         return;
     }
     emscripten_request_animation_frame_loop(main_loop_callback, &opt_state->get());
