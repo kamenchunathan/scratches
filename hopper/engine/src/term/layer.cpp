@@ -9,6 +9,7 @@
 #include <unistd.h>
 
 #include "input.hpp"
+#include "profile.hpp"
 #include "term/ansi.hpp"
 #include "term/input_parser.hpp"
 #include "term/layer.hpp"
@@ -125,6 +126,7 @@ void TerminalLayer::run(std::shared_ptr<core::Application> app) {
 
         app->tick(std::chrono::duration<double>(delta_time).count());
 
+        HOPPER_FRAME_MARK();
         auto work_duration = std::chrono::high_resolution_clock::now() - frame_start_time;
         if (work_duration < target_frame_duration) {
             std::this_thread::sleep_for(target_frame_duration - work_duration);

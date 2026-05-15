@@ -5,6 +5,7 @@ engine_sources = [
   'src/input.cpp',
   'src/renderer.cpp',
   'src/transform.cpp',
+  'src/log.cpp',
   'src/ecs/archetype.cpp',
   'src/ecs/world.cpp',
   'src/log/layer.cpp',
@@ -49,15 +50,12 @@ if get_option('hopper_tracy')
   tracy_dep = dependency(
     'tracy',
     fallback: ['tracy', 'tracy_dep'],
-    default_options: ['tracy_enable=true', 'tracy_on_demand=true'],
+    default_options: ['tracy_enable=true', 'on_demand=true'],
+    static: true,
   )
   add_project_arguments('-DHOPPER_TRACY', language: 'cpp')
-else
-  tracy_dep = dependency(
-    'tracy',
-    fallback: ['tracy', 'tracy_dep'],
-    default_options: ['tracy_enable=false'],
-  )
+
+  engine_lib_deps += tracy_dep
 endif
 
 emscripten_link_args = []

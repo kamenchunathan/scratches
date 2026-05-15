@@ -9,6 +9,7 @@
 
     #include "application.hpp"
     #include "log.hpp"
+    #include "profile.hpp"
     #include "web/layer.hpp"
 
 extern "C" {
@@ -20,6 +21,7 @@ bool main_loop_callback(double time, void* user_data) {
         state->last_time                = time;
 
         state->app->tick(delta_ms);
+        HOPPER_FRAME_MARK();
         return !state->app->should_exit();
     } catch (const std::exception& e) {
         HOPPER_ERROR("{}", e.what());
@@ -33,7 +35,7 @@ namespace web {
 void run(std::shared_ptr<core::Application> app) {
     auto opt_state = app->world.get_resource<web::BrowserLayer::State>();
     if (!opt_state) {
-        HOPPER_ERROR("State not found");
+        HOPPER_ERROR("web", "State not found");
         return;
     }
     emscripten_request_animation_frame_loop(main_loop_callback, &opt_state->get());

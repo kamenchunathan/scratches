@@ -14,6 +14,7 @@
 #endif
 
 void handle_input(ecs::World& world) {
+    HOPPER_INFO("app", "hello world");
     if (auto inp_state = world.get_resource<core::input::InputState>(); inp_state.has_value()) {
         auto inp = inp_state->get();
         if (inp.just_pressed(core::input::KeyCode::Q)) {

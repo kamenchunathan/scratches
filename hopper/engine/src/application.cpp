@@ -1,7 +1,8 @@
 #include "application.hpp"
-#include "log.hpp"
 
 #include "ecs/system.hpp"
+#include "log.hpp"
+#include "profile.hpp"
 #include "time.hpp"
 
 namespace core {
@@ -11,15 +12,22 @@ void Application::set_runner(Runner runner) {
 }
 
 void Application::run() {
-    HOPPER_INFO("Starting application");
+    HOPPER_INFO("engine", "application starting");
     scheduler.run_stage(ecs::Stage::Startup, world);
     if (runner_) {
         runner_(shared_from_this());
     }
+    HOPPER_INFO("engine", "application exiting");
+
+    // TODO: Create a way for applications to handle exit call backs and register this there
+    //
+    //
+    logging::shutdown();
 }
 
 void Application::tick(double delta_time) {
-    scheduler.run_stage(ecs::Stage::PreUpdate, world);
+    // HOPPER_FRAME_MARK();
+    HOPPER_ZONE_NAMED("tick");
 
     if (!world.get_resource<core::FixedUpdateConfig>()) {
         world.insert_resource(core::FixedUpdateConfig {});
@@ -47,7 +55,6 @@ void Application::tick(double delta_time) {
     accumulator.accumulated_seconds += delta_time;
 
     while (accumulator.accumulated_seconds >= config.fixed_delta_seconds) {
-        // Temporarily set delta_seconds to fixed_delta_seconds for FixedUpdate systems
         double original_delta = 0.0;
         if (auto opt_time = world.get_resource<core::Time>()) {
             auto& time         = opt_time->get();
@@ -55,7 +62,10 @@ void Application::tick(double delta_time) {
             time.delta_seconds = config.fixed_delta_seconds;
         }
 
-        scheduler.run_stage(ecs::Stage::FixedUpdate, world);
+        {
+            HOPPER_ZONE_NAMED("FixedUpdate");
+            scheduler.run_stage(ecs::Stage::FixedUpdate, world);
+        }
 
         if (auto opt_time = world.get_resource<core::Time>()) {
             opt_time->get().delta_seconds = original_delta;
@@ -64,8 +74,18 @@ void Application::tick(double delta_time) {
         accumulator.accumulated_seconds -= config.fixed_delta_seconds;
     }
 
-    scheduler.run_stage(ecs::Stage::Update, world);
-    scheduler.run_stage(ecs::Stage::PostUpdate, world);
+    {
+        HOPPER_ZONE_NAMED("PreUpdate");
+        scheduler.run_stage(ecs::Stage::PreUpdate, world);
+    }
+    {
+        HOPPER_ZONE_NAMED("Update");
+        scheduler.run_stage(ecs::Stage::Update, world);
+    }
+    {
+        HOPPER_ZONE_NAMED("PostUpdate");
+        scheduler.run_stage(ecs::Stage::PostUpdate, world);
+    }
 }
 
 } // namespace core
