@@ -20,9 +20,9 @@ void Application::run() {
     HOPPER_INFO("engine", "application exiting");
 
     // TODO: Create a way for applications to handle exit call backs and register this there
+    // can't do this on wasm as the loop there is asynchronous
     //
-    //
-    logging::shutdown();
+    // logging::shutdown();
 }
 
 void Application::tick(double delta_time) {

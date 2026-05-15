@@ -47,15 +47,21 @@ if get_option('hopper_metrics')
 endif
 
 if get_option('hopper_tracy')
-  tracy_dep = dependency(
-    'tracy',
-    fallback: ['tracy', 'tracy_dep'],
-    default_options: ['tracy_enable=true', 'on_demand=true'],
-    static: true,
-  )
-  add_project_arguments('-DHOPPER_TRACY', language: 'cpp')
+  if host_machine.system() != 'emscripten'
+    tracy_dep = dependency(
+      'tracy',
+      fallback: ['tracy', 'tracy_dep'],
+      default_options: ['tracy_enable=true', 'on_demand=true'],
+      static: true,
+    )
+    add_project_arguments('-DHOPPER_TRACY', language: 'cpp')
 
-  engine_lib_deps += tracy_dep
+    engine_lib_deps += tracy_dep
+  else
+    warning(
+      'hopper_tracy is not supported on WASM/emscripten targets; option ignored',
+    )
+  endif
 endif
 
 emscripten_link_args = []
