@@ -78,13 +78,6 @@ executable(
 )
 
 executable(
-  'triangle_instanced',
-  'triangle_instanced.cpp',
-  install: false,
-  dependencies: [engine_dep],
-)
-
-executable(
   'physics',
   'physics.cpp',
   install: false,
@@ -98,3 +91,9 @@ executable(
   dependencies: [engine_dep],
 )
 
+executable(
+  'tetris',
+  'tetris.cpp',
+  install: false,
+  dependencies: [engine_dep],
+)

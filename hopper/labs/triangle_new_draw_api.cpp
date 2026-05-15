@@ -1,15 +1,19 @@
 #include <format>
 #include <iterator>
 #include <memory>
+#include <print>
 #include <string_view>
 #include <vector>
 
 #include "application.hpp"
 #include "color.hpp"
+#include "common.hpp"
 #include "ecs/query.hpp"
 #include "ecs/system.hpp"
 #include "ecs/world.hpp"
 #include "input.hpp"
+#include "log.hpp"
+#include "log/layer.hpp"
 #include "renderer.hpp"
 #include "renderer/command.hpp"
 #include "renderer/graphs/halfblock.hpp"
@@ -27,8 +31,8 @@
 //////////////////////////////////////////////////// Components //////////////////////////////////////////////////////
 
 struct Transform {
-    float x = 0.0f;
-    float y = 0.0f;
+    float x        = 0.0f;
+    float y        = 0.0f;
     float rotation = 0.0f;
 };
 
@@ -106,6 +110,13 @@ public:
     }
 
     void execute(renderer::RenderPassEncoder& encoder) override {
+        HOPPER_TRACE(
+            "renderer",
+            "ColorPassCommand::execute: {} vertices at ({}, {})",
+            vertex_count_,
+            pos_.x(),
+            pos_.y()
+        );
         encoder.draw(pipeline_handle_, target_, vertex_buffer_handle_, pos_, vertex_count_);
     }
 
@@ -122,8 +133,10 @@ private:
 class RendererLayer {
 public:
     void build(std::shared_ptr<core::Application> app) {
-        const std::uint32_t char_width = 160;
+        const std::uint32_t char_width  = 160;
         const std::uint32_t char_height = 45;
+
+        HOPPER_INFO("renderer", "Setting up renderer ({}x{})", char_width, char_height);
 
 #if PLATFORM_WASM
         auto presenter = std::make_unique<web::BrowserPresenter>();
@@ -136,12 +149,14 @@ public:
 
         auto renderer
             = std::make_unique<renderer::Renderer>(char_width, char_height, std::move(presenter));
+        HOPPER_INFO("renderer", "Renderer created");
 
         // Set up halfblock render graph
         auto color_texture_handle = renderer::halfblock::setup(*renderer, char_width, char_height);
+        HOPPER_DEBUG("renderer", "Halfblock graph setup complete");
 
         // Create pipeline
-        auto color_shader = std::make_unique<ColorShader>();
+        auto color_shader    = std::make_unique<ColorShader>();
         auto pipeline_handle = //
             renderer->resource_registry
                 .add_pipeline(
@@ -151,25 +166,29 @@ public:
                     )
                 )
                 .value();
+        HOPPER_INFO("renderer", "Color pipeline created");
 
         // Create vertex buffer
         auto vertex_buffer = renderer->resource_registry.add_buffer<ColorVertex>(3).value();
+        HOPPER_DEBUG("renderer", "Vertex buffer allocated (3 vertices)");
 
         // Store resources
         app->world.insert_resource(
             RenderResources {
                 .vertex_buffer = vertex_buffer,
                 .color_texture = color_texture_handle,
-                .char_texture = std::get<0>(renderer->render_target().attachments).view.texture,
-                .pipeline = pipeline_handle
+                .char_texture  = std::get<0>(renderer->render_target().attachments).view.texture,
+                .pipeline      = pipeline_handle
             }
         );
+        HOPPER_DEBUG("renderer", "Render resources stored in world");
 
         app->world.insert_resource(std::move(renderer));
 
         app->scheduler.add_system(
             ecs::Stage::Update,
             [](ecs::World& world) {
+                HOPPER_TRACE("renderer", "Halfblock conversion system running");
                 auto renderer_ptr = world.get_resource<std::unique_ptr<renderer::Renderer>>();
                 if (!renderer_ptr)
                     return;
@@ -190,6 +209,7 @@ public:
             }
 
         );
+        HOPPER_DEBUG("renderer", "Halfblock conversion system registered");
     }
 };
 
@@ -203,7 +223,7 @@ void input_system(ecs::World& world) {
     const float move_speed = 0.02f;
 
     auto query = ecs::Query<Transform>(&world);
-    auto it = query.begin();
+    auto it    = query.begin();
     if (it != query.end()) {
         auto [entity, transform] = *it;
         if (input_state->get().is_button_down(core::input::KeyCode::W)
@@ -234,6 +254,7 @@ void input_system(ecs::World& world) {
     if (input_state->get().just_pressed(core::input::KeyCode::Q)
         || input_state->get().just_pressed(core::input::KeyCode::Escape))
     {
+        HOPPER_INFO("input", "Quit requested");
         if (auto app_ptr = world.get_resource<core::Application*>()) {
             app_ptr->get()->set_should_exit(true);
         }
@@ -241,10 +262,11 @@ void input_system(ecs::World& world) {
 }
 
 void render_system(ecs::World& world) {
+    HOPPER_TRACE("renderer", "render_system: starting frame");
     auto renderer_ptr = world.get_resource<std::unique_ptr<renderer::Renderer>>();
     if (!renderer_ptr)
         return;
-    auto renderer = renderer_ptr->get().get();
+    auto renderer      = renderer_ptr->get().get();
     auto resources_opt = world.get_resource<RenderResources>();
     if (!resources_opt)
         return;
@@ -258,10 +280,11 @@ void render_system(ecs::World& world) {
             core::ColorRGBA32F::BLACK
         )
     );
+    HOPPER_TRACE("renderer", "Clear command submitted");
 
     // Render triangle
     auto query = ecs::Query<Transform, Triangle>(&world);
-    auto it = query.begin();
+    auto it    = query.begin();
     if (it != query.end()) {
         auto [entity, transform, triangle] = *it;
         std::vector<ColorVertex> vertices
@@ -296,6 +319,7 @@ void render_system(ecs::World& world) {
         {
             std::copy(vertices.begin(), vertices.end(), vb.value().begin());
         }
+        HOPPER_TRACE("renderer", "Vertex buffer updated with triangle vertices");
 
         // Create render target
         renderer::FrameBuffer<renderer::Attachment<core::ColorRGBA32F>> target {
@@ -322,18 +346,22 @@ void render_system(ecs::World& world) {
                 vertices.size()
             )
         );
+        HOPPER_DEBUG("renderer", "Triangle draw submitted at ({}, {})", transform.x, transform.y);
     }
 
     renderer->render_frame();
+    HOPPER_TRACE("renderer", "render_system: frame complete");
 }
 
 int main() {
     static auto app = std::make_shared<core::Application>();
 
+    app->add_layer(logging::LogLayer {});
     app->add_layer(core::input::InputLayer {});
 
 #if PLATFORM_WASM
-    app->add_layer(BrowserLayer {});
+    web::BrowserLayer browser_layer;
+    app->add_layer(browser_layer);
 #else
     TerminalLayer term_layer(std::make_unique<Terminal>(), 60);
     app->world.insert_resource<TerminalLayer*>(&term_layer);
