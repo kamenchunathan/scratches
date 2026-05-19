@@ -4,12 +4,14 @@
 
 #if HOPPER_LOGGING
 
+    #define SPDLOG_ACTIVE_LEVEL SPDLOG_LEVEL_TRACE
+
     #include "spdlog/spdlog.h"
 
 namespace logging {
 
 struct Config {
-    const std::string_view log_dir = "logs";
+    std::string log_dir            = "";
     std::size_t max_file_mb        = 5;
     std::size_t max_files          = 3;
     bool async                     = false; // Use async (lock-free ring buffer) logger
@@ -22,10 +24,6 @@ void shutdown();
 spdlog::logger* get(const char* category);
 
 } // namespace logging
-
-    #ifndef SPDLOG_ACTIVE_LEVEL
-        #define SPDLOG_ACTIVE_LEVEL SPDLOG_LEVEL_TRACE
-    #endif
 
     #define HOPPER_TRACE(cat, ...) SPDLOG_LOGGER_TRACE(::logging::get(cat), __VA_ARGS__)
     #define HOPPER_DEBUG(cat, ...) SPDLOG_LOGGER_DEBUG(::logging::get(cat), __VA_ARGS__)

@@ -2,6 +2,7 @@
 
 #if HOPPER_LOGGING
 
+    #include <cstdlib>
     #include <filesystem>
     #include <mutex>
 
@@ -93,6 +94,25 @@ protected:
 
 namespace {
 
+std::string get_standard_log_dir() {
+#if PLATFORM_LINUX
+    if (const char* xdg_state = std::getenv("XDG_STATE_HOME")) {
+        return std::string(xdg_state) + "/hopper";
+    }
+    if (const char* home = std::getenv("HOME")) {
+        return std::string(home) + "/.local/state/hopper";
+    }
+    return "logs";
+#elif PLATFORM_WINDOWS
+    if (const char* appdata = std::getenv("LOCALAPPDATA")) {
+        return std::string(appdata) + "/hopper/logs";
+    }
+    return "logs";
+#else
+    return "logs";
+#endif
+}
+
 // Pre-registered subsystem names. Any unknown category passed to log::get()
 // falls back to the default "engine" logger, so registration here is only an
 // optimisation — it is not required for a category to work.
@@ -139,6 +159,11 @@ void init(const Config& cfg) {
     std::call_once(g_init_flag, [&cfg] {
         std::vector<spdlog::sink_ptr> sinks;
 
+        std::string log_dir = cfg.log_dir;
+        if (log_dir.empty()) {
+            log_dir = get_standard_log_dir();
+        }
+
     #if PLATFORM_WASM
 
         auto console_sink = std::make_shared<BrowserConsoleSink>();
@@ -161,8 +186,8 @@ void init(const Config& cfg) {
 
         // Rotating file sink — always included when HOPPER_LOGGING is on.
         try {
-            std::filesystem::create_directories(cfg.log_dir);
-            auto log_path  = std::filesystem::path(cfg.log_dir) / "engine.log";
+            std::filesystem::create_directories(log_dir);
+            auto log_path  = std::filesystem::path(log_dir) / "engine.log";
             auto file_sink = std::make_shared<spdlog::sinks::rotating_file_sink_mt>(
                 log_path.string(),
                 cfg.max_file_mb * 1024UZ * 1024UZ,
@@ -180,6 +205,7 @@ void init(const Config& cfg) {
         auto tracy_sink = std::make_shared<TracyMessageSink>();
         // Omit timestamp from Tracy messages — the profiler adds its own.
         tracy_sink->set_pattern("[%n] [%l] %v");
+        tracy_sink->set_level(spdlog::level::trace);
         sinks.push_back(std::move(tracy_sink));
 
         #endif // HOPPER_TRACY
@@ -201,7 +227,7 @@ void init(const Config& cfg) {
             spdlog::register_logger(make_logger(name, sinks, use_async, pattern));
         }
 
-        spdlog::info("Logger initialised (dir={}, async={})", cfg.log_dir, use_async);
+        spdlog::info("Logger initialised (dir={}, async={})", log_dir, use_async);
     });
 }
 
