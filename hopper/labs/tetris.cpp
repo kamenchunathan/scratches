@@ -4,7 +4,6 @@
 #include <format>
 #include <fstream>
 #include <memory>
-#include <print>
 #include <random>
 #include <vector>
 
@@ -17,6 +16,8 @@
 #include "ecs/system.hpp"
 #include "ecs/world.hpp"
 #include "input.hpp"
+#include "log.hpp"
+#include "log/layer.hpp"
 #include "renderer.hpp"
 #include "renderer/command.hpp"
 #include "renderer/graphs/halfblock.hpp"
@@ -510,9 +511,9 @@ struct Score {
 };
 
 struct PowerUpState {
-    int garbage_clean_charges = 1;
-    int freeze_time_charges   = 1;
-    bool freeze_time_active   = false;
+    int garbage_clean_charges   = 1;
+    int freeze_time_charges     = 1;
+    bool freeze_time_active     = false;
     float freeze_time_remaining = 0.0f;
     float freeze_time_duration  = 3.0f;
 };
@@ -896,7 +897,7 @@ static void perform_hold(ActivePiece& piece, const Board& board, Difficulty diff
 
 static int find_lowest_partial_row(const Board& board) {
     for (int y = Board::HEIGHT - 1; y >= 0; --y) {
-        bool any = false;
+        bool any  = false;
         bool full = true;
         for (int x = 0; x < Board::WIDTH; ++x) {
             if (board.grid[y][x])
@@ -1054,9 +1055,8 @@ void tetris_input_system(ecs::World& world) {
     if (status.state == GameState::Paused) {
         if (input.just_pressed(K::Q) || input.just_pressed(K::Escape)) {
             status.state = GameState::StartMenu;
-        } else if (
-            input.just_pressed(K::P) || input.just_pressed(K::Space) || input.just_pressed(K::Enter)
-        )
+        } else if (input.just_pressed(K::P) || input.just_pressed(K::Space)
+                   || input.just_pressed(K::Enter))
         {
             status.state = GameState::Playing;
         }
@@ -1193,20 +1193,18 @@ void tetris_input_system(ecs::World& world) {
 
     if (auto pu_opt = world.get_resource<PowerUpState>()) {
         auto& powerups = pu_opt->get();
-        if (input.just_pressed(K::F)
-            && powerups.garbage_clean_charges > 0
-            && score_opt && score_opt->get().clear_anim_timer <= 0.0f)
+        if (input.just_pressed(K::F) && powerups.garbage_clean_charges > 0 && score_opt
+            && score_opt->get().clear_anim_timer <= 0.0f)
         {
             perform_garbage_clean(board, piece, score_opt->get());
             --powerups.garbage_clean_charges;
         }
 
-        if (input.just_pressed(K::G)
-            && powerups.freeze_time_charges > 0
-            && !powerups.freeze_time_active
-            && score_opt && score_opt->get().clear_anim_timer <= 0.0f)
+        if (input.just_pressed(K::G) && powerups.freeze_time_charges > 0
+            && !powerups.freeze_time_active && score_opt
+            && score_opt->get().clear_anim_timer <= 0.0f)
         {
-            powerups.freeze_time_active   = true;
+            powerups.freeze_time_active    = true;
             powerups.freeze_time_remaining = powerups.freeze_time_duration;
             --powerups.freeze_time_charges;
         }
@@ -1225,11 +1223,11 @@ void tetris_logic_system(ecs::World& world) {
     if (!status_opt || status_opt->get().state != GameState::Playing)
         return;
 
-    auto piece_opt    = world.get_resource<ActivePiece>();
-    auto board_opt    = world.get_resource<Board>();
-    auto score_opt    = world.get_resource<Score>();
-    auto powerup_opt  = world.get_resource<PowerUpState>();
-    auto time_opt     = world.get_resource<core::Time>();
+    auto piece_opt   = world.get_resource<ActivePiece>();
+    auto board_opt   = world.get_resource<Board>();
+    auto score_opt   = world.get_resource<Score>();
+    auto powerup_opt = world.get_resource<PowerUpState>();
+    auto time_opt    = world.get_resource<core::Time>();
     if (!piece_opt || !board_opt || !score_opt || !time_opt)
         return;
 
@@ -1997,15 +1995,16 @@ void tetris_render_system(ecs::World& world) {
 // ---------------------------------------------------------------------------
 
 int main() {
-    std::println("Hello world");
     auto app = std::make_shared<core::Application>();
+    app->add_layer(logging::LogLayer {});
     app->add_layer(core::input::InputLayer {});
+
+    HOPPER_INFO("app", "Hello world");
 
     static constexpr std::uint32_t CHAR_W = 160;
     static constexpr std::uint32_t CHAR_H = 45; // 90 pixels high / 2
 
 #if PLATFORM_WASM
-    std::println("wasm");
     auto presenter = std::make_unique<web::BrowserPresenter>();
 #else
     TerminalLayer term_layer(std::make_unique<Terminal>(), 60);
@@ -2059,7 +2058,7 @@ int main() {
     app->world.insert_resource(PowerUpState {});
 
     AppData ad;
-    // load_app_data(ad);
+    load_app_data(ad);
     app->world.insert_resource(ad.settings);
     app->world.insert_resource(ad.high_scores);
     app->world.insert_resource(std::move(ad));
