@@ -1,10 +1,8 @@
 #pragma once
 
-#include <cassert>
 #include <cstdio>
 #include <optional>
 #include <span>
-#include <sstream>
 #include <sys/ioctl.h>
 #include <termios.h>
 #include <utility>
@@ -41,7 +39,7 @@ public:
 private:
     FILE* output_;
     winsize term_dim_;
-    std::ostringstream buf_;
+    std::vector<char> storage_;
 
     void flush();
     void render_full_frame(
