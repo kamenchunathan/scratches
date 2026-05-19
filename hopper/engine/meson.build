@@ -15,6 +15,7 @@ engine_sources = [
   'src/physics/shape.cpp',
   'src/renderer/graph.cpp',
   'src/term/layer.cpp',
+  'src/term/emitter.cpp',
   'src/term/presenter.cpp',
   'src/term/input_parser.cpp',
   'src/util/text.cpp',
