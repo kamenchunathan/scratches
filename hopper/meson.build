@@ -17,5 +17,4 @@ add_project_arguments(
 )
 
 subdir('engine')
-subdir('hopper')
 subdir('labs')
