@@ -18,3 +18,4 @@ add_project_arguments(
 
 subdir('engine')
 subdir('labs')
+subdir('examples')
