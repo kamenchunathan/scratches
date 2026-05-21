@@ -33,10 +33,11 @@ engine_dep_deps = [
 ]
 
 if get_option('hopper_logging')
-  spdlog_dep = subproject(
+  spdlog_dep = dependency(
     'spdlog',
+    fallback: ['spdlog', 'spdlog_dep'],
     default_options: ['default_library=static'],
-  ).get_variable('spdlog_dep')
+  )
 
   engine_lib_deps += spdlog_dep
   engine_dep_deps += spdlog_dep
@@ -90,8 +91,11 @@ engine_dep = declare_dependency(
   link_args: emscripten_link_args,
 )
 
-gtest_subp = subproject('gtest', default_options: ['default_library=static'])
-gtest_dep = gtest_subp.get_variable('gtest_dep')
+gtest_dep = dependency(
+  'gtest',
+  fallback: ['gtest', 'gtest_dep'],
+  default_options: ['default_library=static'],
+)
 
 test('diff tests', executable('diff_test', 'test/diff.cpp', dependencies: [engine_dep, gtest_dep], install: false))
 test('application tests', executable('application_test', 'test/application.cpp', dependencies: [engine_dep, gtest_dep], install: false))
