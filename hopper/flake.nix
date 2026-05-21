@@ -38,10 +38,15 @@
                     protobuf
                     spdlog
                     gtest
+                    zlib
                   
                     clang-tools
                     llvmPackages_22.libcxxClang
                     emscripten
+                    pkg-config
+                    pkgsCross.mingwW64.stdenv.cc
+                    pkgsCross.mingwW64.windows.pthreads
+                    wine64
                     cmake
                     cppcheck
                     doxygen

@@ -3,13 +3,12 @@
 #include <cstdio>
 #include <optional>
 #include <span>
-#include <sys/ioctl.h>
-#include <termios.h>
 #include <utility>
 #include <vector>
 
 #include "renderer/present.hpp"
 #include "term/diff.hpp"
+#include "term/platform.hpp"
 
 /* This is a redisplay algorithm that reduces the number of characters sent to the terminal on each frame
  * so that we hopefully reduce the time that rendering a frame takes. Idk really I haven't tested if full
@@ -21,7 +20,7 @@
 
 class TerminalPresenter: public renderer::Presenter {
 public:
-    TerminalPresenter(FILE* output, const winsize& ws);
+    TerminalPresenter(FILE* output, const term::TerminalSize& ws);
     ~TerminalPresenter() = default;
 
     void present(
@@ -38,7 +37,7 @@ public:
 
 private:
     FILE* output_;
-    winsize term_dim_;
+    term::TerminalSize term_dim_;
     std::vector<char> storage_;
 
     void flush();

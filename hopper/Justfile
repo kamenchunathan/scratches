@@ -1,7 +1,7 @@
 default:
     @echo "Available recipes: setup, setup-debug, setup-release, serve <binary_name>, watch_lab <binary_name>"
 
-setup: setup-debug setup-release
+setup: setup-debug setup-release setup-windows
 
 setup-debug:
     #!/usr/bin/env bash
@@ -10,6 +10,13 @@ setup-debug:
     echo "Setting up debug build directories..."
     meson setup build/debug
     meson setup --cross-file=./wasm32-debug.ini --wipe build/wasm32/debug
+
+setup-windows:
+    #!/usr/bin/env bash
+    set -euxo pipefail
+
+    echo "Setting up windows build directory..."
+    meson setup --cross-file=./x86_64-windows.ini --wipe build/x86_64-windows/debug
 
 setup-release:
     #!/usr/bin/env bash

@@ -1,23 +1,27 @@
 #include <cassert>
-#include <poll.h>
+#include <cerrno>
 #include <span>
-#include <unistd.h>
 
 #include "log.hpp"
 #include "profile.hpp"
 
 #include "term/emitter.hpp"
+#include "term/platform.hpp"
 #include "term/presenter.hpp"
 #include "util/text.hpp"
 
-TerminalPresenter::TerminalPresenter(FILE* output, const winsize& ws):
+#if defined(PLATFORM_LINUX)
+    #include <poll.h>
+#endif
+
+TerminalPresenter::TerminalPresenter(FILE* output, const term::TerminalSize& ws):
     output_(output),
     term_dim_(ws) {
     storage_.reserve(512 * 1024);
 }
 
 std::optional<std::pair<std::uint32_t, std::uint32_t>> TerminalPresenter::size() {
-    return std::make_pair(term_dim_.ws_col, term_dim_.ws_row);
+    return std::make_pair(term_dim_.width, term_dim_.height);
 }
 
 void TerminalPresenter::init() {
@@ -44,23 +48,40 @@ void TerminalPresenter::flush() {
 
     std::size_t total_written = 0;
     while (total_written < storage_.size()) {
+#if defined(PLATFORM_LINUX)
         ssize_t bytes_written = write(
             fileno(output_),
             storage_.data() + total_written,
             storage_.size() - total_written
         );
+#elif defined(PLATFORM_WINDOWS)
+        int bytes_written = _write(
+            _fileno(output_),
+            storage_.data() + total_written,
+            static_cast<unsigned int>(storage_.size() - total_written)
+        );
+#else
+        ssize_t bytes_written = write(
+            fileno(output_),
+            storage_.data() + total_written,
+            storage_.size() - total_written
+        );
+#endif
 
         if (bytes_written >= 0) {
             total_written += bytes_written;
         } else {
+#if defined(PLATFORM_LINUX)
             if (errno == EAGAIN || errno == EWOULDBLOCK) {
                 struct pollfd pfd = {fileno(output_), POLLOUT, 0};
                 poll(&pfd, 1, -1);
                 continue;
             } else {
-                // Error writing
                 break;
             }
+#else
+            break;
+#endif
         }
     }
 

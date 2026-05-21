@@ -1,5 +1,10 @@
 #include "transform.hpp"
 #include <Eigen/Geometry>
+#include <numbers>
+
+#ifdef _MSC_VER
+    #define _USE_MATH_DEFINES
+#endif
 #include <cmath>
 
 namespace core {
@@ -233,7 +238,7 @@ auto Transform::euler_angles(EulerOrder order) const -> Eigen::Vector3f {
             angles = rotation.toRotationMatrix().eulerAngles(2, 1, 0);
             break;
     }
-    return angles * 180.0f / M_PI;
+    return angles * 180.0f / std::numbers::pi_v<float>;
 }
 
 auto Transform::pitch() const -> float {
@@ -247,7 +252,7 @@ auto Transform::roll() const -> float {
 }
 
 auto Transform::set_euler_angles(const Eigen::Vector3f& degrees, EulerOrder order) -> void {
-    Eigen::Vector3f radians = degrees * M_PI / 180.0f;
+    Eigen::Vector3f radians = degrees * std::numbers::pi_v<float> / 180.0f;
     switch (order) {
         case EulerOrder::XYZ:
             rotation = Eigen::AngleAxisf(radians.x(), Eigen::Vector3f::UnitX())
